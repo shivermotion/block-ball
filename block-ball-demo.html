@@ -21,6 +21,47 @@
       width: 100%;
       height: 100%;
     }
+    #level-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 10px;
+      background: rgba(26, 26, 46, 0.92);
+      border-bottom: 1px solid #444;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      color: #eee;
+    }
+    #level-bar label { color: #aaa; }
+    #level-bar select, #level-bar button, #level-bar a {
+      background: #252545;
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    #level-bar button { cursor: pointer; }
+    #level-bar a:hover, #level-bar button:hover { border-color: #ffe66d; }
+    #boot-status {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+      color: #aaa;
+      font-family: system-ui, sans-serif;
+      z-index: 999;
+    }
+    #boot-status.error { color: #ff6b6b; padding: 24px; text-align: center; max-width: 420px; }
   </style>
 </head>
 <body>
@@ -47,7 +88,7 @@ HOW TO RUN
 MOBILE CONTROLS
 ---------------
   • Drag left/right on the BOTTOM HALF → move the paddle.
-  • Tap while the ball sits on the paddle → launch.
+  • Ball on paddle: aim arrow cycles (↖ ↑ ↗); **release** to launch in that direction.
   • Power Bounce: drag while the ball falls (paddle grows & shakes), RELEASE to arm;
     the trampoline spring plays only when the ball hits the paddle successfully.
   • Chain Power Bounces on returns to keep momentum through hard sections.
@@ -76,13 +117,29 @@ PACKAGING FOR REAL MOBILE APPS
 ================================================================================
 -->
 
+<div id="boot-status">Loading level…</div>
+<nav id="level-bar" hidden>
+  <label for="level-select">Level</label>
+  <select id="level-select" aria-label="Select level"></select>
+  <button type="button" id="level-restart">Restart</button>
+  <a href="level-editor.html">Editor</a>
+</nav>
 <div id="game-container"></div>
 
 <script src="block-types.js"></script>
 <script src="enemy-types.js"></script>
+<script src="level-grid.js"></script>
+<script src="hud-avatar.js"></script>
+<script src="levels/registry.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
 <script>
-/* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, resolveBlockHit, getEnemyDef, resolveEnemyHit */
+/* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, resolveBlockHit, getEnemyDef, resolveEnemyHit, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, fitEntityToCell, fitEntityToCellSpan, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES */
+
+let ACTIVE_LEVEL = null;
+const URL_PARAMS = new URLSearchParams(window.location.search);
+const SHOW_LEVEL_GRID = URL_PARAMS.has('debugGrid');
+/** Full game / HUD / play outlines. Disable with ?devBorders=0 */
+const DEV_BORDERS = URL_PARAMS.get('devBorders') !== '0';
 
 const DEBUG_LOG = true;
 
@@ -141,6 +198,14 @@ const PHYSICS = {
   paddleBounceFactor: 1.05,
 };
 
+/** Aim while ball on paddle: left 45° → straight up → right 45° (screen coords, y down). */
+const LAUNCH_AIM_TICK_MS = 650;
+const LAUNCH_AIM_DIRS = [
+  { vx: -1 / Math.SQRT2, vy: -1 / Math.SQRT2 },
+  { vx: 0, vy: -1 },
+  { vx: 1 / Math.SQRT2, vy: -1 / Math.SQRT2 },
+];
+
 const SCORE = {
   powerMultiplier: 1.5,
 };
@@ -168,76 +233,81 @@ const POWER_BALL = {
   tint: 0xfff0a0,
 };
 
-// Pyramid layout — see BLOCK_COMPENDIUM.md (0=empty, 1=normal, 2=gray, 3=power)
-const LEVEL_LAYOUT = [
-  [0, 0, 1, 1, 1, 1, 0, 0],
-  [0, 1, 1, 2, 2, 1, 1, 0],
-  [1, 1, 1, 1, 1, 1, 1, 1],
-  [1, 1, 3, 1, 1, 3, 1, 1],
-  [1, 1, 1, 1, 1, 1, 1, 1],
-];
-
 // =============================================================================
 // TEXTURE GENERATION (generic shapes — no franchise assets)
 // =============================================================================
 
-function generateTextures(scene) {
+function generateTextures(scene, cellW, cellH) {
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
+  const pad = 2;
+  const innerW = cellW - pad * 2;
+  const innerH = cellH - pad * 2;
+  const paddleColSpan = (ACTIVE_LEVEL?.paddle?.colSpan) ?? 2;
+  const paddleW = paddleColSpan * cellW - pad;
+  const paddleTexH = cellH * 0.5;
+  const paddleInnerH = paddleTexH - pad - 2;
 
-  // Paddle
+  // Paddle (colSpan wide × half cell tall)
   g.clear();
   g.fillStyle(COLORS.paddleDark, 1);
-  g.fillRoundedRect(0, 4, 100, 18, 8);
+  g.fillRoundedRect(0, 2, paddleW, paddleInnerH, 6);
   g.fillStyle(COLORS.paddle, 1);
-  g.fillRoundedRect(0, 0, 100, 18, 8);
-  g.generateTexture('paddle', 100, 22);
+  g.fillRoundedRect(0, 0, paddleW, paddleInnerH, 6);
+  g.generateTexture('paddle', paddleW, paddleTexH);
 
-  // Normal block
+  function drawBlockTexture(key, fill, border, extra) {
+    g.clear();
+    g.fillStyle(border, 1);
+    g.fillRoundedRect(0, 0, innerW, innerH, 4);
+    g.fillStyle(fill, 1);
+    g.fillRoundedRect(2, 2, innerW - 4, innerH - 4, 3);
+    if (extra) extra(g, innerW, innerH);
+    g.generateTexture(key, cellW, cellH);
+  }
+
+  drawBlockTexture('block_normal', COLORS.blockNormal, COLORS.blockNormalBorder);
+  drawBlockTexture('block_gray', COLORS.blockGray, COLORS.blockGrayBorder, (gfx, w, h) => {
+    gfx.lineStyle(1, 0x6b7280, 0.8);
+    gfx.strokeRect(w * 0.2, h * 0.35, w * 0.6, h * 0.3);
+  });
+  drawBlockTexture('block_power', COLORS.blockPower, COLORS.blockPowerBorder, (gfx, w, h) => {
+    gfx.lineStyle(2, COLORS.blockPowerGlow, 0.85);
+    gfx.strokeRoundedRect(4, 4, w - 8, h - 8, 3);
+    gfx.fillStyle(COLORS.blockPowerGlow, 0.35);
+    gfx.fillRect(6, 6, w - 12, Math.max(4, h * 0.2));
+  });
+
+  // Spike hazard block (one cell)
   g.clear();
-  g.fillStyle(COLORS.blockNormalBorder, 1);
-  g.fillRoundedRect(0, 0, 44, 22, 4);
-  g.fillStyle(COLORS.blockNormal, 1);
-  g.fillRoundedRect(2, 2, 40, 18, 3);
-  g.generateTexture('block_normal', 44, 22);
+  g.fillStyle(0x4a1028, 1);
+  g.fillRoundedRect(0, 0, innerW, innerH, 3);
+  g.fillStyle(COLORS.spike, 1);
+  const spikeW = innerW / 3;
+  for (let i = 0; i < 3; i++) {
+    const cx = spikeW * i + spikeW * 0.5;
+    const half = spikeW * 0.38;
+    g.fillTriangle(cx - half, innerH, cx, innerH * 0.12, cx + half, innerH);
+  }
+  g.lineStyle(2, 0xcc1144, 0.7);
+  g.strokeRect(1, innerH - 2, innerW - 2, 2);
+  g.generateTexture('block_spike', cellW, cellH);
 
-  // Gray block (medium — cracks to normal on weak hit)
-  g.clear();
-  g.fillStyle(COLORS.blockGrayBorder, 1);
-  g.fillRoundedRect(0, 0, 44, 22, 4);
-  g.fillStyle(COLORS.blockGray, 1);
-  g.fillRoundedRect(2, 2, 40, 18, 3);
-  g.lineStyle(1, 0x6b7280, 0.8);
-  g.strokeRect(8, 7, 28, 8);
-  g.generateTexture('block_gray', 44, 22);
-
-  // Power block (gatekeeper — glow highlight)
-  g.clear();
-  g.fillStyle(COLORS.blockPowerBorder, 1);
-  g.fillRoundedRect(0, 0, 44, 22, 4);
-  g.fillStyle(COLORS.blockPower, 1);
-  g.fillRoundedRect(2, 2, 40, 18, 3);
-  g.lineStyle(2, COLORS.blockPowerGlow, 0.85);
-  g.strokeRoundedRect(4, 4, 36, 14, 3);
-  g.fillStyle(COLORS.blockPowerGlow, 0.35);
-  g.fillRect(6, 6, 32, 4);
-  g.generateTexture('block_power', 44, 22);
-
-  // Bouncy ball (blue circle + face)
-  const r = 14;
+  // Ball (inscribed in one cell)
+  const r = ballRadiusForCell({ config: { cellWidth: cellW, cellHeight: cellH } });
   g.clear();
   g.fillStyle(COLORS.ball, 1);
   g.fillCircle(r, r, r);
   g.fillStyle(COLORS.ballHighlight, 0.6);
-  g.fillEllipse(r - 4, r - 5, 8, 6);
+  g.fillEllipse(r - 3, r - 4, r * 0.55, r * 0.4);
   g.fillStyle(0x1e3a5f, 1);
-  g.fillCircle(r - 5, r - 1, 3);
-  g.fillCircle(r + 5, r - 1, 3);
+  g.fillCircle(r - r * 0.35, r - r * 0.05, Math.max(2, r * 0.22));
+  g.fillCircle(r + r * 0.35, r - r * 0.05, Math.max(2, r * 0.22));
   g.fillStyle(0xffffff, 1);
-  g.fillCircle(r - 4, r - 2, 1.2);
-  g.fillCircle(r + 6, r - 2, 1.2);
+  g.fillCircle(r - r * 0.3, r - r * 0.12, Math.max(1, r * 0.08));
+  g.fillCircle(r + r * 0.42, r - r * 0.12, Math.max(1, r * 0.08));
   g.lineStyle(2, 0x1e3a5f, 1);
   g.beginPath();
-  g.arc(r, r + 4, 5, 0.2, Math.PI - 0.2, false);
+  g.arc(r, r + r * 0.25, r * 0.35, 0.2, Math.PI - 0.2, false);
   g.strokePath();
   g.generateTexture('ball', r * 2, r * 2);
 
@@ -247,21 +317,23 @@ function generateTextures(scene) {
   g.fillCircle(8, 8, 8);
   g.generateTexture('life_icon', 16, 16);
 
-  // Blob enemy
+  generateHudAvatarTextures(scene, 48);
+
+  // Enemy (one cell)
   g.clear();
   g.fillStyle(COLORS.enemyDark, 1);
-  g.fillEllipse(18, 22, 32, 24);
+  g.fillEllipse(cellW / 2, cellH * 0.65, innerW * 0.85, innerH * 0.7);
   g.fillStyle(COLORS.enemy, 1);
-  g.fillEllipse(18, 20, 30, 22);
+  g.fillEllipse(cellW / 2, cellH * 0.58, innerW * 0.8, innerH * 0.65);
   g.fillStyle(0xffffff, 1);
-  g.fillCircle(12, 16, 4);
-  g.fillCircle(24, 16, 4);
+  g.fillCircle(cellW * 0.35, cellH * 0.42, Math.max(3, cellW * 0.1));
+  g.fillCircle(cellW * 0.65, cellH * 0.42, Math.max(3, cellW * 0.1));
   g.fillStyle(0x1e3a5f, 1);
-  g.fillCircle(12, 16, 2);
-  g.fillCircle(24, 16, 2);
+  g.fillCircle(cellW * 0.35, cellH * 0.42, Math.max(2, cellW * 0.05));
+  g.fillCircle(cellW * 0.65, cellH * 0.42, Math.max(2, cellW * 0.05));
   g.fillStyle(0x1e3a5f, 0.8);
-  g.fillEllipse(18, 24, 6, 3);
-  g.generateTexture('enemy', 36, 32);
+  g.fillEllipse(cellW / 2, cellH * 0.72, cellW * 0.15, cellH * 0.1);
+  g.generateTexture('enemy', cellW, cellH);
 
   // Particle spark
   g.clear();
@@ -325,7 +397,6 @@ class GameScene extends Phaser.Scene {
     bbLog('create() start');
     this.gameState = 'playing'; // playing | levelClear | gameOver
     this.score = 0;
-    this.lives = 3;
     this.ballLaunched = false;
     this.ballOnPaddle = true;
     this.powerBounceQueued = false;
@@ -346,7 +417,15 @@ class GameScene extends Phaser.Scene {
     this.bottomHalfTouchThisStroke = false;
     this.pendingPowerSpring = false;
 
+    this.launchAimIndex = 0;
+    this.launchAimDirection = 1;
+    this.launchAimTickEvent = null;
+    this.aimArrowGfx = null;
+
     const { width, height } = this.scale;
+    this.level = ACTIVE_LEVEL;
+    this.levelGrid = createLevelGrid(this.level, height, width);
+    this.lives = this.level.meta?.lives ?? 3;
 
     // Background gradient bands
     this.add.rectangle(width / 2, height / 2, width, height, COLORS.bg);
@@ -357,13 +436,15 @@ class GameScene extends Phaser.Scene {
     frame.lineStyle(3, 0xffe66d, 0.5);
     frame.strokeRect(8, 8, width - 16, height - 16);
 
-    generateTextures(this);
+    generateTextures(this, this.levelGrid.config.cellWidth, this.levelGrid.config.cellHeight);
+    this.ballRadius = ballRadiusForCell(this.levelGrid);
+    this.gridCellH = this.levelGrid.config.cellHeight;
 
-    // Physics world
-    this.physics.world.setBounds(12, 12, width - 24, height - 24);
+    // Physics world — only the playfield (below HUD), not the full frame
+    const playBounds = this.levelGrid.getPlayBounds();
+    this.physics.world.setBounds(playBounds.x, playBounds.y, playBounds.width, playBounds.height);
     this.physics.world.setBoundsCollision(true, true, true, false);
 
-    this.createWallsAndSpikes();
     this.createBlocks();
     this.createEnemies();
     this.createPaddle();
@@ -371,6 +452,14 @@ class GameScene extends Phaser.Scene {
     this.setupCollisions();
     this.createUI();
     this.setupInput();
+
+    if (SHOW_LEVEL_GRID) {
+      drawLevelGridDebug(this, this.levelGrid, this.level);
+    }
+
+    if (DEV_BORDERS) {
+      drawDevViewBorders(this, this.levelGrid, width, height);
+    }
 
     this.updateUI();
     bbLog('create() complete', { blocks: this.blocksRemaining, lives: this.lives });
@@ -380,90 +469,54 @@ class GameScene extends Phaser.Scene {
   // Level geometry
   // ---------------------------------------------------------------------------
 
-  createWallsAndSpikes() {
-    const { width, height } = this.scale;
-
-    // Floor spike row — directly under the paddle zone
-    const paddleY = height - 72;
-    const rowMargin = 54;
-    const rowW = width - rowMargin * 2;
-    const rowH = 26;
-    const spikeRowY = paddleY + 34;
-    const rowGfx = this.add.graphics();
-    rowGfx.fillStyle(COLORS.spike, 1);
-    const spikeCount = Math.floor(rowW / 22);
-    const spikeStep = rowW / spikeCount;
-    for (let i = 0; i < spikeCount; i++) {
-      const x = i * spikeStep + spikeStep * 0.5;
-      const half = spikeStep * 0.42;
-      rowGfx.fillTriangle(x - half, rowH, x, 2, x + half, rowH);
-    }
-    rowGfx.lineStyle(2, 0xcc1144, 0.6);
-    rowGfx.strokeRect(0, rowH - 2, rowW, 2);
-    rowGfx.generateTexture('spike_row', rowW, rowH);
-    rowGfx.destroy();
-
-    this.spikeFloor = this.physics.add.staticGroup();
-    const floorZone = this.spikeFloor.create(width / 2, spikeRowY, 'spike_row');
-    floorZone.setDepth(8);
-    floorZone.setData('hazard', true);
-    floorZone.refreshBody();
-    floorZone.body.setSize(rowW - 8, rowH - 4);
-  }
-
   createBlocks() {
-    const { width } = this.scale;
-    const cols = 8;
-    const blockW = 44;
-    const blockH = 22;
-    const gapX = 4;
-    const gapY = 4;
-    const gridW = cols * (blockW + gapX) - gapX;
-    const startX = (width - gridW) / 2 + blockW / 2;
-    const startY = 130;
+    const cells = ensurePlayBlockCells(this.level, this.levelGrid);
 
     this.blocks = this.physics.add.staticGroup();
     this.blocksRemaining = 0;
 
-    for (let row = 0; row < LEVEL_LAYOUT.length; row++) {
-      for (let col = 0; col < LEVEL_LAYOUT[row].length; col++) {
-        const cell = LEVEL_LAYOUT[row][col];
+    const spawnBlock = (x, y, cell, gridCol, gridRow) => {
+      const typeId = BLOCK_CELL_MAP[cell];
+      if (!typeId) return;
+      const def = getBlockDef(typeId);
+
+      const block = this.blocks.create(x, y, def.texture);
+      fitEntityToCell(block, this.levelGrid);
+      block.refreshBody();
+      block.setDepth(def.isHazard ? 8 : 5);
+      block.setData('typeId', typeId);
+      block.setData('points', def.points);
+      block.setData('isPower', def.powerOnly);
+      block.setData('isHazard', Boolean(def.isHazard));
+      block.setData('gridCol', gridCol);
+      block.setData('gridRow', gridRow);
+      if (def.countsTowardClear !== false) this.blocksRemaining++;
+    };
+
+    for (let row = 0; row < cells.length; row++) {
+      for (let col = 0; col < cells[row].length; col++) {
+        const cell = cells[row][col];
         if (cell === 0) continue;
-
-        const x = startX + col * (blockW + gapX);
-        const y = startY + row * (blockH + gapY);
-        const typeId = BLOCK_CELL_MAP[cell];
-        const def = getBlockDef(typeId);
-
-        const block = this.blocks.create(x, y, def.texture);
-        block.refreshBody();
-        block.setData('typeId', typeId);
-        block.setData('points', def.points);
-        block.setData('isPower', def.powerOnly);
-        this.blocksRemaining++;
+        const { x, y } = this.levelGrid.cellCenter(col, row);
+        spawnBlock(x, y, cell, col, row);
       }
     }
   }
 
   createEnemies() {
-    const { width } = this.scale;
-    const spawns = [
-      { type: 'drifter', x: width * 0.25, y: 340 },
-      { type: 'drifter', x: width * 0.5, y: 300 },
-      { type: 'drifter', x: width * 0.75, y: 340 },
-      { type: 'drifter', x: width * 0.5, y: 380 },
-    ];
+    const spawns = this.level.enemies || [];
 
     this.enemies = this.physics.add.group();
-    spawns.forEach((spawn, i) => this.spawnEnemy(spawn.type, spawn.x, spawn.y, i));
+    spawns.forEach((spawn, i) => {
+      const { x, y } = this.levelGrid.cellCenter(spawn.col, spawn.row);
+      this.spawnEnemy(spawn.type, x, y, i);
+    });
   }
 
   spawnEnemy(typeId, x, y, index) {
     const def = getEnemyDef(typeId);
-    const scale = def.radius / 14;
     const enemy = this.enemies.create(x, y, def.texture);
-    enemy.setCircle(def.radius);
-    enemy.setScale(scale);
+    fitEntityToCell(enemy, this.levelGrid, { circle: true });
     enemy.setBounce(1);
     enemy.setCollideWorldBounds(true);
     enemy.setImmovable(true);
@@ -485,7 +538,7 @@ class GameScene extends Phaser.Scene {
       default:
         this.tweens.add({
           targets: enemy,
-          x: startX + (index % 2 === 0 ? 40 : -40),
+          x: startX + (index % 2 === 0 ? this.levelGrid.config.cellWidth : -this.levelGrid.config.cellWidth),
           duration: 2200 + index * 400,
           yoyo: true,
           repeat: -1,
@@ -497,9 +550,17 @@ class GameScene extends Phaser.Scene {
   }
 
   createPaddle() {
-    const { width, height } = this.scale;
-    this.paddleFlexGfx = this.add.graphics().setDepth(9);
-    this.paddle = this.physics.add.image(width / 2, height - 72, 'paddle');
+    const paddleDef = this.level.paddle || { col: 4, colSpan: 2, rowFromBottom: 2 };
+    const colSpan = paddleDef.colSpan ?? 2;
+    const paddleRow = resolveGridRow(this.levelGrid, paddleDef);
+    const { x: paddleX, y: paddleY } = this.levelGrid.cellSpanCenter(
+      paddleDef.col,
+      paddleRow,
+      colSpan,
+      1
+    );
+    this.paddle = this.physics.add.image(paddleX, paddleY, 'paddle');
+    fitEntityToCellSpan(this.paddle, this.levelGrid, colSpan, 1, { heightFraction: 0.5 });
     this.paddle.setImmovable(true);
     this.paddle.body.allowGravity = false;
     this.paddle.setCollideWorldBounds(true);
@@ -508,10 +569,10 @@ class GameScene extends Phaser.Scene {
   }
 
   createBall() {
-    const { width, height } = this.scale;
     this.ballAura = this.add.graphics().setDepth(10);
-    this.ball = this.physics.add.image(width / 2, height - 100, 'ball');
-    this.ball.setCircle(14);
+    this.ball = this.physics.add.image(this.paddle.x, this.paddle.y, 'ball');
+    this.ball.setDisplaySize(this.ballRadius * 2, this.ballRadius * 2);
+    this.ball.body.setCircle(this.ballRadius);
     this.ball.setBounce(1);
     this.ball.setCollideWorldBounds(true);
     this.ball.body.onWorldBounds = true;
@@ -521,10 +582,10 @@ class GameScene extends Phaser.Scene {
     this.ballBaseScale = 1;
     this.physics.world.gravity.y = 0;
 
-    this.attachBallToPaddle();
+    this.attachBallToPaddle(false);
   }
 
-  attachBallToPaddle() {
+  attachBallToPaddle(deferAim = false) {
     this.ballOnPaddle = true;
     this.ballLaunched = false;
     this.pendingPowerSpring = false;
@@ -533,26 +594,97 @@ class GameScene extends Phaser.Scene {
     this.clearBallPowerState();
     this.finishPaddleSpring();
     this.syncBallToPaddle();
+    this.launchAimIndex = 0;
+    this.launchAimDirection = 1;
+    if (deferAim) {
+      this.stopLaunchAimCycle();
+    } else {
+      this.startLaunchAimCycle();
+    }
+  }
+
+  startLaunchAimCycle() {
+    this.stopLaunchAimCycle();
+    if (!this.aimArrowGfx) {
+      this.aimArrowGfx = this.add.graphics().setDepth(12).setScrollFactor(0);
+    }
+    this.launchAimTickEvent = this.time.addEvent({
+      delay: LAUNCH_AIM_TICK_MS,
+      loop: true,
+      callback: () => {
+        if (!this.ballOnPaddle || this.gameState !== 'playing' || this.isLosingBall) return;
+        let next = this.launchAimIndex + this.launchAimDirection;
+        if (next < 0 || next >= LAUNCH_AIM_DIRS.length) {
+          this.launchAimDirection *= -1;
+          next = this.launchAimIndex + this.launchAimDirection;
+        }
+        this.launchAimIndex = next;
+        this.redrawAimArrow();
+      },
+    });
+    this.redrawAimArrow();
+  }
+
+  stopLaunchAimCycle() {
+    if (this.launchAimTickEvent) {
+      this.launchAimTickEvent.destroy();
+      this.launchAimTickEvent = null;
+    }
+    if (this.aimArrowGfx) {
+      this.aimArrowGfx.clear();
+    }
+  }
+
+  redrawAimArrow() {
+    if (!this.aimArrowGfx || !this.ballOnPaddle || !this.ball?.active || this.isLosingBall) {
+      if (this.aimArrowGfx) this.aimArrowGfx.clear();
+      return;
+    }
+    const d = LAUNCH_AIM_DIRS[this.launchAimIndex];
+    const bx = this.ball.x;
+    const by = this.ball.y;
+    const shaftLen = this.ballRadius + 36;
+    const tipX = bx + d.vx * shaftLen;
+    const tipY = by + d.vy * shaftLen;
+    const px = -d.vy;
+    const py = d.vx;
+    const hw = 7;
+
+    this.aimArrowGfx.clear();
+    this.aimArrowGfx.lineStyle(4, 0xffe66d, 0.95);
+    this.aimArrowGfx.beginPath();
+    this.aimArrowGfx.moveTo(bx + d.vx * (this.ballRadius + 4), by + d.vy * (this.ballRadius + 4));
+    this.aimArrowGfx.lineTo(tipX, tipY);
+    this.aimArrowGfx.strokePath();
+
+    this.aimArrowGfx.fillStyle(0xffe66d, 0.95);
+    this.aimArrowGfx.fillTriangle(
+      tipX,
+      tipY,
+      tipX - d.vx * 14 + px * hw,
+      tipY - d.vy * 14 + py * hw,
+      tipX - d.vx * 14 - px * hw,
+      tipY - d.vy * 14 - py * hw
+    );
   }
 
   syncBallToPaddle() {
     if (this.ballOnPaddle && this.paddle) {
       this.ball.x = this.paddle.x;
-      this.ball.y = this.paddle.y - 24;
+      const above = this.paddle.displayHeight * 0.5 + this.ballRadius + 2;
+      this.ball.y = this.paddle.y - above;
     }
+    if (this.ballOnPaddle && !this.isLosingBall) this.redrawAimArrow();
   }
 
   launchBall() {
-    if (!this.ballOnPaddle || this.gameState !== 'playing') return;
+    if (!this.ballOnPaddle || this.gameState !== 'playing' || this.isLosingBall) return;
+    this.stopLaunchAimCycle();
+    const d = LAUNCH_AIM_DIRS[this.launchAimIndex];
     this.ballOnPaddle = false;
     this.ballLaunched = true;
     this.ball.body.moves = true;
-    const angle = Phaser.Math.Between(-25, 25);
-    const rad = Phaser.Math.DegToRad(angle - 90);
-    this.ball.setVelocity(
-      Math.cos(rad) * PHYSICS.launchSpeed,
-      Math.sin(rad) * PHYSICS.launchSpeed
-    );
+    this.ball.setVelocity(d.vx * PHYSICS.launchSpeed, d.vy * PHYSICS.launchSpeed);
   }
 
   // ---------------------------------------------------------------------------
@@ -564,8 +696,6 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.ball, this.paddle, this.onBallPaddle, null, this);
     this.physics.add.collider(this.ball, this.enemies, this.onBallEnemy, null, this);
     this.physics.add.collider(this.enemies, this.blocks);
-    this.physics.add.overlap(this.ball, this.spikeFloor, this.onBallHazard, null, this);
-
     this.physics.world.on('worldbounds', (body) => {
       if (body.gameObject === this.ball && body.blocked.down === false) {
         // Top/side bounces handled by physics; bottom = lose ball
@@ -577,10 +707,15 @@ class GameScene extends Phaser.Scene {
     if (!block.active) return;
 
     const typeId = block.getData('typeId') || 'normal';
-    const result = resolveBlockHit(typeId, this.powerBounceActive);
+    const result = resolveBlockHit(typeId, this.powerBounceActive || this.ballPowerMode);
 
     if (result.action === 'immune') {
       this.flashBlock(block, 0xaaaaaa);
+      return;
+    }
+
+    if (result.action === 'hazard' || result.action === 'hazard_bounce') {
+      this.onBallSpike(ball, block, result.action === 'hazard_bounce');
       return;
     }
 
@@ -648,10 +783,6 @@ class GameScene extends Phaser.Scene {
       }
       this.flashBallPowerSuccess();
       this.triggerPerfectTimingFeedback();
-      this.powerHint.setText('POWER BALL!').setColor('#ffe66d');
-      this.time.delayedCall(500, () => {
-        if (this.gameState === 'playing' && !this.ballPowerMode) this.powerHint.setText('');
-      });
     } else {
       if (this.powerBounceQueued) {
         bbLog('power bounce not applied', {
@@ -659,7 +790,6 @@ class GameScene extends Phaser.Scene {
           windowMs: POWER_BOUNCE.queueWindowMs,
           vy: ball.body.velocity.y,
         });
-        this.flashPowerMissHint(queueElapsed > POWER_BOUNCE.queueWindowMs ? 'Too slow — hit earlier' : 'Release closer to contact');
       }
       this.powerBounceQueued = false;
       vy = -Math.abs(ball.body.velocity.y) * PHYSICS.paddleBounceFactor;
@@ -719,14 +849,14 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  onBallHazard(ball) {
+  onBallSpike(ball, block, poweredBounce) {
     if (this.ballOnPaddle || this.gameState !== 'playing') return;
 
-    // Powered ball: spikes bounce off safely (spec)
-    if (this.ballPowerMode) {
+    if (poweredBounce || this.ballPowerMode) {
       const pushX = ball.body.velocity.x * 1.05 || (ball.x < this.scale.width / 2 ? -140 : 140);
       ball.setVelocity(pushX, -Math.max(380, Math.abs(ball.body.velocity.y) * 1.2));
       this.spawnDestroyParticles(ball.x, ball.y, 0xffe66d);
+      if (block?.active) this.flashBlock(block, 0xffe66d);
       this.clampBallSpeed();
       return;
     }
@@ -735,7 +865,7 @@ class GameScene extends Phaser.Scene {
   }
 
   destroyBlock(block) {
-    const tints = { normal: 0xffb347, gray: 0x9ca3af, power: 0xffe66d };
+    const tints = { normal: 0xffb347, gray: 0x9ca3af, power: 0xffe66d, spike: COLORS.spike };
     const typeId = block.getData('typeId') || 'normal';
     this.spawnDestroyParticles(block.x, block.y, tints[typeId] || 0xffffff);
     block.destroy();
@@ -767,15 +897,17 @@ class GameScene extends Phaser.Scene {
     this.spawnDestroyParticles(this.ball.x, this.ball.y, COLORS.ball);
 
     if (this.lives <= 0) {
+      this.stopLaunchAimCycle();
       this.ball.setActive(false).setVisible(false);
       this.showGameOver();
       return;
     }
 
-    this.attachBallToPaddle();
+    this.attachBallToPaddle(true);
     this.powerBounceQueued = false;
     this.time.delayedCall(400, () => {
       this.isLosingBall = false;
+      this.startLaunchAimCycle();
     });
   }
 
@@ -840,13 +972,6 @@ class GameScene extends Phaser.Scene {
     return true;
   }
 
-  flashPowerMissHint(msg) {
-    this.powerHint.setText(msg).setColor('#ff9999');
-    this.time.delayedCall(700, () => {
-      if (this.gameState === 'playing' && !this.ballPowerMode) this.powerHint.setText('');
-    });
-  }
-
   setupInput() {
     this.input.on('pointerdown', (pointer) => {
       if (this.gameState !== 'playing') return;
@@ -857,7 +982,11 @@ class GameScene extends Phaser.Scene {
       this.bottomHalfTouchThisStroke = bottomHalf;
 
       if (this.ballOnPaddle) {
-        this.launchBall();
+        if (this.isLosingBall) return;
+        if (bottomHalf) {
+          this.dragging = true;
+          this.movePaddleToPointer(pointer);
+        }
         return;
       }
 
@@ -878,8 +1007,13 @@ class GameScene extends Phaser.Scene {
     this.input.on('pointerup', () => {
       const wasPaddleTouch =
         this.bottomHalfTouchThisStroke || this.dragging || this.pointerWasDragging;
+      const ballOnPaddleAtStart = this.ballOnPaddle;
 
-      if (this.gameState === 'playing' && wasPaddleTouch && !this.ballOnPaddle) {
+      if (this.gameState === 'playing' && ballOnPaddleAtStart && !this.isLosingBall) {
+        this.launchBall();
+      }
+
+      if (this.gameState === 'playing' && wasPaddleTouch && !ballOnPaddleAtStart && !this.ballOnPaddle) {
         const queued = this.queuePowerBounceOnRelease(wasPaddleTouch);
         if (this.pendingPowerSpring) {
           this.pendingPowerSpring = false;
@@ -909,50 +1043,87 @@ class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   createUI() {
-    const { width } = this.scale;
-    const style = { fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: '18px', color: COLORS.text };
+    const hud = this.levelGrid.hud;
+    const maxLives = this.level.meta?.lives ?? 3;
+    const textStyle = {
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontSize: '18px',
+      color: COLORS.text,
+    };
 
-    this.scoreText = this.add.text(20, 24, 'Score: 0', style).setDepth(100);
-    this.livesContainer = this.add.container(width - 20, 28).setDepth(100);
+    if (!hud) {
+      bbError('createUI', 'level.hud is required for HUD container');
+      return;
+    }
+
+    const { x, y, width, height } = hud.bounds;
+    this.hudContainer = this.add.container(x, y).setDepth(200).setScrollFactor(0);
+
+    const hudBg = this.add.rectangle(width / 2, height / 2, width, height, 0x16082a, 0.94);
+    this.hudContainer.add(hudBg);
+
+    const hudFrame = this.add.graphics();
+    hudFrame.lineStyle(2, 0xffe66d, 0.4);
+    hudFrame.strokeRect(0, 0, width, height);
+    this.hudContainer.add(hudFrame);
+
+    const pos = resolveHudLayout(this.level, { width, height }, { maxLives });
+    const hudLayout = { ...DEFAULT_HUD_LAYOUT, ...(this.level.hudLayout || {}) };
+
+    this.scoreText = this.add.text(pos.score.x, pos.score.y, 'Score: 0', textStyle).setOrigin(0, 0.5);
+    this.hudContainer.add(this.scoreText);
+
+    const lifeStep = 20;
+    this.livesContainer = this.add.container(pos.livesContainer.x, pos.livesContainer.y);
     this.lifeIcons = [];
-    for (let i = 0; i < 3; i++) {
-      const icon = this.add.image(-i * 22, 0, 'life_icon').setScale(0.9);
+    for (let i = 0; i < maxLives; i++) {
+      const icon = this.add.image(-i * lifeStep - 8, 0, 'life_icon').setScale(0.85);
       this.lifeIcons.push(icon);
       this.livesContainer.add(icon);
     }
-    this.livesContainer.setX(width - 20 - 22 * 2);
+    this.hudContainer.add(this.livesContainer);
 
-    this.powerHint = this.add
-      .text(width / 2, 56, '', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '16px',
-        color: COLORS.accent,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(100);
+    this.hudAvatarState = 'default';
+    this.hudAvatarConfig = { ...(this.level.hudLayout?.avatar || {}) };
 
-    this.powerBallBadge = this.add
-      .text(width / 2, 88, '', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
-        color: '#1a1a2e',
-        backgroundColor: '#ffe66d',
-        padding: { x: 10, y: 4 },
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(100)
-      .setVisible(false);
+    this.hudAvatar = null;
+    if (hudLayout.right && hudLayout.right.includes('avatar')) {
+      const avSize = pos.avatar.size;
+      const startKey = getHudAvatarTextureKey('default', this.hudAvatarConfig);
+      this.hudAvatar = this.add
+        .image(pos.avatar.x, pos.avatar.y, startKey)
+        .setDisplaySize(avSize, avSize)
+        .setOrigin(0.5, 0.5);
+      this.hudContainer.add(this.hudAvatar);
+      this.updateHudAvatar();
+    }
 
-    this.launchHint = this.add
-      .text(width / 2, this.scale.height - 120, 'Tap to launch', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '14px',
-        color: '#ffffff88',
-      })
-      .setOrigin(0.5)
-      .setDepth(100);
+    this.playAreaDivider = this.add.graphics().setDepth(199).setScrollFactor(0);
+    this.playAreaDivider.lineStyle(2, 0xffe66d, 0.35);
+    this.playAreaDivider.lineBetween(x, y + height, x + width, y + height);
+  }
+
+  /** Updates portrait from gameplay state (power, charging, lives, etc.). */
+  updateHudAvatar() {
+    if (!this.hudAvatar) return;
+    const stateId = resolveHudAvatarState({
+      gameState: this.gameState,
+      ballPowerMode: this.ballPowerMode,
+      ballPowerCooling: this.ballPowerCooling,
+      paddleCharging: this.paddleCharging,
+      powerBounceQueued: this.powerBounceQueued,
+      lives: this.lives,
+    });
+    this.hudAvatarState = applyHudAvatarState(this.hudAvatar, stateId, this.hudAvatarConfig);
+  }
+
+  /**
+   * Force a portrait state (e.g. after loading custom textures).
+   * Gameplay will override on the next updateHudAvatar() unless you set a lock later.
+   */
+  setHudAvatarState(stateId) {
+    if (!this.hudAvatar) return;
+    this.hudAvatarState = applyHudAvatarState(this.hudAvatar, stateId, this.hudAvatarConfig);
   }
 
   updateUI() {
@@ -961,7 +1132,7 @@ class GameScene extends Phaser.Scene {
       icon.setAlpha(i < this.lives ? 1 : 0.25);
       icon.setTint(i < this.lives ? 0xffffff : 0x666666);
     });
-    this.launchHint.setVisible(this.ballOnPaddle && this.gameState === 'playing');
+    this.updateHudAvatar();
   }
 
   addScore(pts) {
@@ -981,7 +1152,6 @@ class GameScene extends Phaser.Scene {
     this.paddle.setScale(1);
     this.paddle.angle = 0;
     this.paddle.clearTint();
-    this.drawPaddleFlexArc(0);
   }
 
   startPaddleCharge() {
@@ -999,10 +1169,6 @@ class GameScene extends Phaser.Scene {
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
-      onUpdate: () => {
-        const flex = 0.25 + (this.paddle.scaleX - 1) * 0.8;
-        this.drawPaddleFlexArc(flex);
-      },
     });
 
     this.paddleChargeShakeTween = this.tweens.add({
@@ -1062,27 +1228,12 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  updatePowerBallBadge() {
-    if (!this.powerBallBadge) return;
-    if (this.ballPowerMode) {
-      this.powerBallBadge.setText('⚡ POWER BALL');
-      this.powerBallBadge.setBackgroundColor('#ffe66d');
-      this.powerBallBadge.setVisible(true);
-    } else if (this.ballPowerCooling) {
-      this.powerBallBadge.setText('cooling down…');
-      this.powerBallBadge.setBackgroundColor('#9ca3af');
-      this.powerBallBadge.setVisible(true);
-    } else {
-      this.powerBallBadge.setVisible(false);
-    }
-  }
-
   updateBallPowerVisual(time) {
     this.ballAura.clear();
     if (!this.ball.active || this.ballOnPaddle) return;
 
     const scale = this.ball.scaleX;
-    const baseR = 16 * scale;
+    const baseR = this.ballRadius * scale;
     const pulse = 1 + 0.12 * Math.sin(time / 90);
 
     if (this.ballPowerMode) {
@@ -1108,10 +1259,9 @@ class GameScene extends Phaser.Scene {
     this.powerBounceActive = false;
     this.powerBounceMultiplier = false;
     this.ball.setScale(this.ballBaseScale);
-    this.ball.body.setCircle(14);
+    this.ball.body.setCircle(this.ballRadius);
     this.ball.clearTint();
     this.ballAura.clear();
-    this.updatePowerBallBadge();
   }
 
   refreshPowerBallTimer() {
@@ -1141,8 +1291,7 @@ class GameScene extends Phaser.Scene {
         ease: 'Back.easeOut',
       });
     }
-    this.ball.body.setCircle(14 * POWER_BALL.scale);
-    this.updatePowerBallBadge();
+    this.ball.body.setCircle(this.ballRadius * POWER_BALL.scale);
     this.refreshPowerBallTimer();
   }
 
@@ -1153,7 +1302,6 @@ class GameScene extends Phaser.Scene {
     this.ballPowerCooling = true;
     this.powerBounceActive = false;
     this.powerBounceMultiplier = false;
-    this.updatePowerBallBadge();
 
     this.tweens.killTweensOf(this.ball);
     this.tweens.add({
@@ -1163,10 +1311,9 @@ class GameScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
       onComplete: () => {
         this.ball.clearTint();
-        this.ball.body.setCircle(14);
+        this.ball.body.setCircle(this.ballRadius);
         this.ballPowerCooling = false;
         this.ballAura.clear();
-        this.updatePowerBallBadge();
       },
     });
 
@@ -1174,7 +1321,6 @@ class GameScene extends Phaser.Scene {
       this.powerBallTimer = null;
       if (!this.ballPowerMode) {
         this.ballPowerCooling = false;
-        this.updatePowerBallBadge();
       }
     });
   }
@@ -1209,7 +1355,6 @@ class GameScene extends Phaser.Scene {
       angle: 0,
       duration: armed ? 75 : 60,
       ease: 'Quad.easeIn',
-      onUpdate: () => this.drawPaddleFlexArc(armed ? 0.32 : 0.16),
       onComplete: () => {
         if (!this.isSceneActive()) return;
 
@@ -1226,7 +1371,6 @@ class GameScene extends Phaser.Scene {
           scaleY: 1.06,
           duration: 85,
           ease: 'Back.easeOut',
-          onUpdate: () => this.drawPaddleFlexArc(0.1),
           onComplete: () => {
             if (!this.isSceneActive()) return;
             this.tweens.add({
@@ -1235,7 +1379,6 @@ class GameScene extends Phaser.Scene {
               scaleY: 1,
               duration: 110,
               ease: 'Quad.easeOut',
-              onUpdate: () => this.drawPaddleFlexArc(0.04),
               onComplete: () => {
                 if (!this.isSceneActive()) return;
                 this.finishPaddleSpring();
@@ -1245,25 +1388,6 @@ class GameScene extends Phaser.Scene {
         });
       },
     });
-  }
-
-  drawPaddleFlexArc(strength) {
-    if (!this.paddleFlexGfx?.active || !this.paddle?.active) return;
-    this.paddleFlexGfx.clear();
-    if (strength <= 0.01) return;
-
-    const px = this.paddle.x;
-    const py = this.paddle.y - 2;
-    const hw = 46 * this.paddle.scaleX;
-    const bulge = 4 + strength * 16;
-
-    // Phaser Graphics has no quadraticCurveTo — use ellipses + triangle dome
-    this.paddleFlexGfx.fillStyle(COLORS.paddleDark, 0.85);
-    this.paddleFlexGfx.fillTriangle(px - hw, py + 8, px + hw, py + 8, px, py - bulge);
-    this.paddleFlexGfx.fillEllipse(px, py + 4, hw * 1.05, 10 + strength * 2);
-
-    this.paddleFlexGfx.fillStyle(COLORS.paddle, 1);
-    this.paddleFlexGfx.fillEllipse(px, py - bulge * 0.4, hw * 0.92, bulge * 0.8);
   }
 
   /** Trampoline spring on successful Power Bounce contact */
@@ -1281,7 +1405,6 @@ class GameScene extends Phaser.Scene {
       angle: 0,
       duration: 45,
       ease: 'Quad.easeIn',
-      onUpdate: () => this.drawPaddleFlexArc(0.2),
       onComplete: () => {
         if (!this.isSceneActive()) return;
         this.tweens.add({
@@ -1290,10 +1413,6 @@ class GameScene extends Phaser.Scene {
           scaleY: 1.42,
           duration: 95,
           ease: 'Back.easeOut',
-          onUpdate: () => {
-            const flex = Math.max(0, (this.paddle.scaleY - 1) * 1.4);
-            this.drawPaddleFlexArc(flex);
-          },
           onComplete: () => {
             if (!this.isSceneActive()) return;
             this.tweens.add({
@@ -1302,10 +1421,6 @@ class GameScene extends Phaser.Scene {
               scaleY: 1,
               duration: 280,
               ease: 'Bounce.easeOut',
-              onUpdate: () => {
-                const flex = Math.max(0, (this.paddle.scaleY - 1) * 1.2);
-                this.drawPaddleFlexArc(flex);
-              },
               onComplete: () => {
                 if (!this.isSceneActive()) return;
                 this.finishPaddleSpring();
@@ -1329,7 +1444,6 @@ class GameScene extends Phaser.Scene {
       duration: 50,
       yoyo: true,
       ease: 'Quad.easeOut',
-      onUpdate: () => this.drawPaddleFlexArc(0.15),
       onComplete: () => {
         if (!this.isSceneActive()) return;
         this.finishPaddleSpring();
@@ -1394,7 +1508,7 @@ class GameScene extends Phaser.Scene {
 
   showOverlay(title, subtitle, buttonLabel, onRestart) {
     const { width, height } = this.scale;
-    const overlay = this.add.container(0, 0).setDepth(200);
+    const overlay = this.add.container(0, 0).setDepth(250);
 
     const dim = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75);
     const panel = this.add.rectangle(width / 2, height / 2, width - 48, 220, 0x1a1a2e, 0.95);
@@ -1439,6 +1553,7 @@ class GameScene extends Phaser.Scene {
   showLevelClear() {
     if (this.gameState !== 'playing') return;
     this.gameState = 'levelClear';
+    this.stopLaunchAimCycle();
     this.ball.body.setVelocity(0, 0);
     this.ball.body.moves = false;
     this.showOverlay('Level Clear!', `Final Score: ${this.score}`, 'Play Again', () => this.scene.restart());
@@ -1446,6 +1561,7 @@ class GameScene extends Phaser.Scene {
 
   showGameOver() {
     this.gameState = 'gameOver';
+    this.stopLaunchAimCycle();
     this.showOverlay('Game Over', `Score: ${this.score}`, 'Try Again', () => this.scene.restart());
   }
 
@@ -1460,7 +1576,6 @@ class GameScene extends Phaser.Scene {
       if (this.ballOnPaddle) {
         this.syncBallToPaddle();
       } else if (this.ball?.active) {
-        // Ball fell through paddle into floor spikes (overlap also triggers loseBall)
         if (this.ball.y > this.scale.height - 28) {
           this.loseBall();
         }
@@ -1469,6 +1584,7 @@ class GameScene extends Phaser.Scene {
       }
 
       this.updatePaddleCharge();
+      this.updateHudAvatar();
 
       // Expire stale power bounce queue
       if (this.powerBounceQueued && time - this.powerBounceQueuedAt > POWER_BOUNCE.queueWindowMs) {
@@ -1521,12 +1637,55 @@ const config = {
 };
 
 bbLog('boot Phaser', { width: GAME_WIDTH, height: GAME_HEIGHT });
-try {
-  new Phaser.Game(config);
-  bbLog('Phaser.Game created');
-} catch (err) {
-  bbError('Phaser.Game boot', err);
+
+function initLevelBar(activeEntry) {
+  const bar = document.getElementById('level-bar');
+  const select = document.getElementById('level-select');
+  if (activeEntry.id === 'preview') {
+    const opt = document.createElement('option');
+    opt.value = 'preview';
+    opt.textContent = activeEntry.name || 'Editor preview';
+    opt.selected = true;
+    select.appendChild(opt);
+    select.disabled = true;
+  } else {
+    populateLevelSelect(select, activeEntry.id);
+  }
+  bar.hidden = false;
+
+  select.addEventListener('change', () => {
+    const id = select.value;
+    try {
+      localStorage.setItem('blockBall.level', id);
+    } catch (_) {
+      /* ignore */
+    }
+    window.location.search = `?level=${encodeURIComponent(id)}`;
+  });
+
+  document.getElementById('level-restart').addEventListener('click', () => {
+    window.location.reload();
+  });
 }
+
+async function bootGame() {
+  const status = document.getElementById('boot-status');
+  try {
+    const { level, entry } = await resolveActiveLevel();
+    ACTIVE_LEVEL = level;
+    bbLog('active level', entry.id, level.name);
+    status.remove();
+    initLevelBar(entry);
+    new Phaser.Game(config);
+    bbLog('Phaser.Game created');
+  } catch (err) {
+    bbError('boot', err);
+    status.className = 'error';
+    status.textContent = `Failed to load level: ${err.message}. Check levels/registry.js and your level script.`;
+  }
+}
+
+bootGame();
 </script>
 
 <!--
@@ -1536,7 +1695,7 @@ try {
 
 LIMITATIONS (this demo)
 -----------------------
-  • Single hard-coded level layout (no level loader or editor).
+  • Level select bar + ?level=id URL; register levels in levels/registry.js.
   • Procedural textures only — no sprite atlases or audio.
   • Power Bounce: release-only timing before contact; spike immunity while powered.
   • Enemies use simple tweens, not true AI or spawn waves.

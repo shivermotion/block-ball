@@ -36,6 +36,16 @@ const BLOCK_COMPENDIUM = [
     notes: 'Gatekeeper — requires Power Bounce. Often protects clusters behind.',
   },
   {
+    id: 'spike',
+    name: 'Spike Block',
+    implemented: true,
+    appearance: 'Red triangular hazard, one cell',
+    points: 0,
+    normalHit: 'hazard',
+    powerHit: 'hazard_bounce',
+    notes: 'Costs a life on contact unless the ball is powered. Indestructible.',
+  },
+  {
     id: 'splitting',
     name: 'Splitting Block',
     implemented: false,
@@ -137,6 +147,16 @@ const BLOCK_TYPES = {
     powerHit: 'destroy',
     countsTowardClear: true,
   },
+  spike: {
+    id: 'spike',
+    texture: 'block_spike',
+    points: 0,
+    powerOnly: false,
+    normalHit: 'hazard',
+    powerHit: 'hazard_bounce',
+    countsTowardClear: false,
+    isHazard: true,
+  },
 };
 
 /** Level grid cell → block type id */
@@ -145,6 +165,7 @@ const BLOCK_CELL_MAP = {
   1: 'normal',
   2: 'gray',
   3: 'power',
+  4: 'spike',
 };
 
 function getBlockDef(typeId) {
@@ -157,6 +178,10 @@ function getCompendiumEntry(typeId) {
 
 function resolveBlockHit(typeId, isPowered) {
   const def = getBlockDef(typeId);
+  if (def.normalHit === 'hazard' || def.isHazard) {
+    if (isPowered && def.powerHit === 'hazard_bounce') return { action: 'hazard_bounce', points: 0 };
+    return { action: 'hazard', points: 0 };
+  }
   if (isPowered) {
     if (def.powerHit === 'destroy') return { action: 'destroy', points: def.points };
     if (def.powerHit === 'immune') return { action: 'immune', points: 0 };
