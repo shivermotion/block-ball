@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Block Ball — Demo Level</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1a2e;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    #game-container {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+<!--
+================================================================================
+  BLOCK BALL — Single-Level Demo (Phaser 3 + Arcade Physics)
+================================================================================
+
+HOW TO RUN
+----------
+  Yarn (recommended):
+       yarn install
+       yarn start
+     Then open http://localhost:8080/ (or /block-ball-demo.html)
+     On your phone (same Wi‑Fi): http://YOUR_LOCAL_IP:8080/block-ball-demo.html
+
+  1. Quick test: double-click block-ball-demo.html or drag it into a browser.
+     (file:// works for this demo.)
+
+  2. Without Yarn: python3 -m http.server 8080 in this folder, then open the URL above.
+
+  3. Any static server works (VS Code Live Server, etc.).
+
+MOBILE CONTROLS
+---------------
+  • Drag left/right on the BOTTOM HALF → move the paddle.
+  • Tap while the ball sits on the paddle → launch.
+  • Power Bounce: drag while the ball falls (paddle grows & shakes), RELEASE to arm;
+    the trampoline spring plays only when the ball hits the paddle successfully.
+  • Chain Power Bounces on returns to keep momentum through hard sections.
+  • No release timing → normal bounce; spikes cost a life when not powered.
+
+PACKAGING FOR REAL MOBILE APPS
+------------------------------
+  Capacitor (recommended):
+    1. npm create vite@latest block-ball-app -- --template vanilla
+    2. Copy block-ball-demo.html into www/index.html (or merge into your build).
+    3. npm install @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android
+    4. npx cap init "Block Ball" com.example.blockball
+    5. npx cap add ios && npx cap add android
+    6. Set capacitor.config.json webDir to "www", lock orientation to portrait.
+    7. npx cap sync && npx cap open ios (or android)
+
+  Cordova (legacy):
+    1. cordova create block-ball com.example.blockball "Block Ball"
+    2. Place this HTML as www/index.html
+    3. cordova plugin add cordova-plugin-screen-orientation
+    4. cordova platform add ios android && cordova run
+
+  Also consider: fullscreen meta tags (already included), disable overscroll,
+  asset atlases for production, and touch-action:none on the document (done).
+
+================================================================================
+-->
+
+<div id="game-container"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+<script>
+/* global Phaser */
+
+const DEBUG_LOG = true;
+
+function bbLog(...args) {
+  if (DEBUG_LOG) console.log('[BlockBall]', ...args);
+}
+
+function bbError(context, err) {
+  console.error('[BlockBall]', context, err);
+}
+
+window.addEventListener('error', (e) => {
+  bbError('window.error', e.error || e.message);
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  bbError('unhandledrejection', e.reason);
+});
+
+// =============================================================================
+// GAME CONFIG
+// =============================================================================
+
+const GAME_WIDTH = 390;
+const GAME_HEIGHT = 780;
+
+const COLORS = {
+  bg: 0x2d1b4e,
+  bgLight: 0x4a2c7a,
+  paddle: 0x00d4aa,
+  paddleDark: 0x00a080,
+  ball: 0x4da6ff,
+  ballHighlight: 0x8ec8ff,
+  blockNormal: 0xfff5e6,
+  blockNormalBorder: 0xffb347,
+  blockPower: 0x9ca3af,
+  blockPowerBorder: 0x4b5563,
+  spike: 0xff3366,
+  enemy: 0xff6bcb,
+  enemyDark: 0xc94d9a,
+  text: '#ffffff',
+  accent: '#ffe66d',
+  danger: '#ff3366',
+};
+
+const PHYSICS = {
+  ballSpeed: 380,
+  ballMaxSpeed: 520,
+  powerBallMaxSpeed: 760,
+  launchSpeed: 420,
+  powerBounceSpeed: 680,
+  powerAngleAmp: 1.38,
+  paddleBounceFactor: 1.05,
+};
+
+const SCORE = {
+  normalBlock: 100,
+  powerBlock: 300,
+  enemy: 500,
+  powerMultiplier: 1.5,
+};
+
+const POWER_BOUNCE = {
+  /** Release arms power; paddle hit must occur within this window (ms) */
+  queueWindowMs: 1100,
+  /** Ball falling — used for charge visuals */
+  minFallSpeed: 18,
+  /** How far above/below paddle center release can arm power */
+  armAbovePaddle: 240,
+  armBelowPaddle: 48,
+  /** Charge ring / shake while ball is in this zone above paddle */
+  chargeAbovePaddle: 200,
+  chargeBelowPaddle: 40,
+  /** Brief slow-mo emphasis on perfect Power Bounce (real-time ms) */
+  slowMoRealMs: 130,
+  slowMoTimeScale: 0.32,
+};
+
+const POWER_BALL = {
+  durationMs: 2800,
+  cooldownMs: 500,
+  scale: 1.24,
+  tint: 0xfff0a0,
+};
+
+// Pyramid layout: 1 = normal block, 2 = power block, 0 = empty
+// 8 columns × 5 rows (row 0 = top)
+const LEVEL_LAYOUT = [
+  [0, 0, 1, 1, 1, 1, 0, 0],
+  [0, 1, 1, 2, 2, 1, 1, 0],
+  [1, 1, 1, 1, 1, 1, 1, 1],
+  [1, 1, 2, 1, 1, 2, 1, 1],
+  [1, 1, 1, 1, 1, 1, 1, 1],
+];
+
+// =============================================================================
+// TEXTURE GENERATION (generic shapes — no franchise assets)
+// =============================================================================
+
+function generateTextures(scene) {
+  const g = scene.make.graphics({ x: 0, y: 0, add: false });
+
+  // Paddle
+  g.clear();
+  g.fillStyle(COLORS.paddleDark, 1);
+  g.fillRoundedRect(0, 4, 100, 18, 8);
+  g.fillStyle(COLORS.paddle, 1);
+  g.fillRoundedRect(0, 0, 100, 18, 8);
+  g.generateTexture('paddle', 100, 22);
+
+  // Normal block
+  g.clear();
+  g.fillStyle(COLORS.blockNormalBorder, 1);
+  g.fillRoundedRect(0, 0, 44, 22, 4);
+  g.fillStyle(COLORS.blockNormal, 1);
+  g.fillRoundedRect(2, 2, 40, 18, 3);
+  g.generateTexture('block_normal', 44, 22);
+
+  // Power block
+  g.clear();
+  g.fillStyle(COLORS.blockPowerBorder, 1);
+  g.fillRoundedRect(0, 0, 44, 22, 4);
+  g.fillStyle(COLORS.blockPower, 1);
+  g.fillRoundedRect(2, 2, 40, 18, 3);
+  g.lineStyle(2, 0xffffff, 0.4);
+  g.strokeRoundedRect(6, 6, 32, 10, 2);
+  g.generateTexture('block_power', 44, 22);
+
+  // Bouncy ball (blue circle + face)
+  const r = 14;
+  g.clear();
+  g.fillStyle(COLORS.ball, 1);
+  g.fillCircle(r, r, r);
+  g.fillStyle(COLORS.ballHighlight, 0.6);
+  g.fillEllipse(r - 4, r - 5, 8, 6);
+  g.fillStyle(0x1e3a5f, 1);
+  g.fillCircle(r - 5, r - 1, 3);
+  g.fillCircle(r + 5, r - 1, 3);
+  g.fillStyle(0xffffff, 1);
+  g.fillCircle(r - 4, r - 2, 1.2);
+  g.fillCircle(r + 6, r - 2, 1.2);
+  g.lineStyle(2, 0x1e3a5f, 1);
+  g.beginPath();
+  g.arc(r, r + 4, 5, 0.2, Math.PI - 0.2, false);
+  g.strokePath();
+  g.generateTexture('ball', r * 2, r * 2);
+
+  // Life icon (mini ball)
+  g.clear();
+  g.fillStyle(COLORS.ball, 1);
+  g.fillCircle(8, 8, 8);
+  g.generateTexture('life_icon', 16, 16);
+
+  // Blob enemy
+  g.clear();
+  g.fillStyle(COLORS.enemyDark, 1);
+  g.fillEllipse(18, 22, 32, 24);
+  g.fillStyle(COLORS.enemy, 1);
+  g.fillEllipse(18, 20, 30, 22);
+  g.fillStyle(0xffffff, 1);
+  g.fillCircle(12, 16, 4);
+  g.fillCircle(24, 16, 4);
+  g.fillStyle(0x1e3a5f, 1);
+  g.fillCircle(12, 16, 2);
+  g.fillCircle(24, 16, 2);
+  g.fillStyle(0x1e3a5f, 0.8);
+  g.fillEllipse(18, 24, 6, 3);
+  g.generateTexture('enemy', 36, 32);
+
+  // Particle spark
+  g.clear();
+  g.fillStyle(0xffffff, 1);
+  g.fillCircle(4, 4, 4);
+  g.generateTexture('particle', 8, 8);
+
+  g.destroy();
+}
+
+// =============================================================================
+// MAIN SCENE
+// =============================================================================
+
+class GameScene extends Phaser.Scene {
+  constructor() {
+    super({ key: 'GameScene' });
+  }
+
+  clearPaddleTweenRefs() {
+    this.paddleChargeScaleTween = null;
+    this.paddleChargeShakeTween = null;
+  }
+
+  killPaddleTweens() {
+    if (this.paddle) this.tweens.killTweensOf(this.paddle);
+    this.clearPaddleTweenRefs();
+  }
+
+  finishPaddleSpring() {
+    this.paddleSpringing = false;
+    this.killPaddleTweens();
+    this.resetPaddleVisual();
+  }
+
+  preparePaddleForCharge() {
+    if (this.paddleSpringing) {
+      this.finishPaddleSpring();
+    } else {
+      this.killPaddleTweens();
+      this.resetPaddleVisual();
+    }
+  }
+
+  isSceneActive() {
+    return Boolean(this.sys?.isActive());
+  }
+
+  safeStopTween(tween) {
+    if (!tween) return;
+    try {
+      if (typeof tween.isPlaying === 'function' && tween.isPlaying()) {
+        tween.stop();
+      }
+    } catch (err) {
+      bbError('safeStopTween', err);
+    }
+  }
+
+  create() {
+    bbLog('create() start');
+    this.gameState = 'playing'; // playing | levelClear | gameOver
+    this.score = 0;
+    this.lives = 3;
+    this.ballLaunched = false;
+    this.ballOnPaddle = true;
+    this.powerBounceQueued = false;
+    this.powerBounceQueuedAt = 0;
+    this.powerBounceActive = false;
+    this.powerBounceMultiplier = false;
+    this.ballPowerMode = false;
+    this.ballPowerCooling = false;
+    this.powerBallTimer = null;
+    this.blocksRemaining = 0;
+    this.dragging = false;
+    this.pointerWasDragging = false;
+    this.isLosingBall = false;
+    this.paddleCharging = false;
+    this.paddleSpringing = false;
+    this.paddleChargeScaleTween = null;
+    this.paddleChargeShakeTween = null;
+    this.bottomHalfTouchThisStroke = false;
+    this.pendingPowerSpring = false;
+
+    const { width, height } = this.scale;
+
+    // Background gradient bands
+    this.add.rectangle(width / 2, height / 2, width, height, COLORS.bg);
+    this.add.rectangle(width / 2, height * 0.35, width, height * 0.5, COLORS.bgLight, 0.35);
+
+    // Arcade frame lines
+    const frame = this.add.graphics();
+    frame.lineStyle(3, 0xffe66d, 0.5);
+    frame.strokeRect(8, 8, width - 16, height - 16);
+
+    generateTextures(this);
+
+    // Physics world
+    this.physics.world.setBounds(12, 12, width - 24, height - 24);
+    this.physics.world.setBoundsCollision(true, true, true, false);
+
+    this.createWallsAndSpikes();
+    this.createBlocks();
+    this.createEnemies();
+    this.createPaddle();
+    this.createBall();
+    this.setupCollisions();
+    this.createUI();
+    this.setupInput();
+
+    this.updateUI();
+    bbLog('create() complete', { blocks: this.blocksRemaining, lives: this.lives });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Level geometry
+  // ---------------------------------------------------------------------------
+
+  createWallsAndSpikes() {
+    const { width, height } = this.scale;
+
+    // Floor spike row — directly under the paddle zone
+    const paddleY = height - 72;
+    const rowMargin = 54;
+    const rowW = width - rowMargin * 2;
+    const rowH = 26;
+    const spikeRowY = paddleY + 34;
+    const rowGfx = this.add.graphics();
+    rowGfx.fillStyle(COLORS.spike, 1);
+    const spikeCount = Math.floor(rowW / 22);
+    const spikeStep = rowW / spikeCount;
+    for (let i = 0; i < spikeCount; i++) {
+      const x = i * spikeStep + spikeStep * 0.5;
+      const half = spikeStep * 0.42;
+      rowGfx.fillTriangle(x - half, rowH, x, 2, x + half, rowH);
+    }
+    rowGfx.lineStyle(2, 0xcc1144, 0.6);
+    rowGfx.strokeRect(0, rowH - 2, rowW, 2);
+    rowGfx.generateTexture('spike_row', rowW, rowH);
+    rowGfx.destroy();
+
+    this.spikeFloor = this.physics.add.staticGroup();
+    const floorZone = this.spikeFloor.create(width / 2, spikeRowY, 'spike_row');
+    floorZone.setDepth(8);
+    floorZone.setData('hazard', true);
+    floorZone.refreshBody();
+    floorZone.body.setSize(rowW - 8, rowH - 4);
+  }
+
+  createBlocks() {
+    const { width } = this.scale;
+    const cols = 8;
+    const blockW = 44;
+    const blockH = 22;
+    const gapX = 4;
+    const gapY = 4;
+    const gridW = cols * (blockW + gapX) - gapX;
+    const startX = (width - gridW) / 2 + blockW / 2;
+    const startY = 130;
+
+    this.blocks = this.physics.add.staticGroup();
+    this.blocksRemaining = 0;
+
+    for (let row = 0; row < LEVEL_LAYOUT.length; row++) {
+      for (let col = 0; col < LEVEL_LAYOUT[row].length; col++) {
+        const cell = LEVEL_LAYOUT[row][col];
+        if (cell === 0) continue;
+
+        const x = startX + col * (blockW + gapX);
+        const y = startY + row * (blockH + gapY);
+        const isPower = cell === 2;
+        const key = isPower ? 'block_power' : 'block_normal';
+
+        const block = this.blocks.create(x, y, key);
+        block.refreshBody();
+        block.setData('isPower', isPower);
+        block.setData('points', isPower ? SCORE.powerBlock : SCORE.normalBlock);
+        this.blocksRemaining++;
+      }
+    }
+  }
+
+  createEnemies() {
+    const { width } = this.scale;
+    const positions = [
+      { x: width * 0.25, y: 340 },
+      { x: width * 0.5, y: 300 },
+      { x: width * 0.75, y: 340 },
+      { x: width * 0.5, y: 380 },
+    ];
+
+    this.enemies = this.physics.add.group();
+    positions.forEach((pos, i) => {
+      const enemy = this.enemies.create(pos.x, pos.y, 'enemy');
+      enemy.setCircle(14);
+      enemy.setBounce(1);
+      enemy.setCollideWorldBounds(true);
+      enemy.body.setImmovable(false);
+      enemy.setData('points', SCORE.enemy);
+      enemy.setData('hp', 1);
+
+      // Slow drift
+      const speed = 28 + i * 8;
+      this.tweens.add({
+        targets: enemy,
+        x: pos.x + (i % 2 === 0 ? 40 : -40),
+        duration: 2200 + i * 400,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+      enemy.setData('baseX', pos.x);
+    });
+  }
+
+  createPaddle() {
+    const { width, height } = this.scale;
+    this.paddleFlexGfx = this.add.graphics().setDepth(9);
+    this.paddle = this.physics.add.image(width / 2, height - 72, 'paddle');
+    this.paddle.setImmovable(true);
+    this.paddle.body.allowGravity = false;
+    this.paddle.setCollideWorldBounds(true);
+    this.paddle.setDepth(10);
+    this.paddle.setOrigin(0.5, 0.5);
+  }
+
+  createBall() {
+    const { width, height } = this.scale;
+    this.ballAura = this.add.graphics().setDepth(10);
+    this.ball = this.physics.add.image(width / 2, height - 100, 'ball');
+    this.ball.setCircle(14);
+    this.ball.setBounce(1);
+    this.ball.setCollideWorldBounds(true);
+    this.ball.body.onWorldBounds = true;
+    this.ball.setDepth(11);
+    this.ball.setOrigin(0.5, 0.5);
+    this.ball.body.allowGravity = false;
+    this.ballBaseScale = 1;
+    this.physics.world.gravity.y = 0;
+
+    this.attachBallToPaddle();
+  }
+
+  attachBallToPaddle() {
+    this.ballOnPaddle = true;
+    this.ballLaunched = false;
+    this.pendingPowerSpring = false;
+    this.ball.body.setVelocity(0, 0);
+    this.ball.body.moves = false;
+    this.clearBallPowerState();
+    this.finishPaddleSpring();
+    this.syncBallToPaddle();
+  }
+
+  syncBallToPaddle() {
+    if (this.ballOnPaddle && this.paddle) {
+      this.ball.x = this.paddle.x;
+      this.ball.y = this.paddle.y - 24;
+    }
+  }
+
+  launchBall() {
+    if (!this.ballOnPaddle || this.gameState !== 'playing') return;
+    this.ballOnPaddle = false;
+    this.ballLaunched = true;
+    this.ball.body.moves = true;
+    const angle = Phaser.Math.Between(-25, 25);
+    const rad = Phaser.Math.DegToRad(angle - 90);
+    this.ball.setVelocity(
+      Math.cos(rad) * PHYSICS.launchSpeed,
+      Math.sin(rad) * PHYSICS.launchSpeed
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Collisions
+  // ---------------------------------------------------------------------------
+
+  setupCollisions() {
+    this.physics.add.collider(this.ball, this.blocks, this.onBallBlock, null, this);
+    this.physics.add.collider(this.ball, this.paddle, this.onBallPaddle, null, this);
+    this.physics.add.overlap(this.ball, this.enemies, this.onBallEnemy, null, this);
+    this.physics.add.overlap(this.ball, this.spikeFloor, this.onBallHazard, null, this);
+
+    this.physics.world.on('worldbounds', (body) => {
+      if (body.gameObject === this.ball && body.blocked.down === false) {
+        // Top/side bounces handled by physics; bottom = lose ball
+      }
+    });
+  }
+
+  onBallBlock(ball, block) {
+    if (!block.active) return;
+
+    const isPower = block.getData('isPower');
+    if (isPower && !this.powerBounceActive) {
+      this.flashBlock(block, 0xaaaaaa);
+      return;
+    }
+
+    let points = block.getData('points');
+    if (this.powerBounceMultiplier) {
+      points = Math.floor(points * SCORE.powerMultiplier);
+    }
+
+    this.addScore(points);
+    this.destroyBlock(block);
+    this.clampBallSpeed();
+  }
+
+  onBallPaddle(ball, paddle) {
+    if (this.ballOnPaddle) return;
+
+    const diff = ball.x - paddle.x;
+    const normalized = Phaser.Math.Clamp(diff / (paddle.displayWidth * 0.5), -1, 1);
+    const now = this.time.now;
+    const queueElapsed = now - this.powerBounceQueuedAt;
+    const queuedPower =
+      this.powerBounceQueued && queueElapsed <= POWER_BOUNCE.queueWindowMs;
+
+    let vx = normalized * PHYSICS.ballSpeed * 0.85;
+    let vy;
+
+    const fingerStillDown = this.dragging;
+
+    if (queuedPower) {
+      bbLog('Power Bounce hit — trampoline spring + power ball');
+      this.paddle.clearTint();
+      // Amplified angle: center ≈ vertical, edges = sharper (spec)
+      if (Math.abs(normalized) < 0.22) {
+        vx = normalized * PHYSICS.ballSpeed * 0.4;
+        vy = -PHYSICS.powerBounceSpeed * 1.1;
+      } else {
+        vx = normalized * PHYSICS.ballSpeed * PHYSICS.powerAngleAmp;
+        vy = -PHYSICS.powerBounceSpeed;
+      }
+      this.powerBounceQueued = false;
+      this.enterBallPowerMode();
+      if (fingerStillDown) {
+        // Spring plays on release so charge can continue until then
+        this.pendingPowerSpring = true;
+      } else {
+        this.doPaddleSpringBounce();
+      }
+      this.flashBallPowerSuccess();
+      this.triggerPerfectTimingFeedback();
+      this.powerHint.setText('POWER BALL!').setColor('#ffe66d');
+      this.time.delayedCall(500, () => {
+        if (this.gameState === 'playing' && !this.ballPowerMode) this.powerHint.setText('');
+      });
+    } else {
+      if (this.powerBounceQueued) {
+        bbLog('power bounce not applied', {
+          queueElapsed,
+          windowMs: POWER_BOUNCE.queueWindowMs,
+          vy: ball.body.velocity.y,
+        });
+        this.flashPowerMissHint(queueElapsed > POWER_BOUNCE.queueWindowMs ? 'Too slow — hit earlier' : 'Release closer to contact');
+      }
+      this.powerBounceQueued = false;
+      vy = -Math.abs(ball.body.velocity.y) * PHYSICS.paddleBounceFactor;
+      if (vy > -280) vy = -280;
+      if (!fingerStillDown) {
+        this.doPaddleNormalTap();
+      }
+    }
+
+    ball.setVelocity(vx, vy);
+    this.clampBallSpeed();
+
+    if (fingerStillDown) {
+      this.maintainPaddleChargeWhileDragging();
+    }
+  }
+
+  onBallEnemy(ball, enemy) {
+    if (!enemy.active) return;
+    let points = enemy.getData('points');
+    if (this.powerBounceMultiplier) {
+      points = Math.floor(points * SCORE.powerMultiplier);
+    }
+    this.addScore(points);
+    this.spawnDestroyParticles(enemy.x, enemy.y, COLORS.enemy);
+    enemy.destroy();
+    this.clampBallSpeed();
+  }
+
+  onBallHazard(ball) {
+    if (this.ballOnPaddle || this.gameState !== 'playing') return;
+
+    // Powered ball: spikes bounce off safely (spec)
+    if (this.ballPowerMode) {
+      const pushX = ball.body.velocity.x * 1.05 || (ball.x < this.scale.width / 2 ? -140 : 140);
+      ball.setVelocity(pushX, -Math.max(380, Math.abs(ball.body.velocity.y) * 1.2));
+      this.spawnDestroyParticles(ball.x, ball.y, 0xffe66d);
+      this.clampBallSpeed();
+      return;
+    }
+
+    this.loseBall();
+  }
+
+  destroyBlock(block) {
+    this.spawnDestroyParticles(block.x, block.y, block.getData('isPower') ? 0x9ca3af : 0xffb347);
+    block.destroy();
+    this.blocksRemaining--;
+    if (this.blocksRemaining <= 0) {
+      this.time.delayedCall(300, () => this.showLevelClear());
+    }
+  }
+
+  flashBlock(block, color) {
+    this.tweens.add({
+      targets: block,
+      alpha: 0.5,
+      duration: 60,
+      yoyo: true,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Ball lifecycle
+  // ---------------------------------------------------------------------------
+
+  loseBall() {
+    if (this.gameState !== 'playing' || this.isLosingBall) return;
+    bbLog('loseBall', { livesBefore: this.lives });
+    this.isLosingBall = true;
+    this.lives--;
+    this.updateUI();
+    this.spawnDestroyParticles(this.ball.x, this.ball.y, COLORS.ball);
+
+    if (this.lives <= 0) {
+      this.ball.setActive(false).setVisible(false);
+      this.showGameOver();
+      return;
+    }
+
+    this.attachBallToPaddle();
+    this.powerBounceQueued = false;
+    this.time.delayedCall(400, () => {
+      this.isLosingBall = false;
+    });
+  }
+
+  clampBallSpeed() {
+    const v = this.ball.body.velocity;
+    const speed = Math.sqrt(v.x * v.x + v.y * v.y);
+    const cap = this.ballPowerMode ? PHYSICS.powerBallMaxSpeed : PHYSICS.ballMaxSpeed;
+    if (speed > cap) {
+      const scale = cap / speed;
+      this.ball.setVelocity(v.x * scale, v.y * scale);
+    }
+    if (speed < 200 && this.ballLaunched && !this.ballOnPaddle) {
+      const scale = 220 / speed;
+      this.ball.setVelocity(v.x * scale, v.y * scale);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Input — drag paddle on bottom half; RELEASE in timing window arms Power Bounce
+  // ---------------------------------------------------------------------------
+
+  isBallNearPaddleForCharge() {
+    if (!this.ball?.body || !this.paddle) return false;
+    const dy = this.ball.y - this.paddle.y;
+    return (
+      dy > -POWER_BOUNCE.chargeAbovePaddle &&
+      dy < POWER_BOUNCE.chargeBelowPaddle &&
+      this.ball.body.velocity.y > POWER_BOUNCE.minFallSpeed
+    );
+  }
+
+  canArmPowerOnRelease() {
+    if (!this.ball?.body || !this.paddle) return false;
+    if (!this.ballLaunched || this.ballOnPaddle) return false;
+    const dy = this.ball.y - this.paddle.y;
+    const inZone = dy > -POWER_BOUNCE.armAbovePaddle && dy < POWER_BOUNCE.armBelowPaddle;
+    const falling = this.ball.body.velocity.y > POWER_BOUNCE.minFallSpeed;
+    return inZone && falling;
+  }
+
+  queuePowerBounceOnRelease(wasPaddleTouch) {
+    if (this.gameState !== 'playing') return false;
+    if (!wasPaddleTouch) {
+      bbLog('power bounce not queued — no bottom-half touch');
+      return false;
+    }
+    if (!this.canArmPowerOnRelease()) {
+      bbLog('power bounce not queued — outside arm window', {
+        dy: this.ball.y - this.paddle.y,
+        vy: this.ball.body.velocity.y,
+      });
+      return false;
+    }
+
+    this.powerBounceQueued = true;
+    this.powerBounceQueuedAt = this.time.now;
+    bbLog('power bounce queued', {
+      at: this.powerBounceQueuedAt,
+      dy: this.ball.y - this.paddle.y,
+      vy: this.ball.body.velocity.y,
+    });
+    return true;
+  }
+
+  flashPowerMissHint(msg) {
+    this.powerHint.setText(msg).setColor('#ff9999');
+    this.time.delayedCall(700, () => {
+      if (this.gameState === 'playing' && !this.ballPowerMode) this.powerHint.setText('');
+    });
+  }
+
+  setupInput() {
+    this.input.on('pointerdown', (pointer) => {
+      if (this.gameState !== 'playing') return;
+
+      const { height } = this.scale;
+      const bottomHalf = pointer.y > height * 0.5;
+      this.pointerWasDragging = false;
+      this.bottomHalfTouchThisStroke = bottomHalf;
+
+      if (this.ballOnPaddle) {
+        this.launchBall();
+        return;
+      }
+
+      if (bottomHalf) {
+        this.dragging = true;
+        this.movePaddleToPointer(pointer);
+      }
+    });
+
+    this.input.on('pointermove', (pointer) => {
+      if (this.gameState !== 'playing' || !this.dragging) return;
+      if (pointer.y > this.scale.height * 0.5) {
+        this.pointerWasDragging = true;
+        this.movePaddleToPointer(pointer);
+      }
+    });
+
+    this.input.on('pointerup', () => {
+      const wasPaddleTouch =
+        this.bottomHalfTouchThisStroke || this.dragging || this.pointerWasDragging;
+
+      if (this.gameState === 'playing' && wasPaddleTouch && !this.ballOnPaddle) {
+        const queued = this.queuePowerBounceOnRelease(wasPaddleTouch);
+        if (this.pendingPowerSpring) {
+          this.pendingPowerSpring = false;
+          this.doPaddleSpringBounce();
+        } else {
+          this.paddleReleaseAnimation(queued);
+        }
+      } else if (!this.paddleSpringing) {
+        this.stopPaddleCharge(true);
+      }
+
+      this.dragging = false;
+      this.pointerWasDragging = false;
+      this.bottomHalfTouchThisStroke = false;
+    });
+  }
+
+  movePaddleToPointer(pointer) {
+    const margin = 58;
+    const { width } = this.scale;
+    this.paddle.x = Phaser.Math.Clamp(pointer.x, margin, width - margin);
+    if (this.ballOnPaddle) this.syncBallToPaddle();
+  }
+
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
+
+  createUI() {
+    const { width } = this.scale;
+    const style = { fontFamily: 'system-ui, -apple-system, sans-serif', fontSize: '18px', color: COLORS.text };
+
+    this.scoreText = this.add.text(20, 24, 'Score: 0', style).setDepth(100);
+    this.livesContainer = this.add.container(width - 20, 28).setDepth(100);
+    this.lifeIcons = [];
+    for (let i = 0; i < 3; i++) {
+      const icon = this.add.image(-i * 22, 0, 'life_icon').setScale(0.9);
+      this.lifeIcons.push(icon);
+      this.livesContainer.add(icon);
+    }
+    this.livesContainer.setX(width - 20 - 22 * 2);
+
+    this.powerHint = this.add
+      .text(width / 2, 56, '', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '16px',
+        color: COLORS.accent,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(100);
+
+    this.powerBallBadge = this.add
+      .text(width / 2, 88, '', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '13px',
+        color: '#1a1a2e',
+        backgroundColor: '#ffe66d',
+        padding: { x: 10, y: 4 },
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(100)
+      .setVisible(false);
+
+    this.launchHint = this.add
+      .text(width / 2, this.scale.height - 120, 'Tap to launch', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '14px',
+        color: '#ffffff88',
+      })
+      .setOrigin(0.5)
+      .setDepth(100);
+  }
+
+  updateUI() {
+    this.scoreText.setText(`Score: ${this.score}`);
+    this.lifeIcons.forEach((icon, i) => {
+      icon.setAlpha(i < this.lives ? 1 : 0.25);
+      icon.setTint(i < this.lives ? 0xffffff : 0x666666);
+    });
+    this.launchHint.setVisible(this.ballOnPaddle && this.gameState === 'playing');
+  }
+
+  addScore(pts) {
+    this.score += pts;
+    this.scoreText.setText(`Score: ${this.score}`);
+    this.tweens.add({
+      targets: this.scoreText,
+      scaleX: 1.15,
+      scaleY: 1.15,
+      duration: 80,
+      yoyo: true,
+    });
+  }
+
+  resetPaddleVisual() {
+    if (!this.paddle) return;
+    this.paddle.setScale(1);
+    this.paddle.angle = 0;
+    this.paddle.clearTint();
+    this.drawPaddleFlexArc(0);
+  }
+
+  startPaddleCharge() {
+    if (this.paddleCharging) return;
+    this.preparePaddleForCharge();
+    bbLog('paddle charge start');
+    this.paddleCharging = true;
+    this.paddle.setTint(0xb8ffec);
+
+    this.paddleChargeScaleTween = this.tweens.add({
+      targets: this.paddle,
+      scaleX: 1.16,
+      scaleY: 0.86,
+      duration: 220,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        const flex = 0.25 + (this.paddle.scaleX - 1) * 0.8;
+        this.drawPaddleFlexArc(flex);
+      },
+    });
+
+    this.paddleChargeShakeTween = this.tweens.add({
+      targets: this.paddle,
+      angle: 3,
+      duration: 42,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  stopPaddleCharge(resetVisual) {
+    this.paddleCharging = false;
+    this.safeStopTween(this.paddleChargeScaleTween);
+    this.safeStopTween(this.paddleChargeShakeTween);
+    this.clearPaddleTweenRefs();
+    if (resetVisual && !this.paddleSpringing) {
+      this.resetPaddleVisual();
+    }
+  }
+
+  maintainPaddleChargeWhileDragging() {
+    if (!this.dragging || this.ballOnPaddle || !this.ballLaunched) return;
+    if (!this.paddleCharging) {
+      this.startPaddleCharge();
+    }
+  }
+
+  updatePaddleCharge() {
+    if (this.gameState !== 'playing' || this.ballOnPaddle || !this.ballLaunched) {
+      if (this.paddleCharging) this.stopPaddleCharge(true);
+      return;
+    }
+
+    // Recover if spring flag stuck after a killed/completed tween chain
+    if (this.paddleSpringing && this.paddle && this.tweens.getTweensOf(this.paddle).length === 0) {
+      bbLog('paddle spring flag stuck — resetting');
+      this.finishPaddleSpring();
+    }
+
+    // Finger down: keep shake for whole drag (even after power spring / powered ball)
+    if (this.dragging) {
+      const canStartCharge = this.isBallNearPaddleForCharge() || this.paddleCharging;
+      if (canStartCharge && !this.paddleCharging) {
+        this.startPaddleCharge();
+      }
+      return;
+    }
+
+    // Finger up: only charge when ball is falling near paddle
+    const ready = this.isBallNearPaddleForCharge();
+    if (ready && !this.paddleCharging) {
+      this.startPaddleCharge();
+    } else if (!ready && this.paddleCharging) {
+      this.stopPaddleCharge(true);
+    }
+  }
+
+  updatePowerBallBadge() {
+    if (!this.powerBallBadge) return;
+    if (this.ballPowerMode) {
+      this.powerBallBadge.setText('⚡ POWER BALL');
+      this.powerBallBadge.setBackgroundColor('#ffe66d');
+      this.powerBallBadge.setVisible(true);
+    } else if (this.ballPowerCooling) {
+      this.powerBallBadge.setText('cooling down…');
+      this.powerBallBadge.setBackgroundColor('#9ca3af');
+      this.powerBallBadge.setVisible(true);
+    } else {
+      this.powerBallBadge.setVisible(false);
+    }
+  }
+
+  updateBallPowerVisual(time) {
+    this.ballAura.clear();
+    if (!this.ball.active || this.ballOnPaddle) return;
+
+    const scale = this.ball.scaleX;
+    const baseR = 16 * scale;
+    const pulse = 1 + 0.12 * Math.sin(time / 90);
+
+    if (this.ballPowerMode) {
+      this.ballAura.lineStyle(3, 0xffe66d, 0.95);
+      this.ballAura.strokeCircle(this.ball.x, this.ball.y, baseR * pulse + 4);
+      this.ballAura.lineStyle(2, 0xffffff, 0.45);
+      this.ballAura.strokeCircle(this.ball.x, this.ball.y, baseR * pulse + 8);
+    } else if (this.ballPowerCooling) {
+      const coolPulse = 1 + 0.06 * Math.sin(time / 120);
+      this.ballAura.lineStyle(2, 0x9ca3af, 0.35);
+      this.ballAura.strokeCircle(this.ball.x, this.ball.y, baseR * coolPulse + 2);
+    }
+  }
+
+  clearBallPowerState() {
+    if (this.powerBallTimer) {
+      this.powerBallTimer.remove(false);
+      this.powerBallTimer = null;
+    }
+    this.tweens.killTweensOf(this.ball);
+    this.ballPowerMode = false;
+    this.ballPowerCooling = false;
+    this.powerBounceActive = false;
+    this.powerBounceMultiplier = false;
+    this.ball.setScale(this.ballBaseScale);
+    this.ball.body.setCircle(14);
+    this.ball.clearTint();
+    this.ballAura.clear();
+    this.updatePowerBallBadge();
+  }
+
+  refreshPowerBallTimer() {
+    if (this.powerBallTimer) this.powerBallTimer.remove(false);
+    this.powerBallTimer = this.time.delayedCall(POWER_BALL.durationMs, () => {
+      this.startBallPowerCooldown();
+    });
+  }
+
+  enterBallPowerMode() {
+    const chaining = this.ballPowerMode;
+
+    if (this.powerBallTimer) this.powerBallTimer.remove(false);
+    if (!chaining) this.tweens.killTweensOf(this.ball);
+
+    this.ballPowerMode = true;
+    this.ballPowerCooling = false;
+    this.powerBounceActive = true;
+    this.powerBounceMultiplier = true;
+
+    this.ball.setTint(POWER_BALL.tint);
+    if (!chaining) {
+      this.tweens.add({
+        targets: this.ball,
+        scale: POWER_BALL.scale,
+        duration: 120,
+        ease: 'Back.easeOut',
+      });
+    }
+    this.ball.body.setCircle(14 * POWER_BALL.scale);
+    this.updatePowerBallBadge();
+    this.refreshPowerBallTimer();
+  }
+
+  startBallPowerCooldown() {
+    if (!this.ball.active || this.ballOnPaddle) return;
+
+    this.ballPowerMode = false;
+    this.ballPowerCooling = true;
+    this.powerBounceActive = false;
+    this.powerBounceMultiplier = false;
+    this.updatePowerBallBadge();
+
+    this.tweens.killTweensOf(this.ball);
+    this.tweens.add({
+      targets: this.ball,
+      scale: this.ballBaseScale,
+      duration: POWER_BALL.cooldownMs,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        this.ball.clearTint();
+        this.ball.body.setCircle(14);
+        this.ballPowerCooling = false;
+        this.ballAura.clear();
+        this.updatePowerBallBadge();
+      },
+    });
+
+    this.powerBallTimer = this.time.delayedCall(POWER_BALL.cooldownMs, () => {
+      this.powerBallTimer = null;
+      if (!this.ballPowerMode) {
+        this.ballPowerCooling = false;
+        this.updatePowerBallBadge();
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Effects
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Always plays on bottom-half release while ball is in play.
+   * @param {boolean} armed — power queued; holds coil until ball hits or window expires
+   */
+  paddleReleaseAnimation(armed) {
+    bbLog('paddle release animation', { armed });
+    this.stopPaddleCharge(false);
+    this.killPaddleTweens();
+    this.paddleSpringing = true;
+
+    const coilScaleX = armed ? 1.34 : 1.2;
+    const coilScaleY = armed ? 0.5 : 0.64;
+
+    if (armed) {
+      this.paddle.setTint(0xd4fff0);
+    } else {
+      this.paddle.clearTint();
+    }
+
+    this.tweens.add({
+      targets: this.paddle,
+      scaleX: coilScaleX,
+      scaleY: coilScaleY,
+      angle: 0,
+      duration: armed ? 75 : 60,
+      ease: 'Quad.easeIn',
+      onUpdate: () => this.drawPaddleFlexArc(armed ? 0.32 : 0.16),
+      onComplete: () => {
+        if (!this.isSceneActive()) return;
+
+        if (armed) {
+          // Stay coiled — full trampoline spring runs on successful power hit
+          this.paddleSpringing = false;
+          return;
+        }
+
+        // Miss / early release: small rebound, then rest
+        this.tweens.add({
+          targets: this.paddle,
+          scaleX: 1.08,
+          scaleY: 1.06,
+          duration: 85,
+          ease: 'Back.easeOut',
+          onUpdate: () => this.drawPaddleFlexArc(0.1),
+          onComplete: () => {
+            if (!this.isSceneActive()) return;
+            this.tweens.add({
+              targets: this.paddle,
+              scaleX: 1,
+              scaleY: 1,
+              duration: 110,
+              ease: 'Quad.easeOut',
+              onUpdate: () => this.drawPaddleFlexArc(0.04),
+              onComplete: () => {
+                if (!this.isSceneActive()) return;
+                this.finishPaddleSpring();
+              },
+            });
+          },
+        });
+      },
+    });
+  }
+
+  drawPaddleFlexArc(strength) {
+    if (!this.paddleFlexGfx?.active || !this.paddle?.active) return;
+    this.paddleFlexGfx.clear();
+    if (strength <= 0.01) return;
+
+    const px = this.paddle.x;
+    const py = this.paddle.y - 2;
+    const hw = 46 * this.paddle.scaleX;
+    const bulge = 4 + strength * 16;
+
+    // Phaser Graphics has no quadraticCurveTo — use ellipses + triangle dome
+    this.paddleFlexGfx.fillStyle(COLORS.paddleDark, 0.85);
+    this.paddleFlexGfx.fillTriangle(px - hw, py + 8, px + hw, py + 8, px, py - bulge);
+    this.paddleFlexGfx.fillEllipse(px, py + 4, hw * 1.05, 10 + strength * 2);
+
+    this.paddleFlexGfx.fillStyle(COLORS.paddle, 1);
+    this.paddleFlexGfx.fillEllipse(px, py - bulge * 0.4, hw * 0.92, bulge * 0.8);
+  }
+
+  /** Trampoline spring on successful Power Bounce contact */
+  doPaddleSpringBounce() {
+    bbLog('paddle spring bounce');
+    this.stopPaddleCharge(false);
+    this.killPaddleTweens();
+    this.paddleSpringing = true;
+    this.paddle.clearTint();
+
+    this.tweens.add({
+      targets: this.paddle,
+      scaleX: 1.58,
+      scaleY: 0.4,
+      angle: 0,
+      duration: 45,
+      ease: 'Quad.easeIn',
+      onUpdate: () => this.drawPaddleFlexArc(0.2),
+      onComplete: () => {
+        if (!this.isSceneActive()) return;
+        this.tweens.add({
+          targets: this.paddle,
+          scaleX: 1.22,
+          scaleY: 1.42,
+          duration: 95,
+          ease: 'Back.easeOut',
+          onUpdate: () => {
+            const flex = Math.max(0, (this.paddle.scaleY - 1) * 1.4);
+            this.drawPaddleFlexArc(flex);
+          },
+          onComplete: () => {
+            if (!this.isSceneActive()) return;
+            this.tweens.add({
+              targets: this.paddle,
+              scaleX: 1,
+              scaleY: 1,
+              duration: 280,
+              ease: 'Bounce.easeOut',
+              onUpdate: () => {
+                const flex = Math.max(0, (this.paddle.scaleY - 1) * 1.2);
+                this.drawPaddleFlexArc(flex);
+              },
+              onComplete: () => {
+                if (!this.isSceneActive()) return;
+                this.finishPaddleSpring();
+              },
+            });
+          },
+        });
+      },
+    });
+  }
+
+  /** Subtle trampoline tap on a normal bounce */
+  doPaddleNormalTap() {
+    if (this.paddleCharging) return;
+    this.paddleSpringing = true;
+    this.killPaddleTweens();
+    this.tweens.add({
+      targets: this.paddle,
+      scaleX: 1.1,
+      scaleY: 0.72,
+      duration: 50,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+      onUpdate: () => this.drawPaddleFlexArc(0.15),
+      onComplete: () => {
+        if (!this.isSceneActive()) return;
+        this.finishPaddleSpring();
+      },
+    });
+  }
+
+  flashBallPowerSuccess() {
+    this.ball.setTint(0xffffff);
+    this.time.delayedCall(90, () => {
+      if (this.ball.active && this.ballPowerMode) {
+        this.ball.setTint(POWER_BALL.tint);
+      }
+    });
+  }
+
+  triggerPerfectTimingFeedback() {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(12);
+    }
+
+    const overlay = this.add.rectangle(
+      this.scale.width / 2,
+      this.scale.height / 2,
+      this.scale.width,
+      this.scale.height,
+      0xffffff,
+      0.12
+    ).setDepth(150);
+
+    this.tweens.add({
+      targets: overlay,
+      alpha: 0,
+      duration: POWER_BOUNCE.slowMoRealMs,
+      onComplete: () => overlay.destroy(),
+    });
+
+    const prevScale = this.time.timeScale;
+    this.time.timeScale = POWER_BOUNCE.slowMoTimeScale;
+    window.setTimeout(() => {
+      if (!this.isSceneActive()) return;
+      if (this.time) this.time.timeScale = prevScale === 0 ? 1 : prevScale;
+    }, POWER_BOUNCE.slowMoRealMs);
+  }
+
+  spawnDestroyParticles(x, y, tint) {
+    const emitter = this.add.particles(x, y, 'particle', {
+      speed: { min: 60, max: 180 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1.2, end: 0 },
+      lifespan: 350,
+      quantity: 10,
+      tint: tint,
+      blendMode: 'ADD',
+    });
+    this.time.delayedCall(400, () => emitter.destroy());
+  }
+
+  // ---------------------------------------------------------------------------
+  // End screens
+  // ---------------------------------------------------------------------------
+
+  showOverlay(title, subtitle, buttonLabel, onRestart) {
+    const { width, height } = this.scale;
+    const overlay = this.add.container(0, 0).setDepth(200);
+
+    const dim = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75);
+    const panel = this.add.rectangle(width / 2, height / 2, width - 48, 220, 0x1a1a2e, 0.95);
+    panel.setStrokeStyle(3, 0xffe66d);
+
+    const titleText = this.add
+      .text(width / 2, height / 2 - 50, title, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '28px',
+        color: COLORS.accent,
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+
+    const subText = this.add
+      .text(width / 2, height / 2, subtitle, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '18px',
+        color: COLORS.text,
+      })
+      .setOrigin(0.5);
+
+    const btnBg = this.add.rectangle(width / 2, height / 2 + 60, 180, 44, COLORS.paddle).setInteractive({ useHandCursor: true });
+    const btnLabel = this.add
+      .text(width / 2, height / 2 + 60, buttonLabel, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '18px',
+        color: '#1a1a2e',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+
+    btnBg.on('pointerdown', () => {
+      overlay.destroy();
+      onRestart();
+    });
+
+    overlay.add([dim, panel, titleText, subText, btnBg, btnLabel]);
+    return overlay;
+  }
+
+  showLevelClear() {
+    if (this.gameState !== 'playing') return;
+    this.gameState = 'levelClear';
+    this.ball.body.setVelocity(0, 0);
+    this.ball.body.moves = false;
+    this.showOverlay('Level Clear!', `Final Score: ${this.score}`, 'Play Again', () => this.scene.restart());
+  }
+
+  showGameOver() {
+    this.gameState = 'gameOver';
+    this.showOverlay('Game Over', `Score: ${this.score}`, 'Try Again', () => this.scene.restart());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Update loop
+  // ---------------------------------------------------------------------------
+
+  update(time, delta) {
+    if (this.gameState !== 'playing') return;
+
+    try {
+      if (this.ballOnPaddle) {
+        this.syncBallToPaddle();
+      } else if (this.ball?.active) {
+        // Ball fell through paddle into floor spikes (overlap also triggers loseBall)
+        if (this.ball.y > this.scale.height - 28) {
+          this.loseBall();
+        }
+        this.clampBallSpeed();
+        this.updateBallPowerVisual(time);
+      }
+
+      this.updatePaddleCharge();
+
+      // Expire stale power bounce queue
+      if (this.powerBounceQueued && time - this.powerBounceQueuedAt > POWER_BOUNCE.queueWindowMs) {
+        this.powerBounceQueued = false;
+        if (!this.paddleSpringing && !this.paddleCharging) {
+          this.killPaddleTweens();
+          this.resetPaddleVisual();
+        }
+      }
+
+      // Keep enemy hitboxes aligned with tweened positions
+      this.enemies?.getChildren().forEach((enemy) => {
+        if (enemy.active && enemy.body) {
+          enemy.body.reset(enemy.x, enemy.y);
+        }
+      });
+    } catch (err) {
+      bbError('update()', err);
+    }
+  }
+}
+
+// =============================================================================
+// PHASER BOOT
+// =============================================================================
+
+const config = {
+  type: Phaser.AUTO,
+  parent: 'game-container',
+  width: GAME_WIDTH,
+  height: GAME_HEIGHT,
+  backgroundColor: '#1a1a2e',
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
+  physics: {
+    default: 'arcade',
+    arcade: {
+      gravity: { y: 0 },
+      debug: false,
+    },
+  },
+  scene: [GameScene],
+  render: {
+    antialias: true,
+    pixelArt: false,
+    roundPixels: true,
+  },
+};
+
+bbLog('boot Phaser', { width: GAME_WIDTH, height: GAME_HEIGHT });
+try {
+  new Phaser.Game(config);
+  bbLog('Phaser.Game created');
+} catch (err) {
+  bbError('Phaser.Game boot', err);
+}
+</script>
+
+<!--
+================================================================================
+  KNOWN LIMITATIONS & SUGGESTED NEXT STEPS
+================================================================================
+
+LIMITATIONS (this demo)
+-----------------------
+  • Single hard-coded level layout (no level loader or editor).
+  • Procedural textures only — no sprite atlases or audio.
+  • Power Bounce: release-only timing before contact; spike immunity while powered.
+  • Enemies use simple tweens, not true AI or spawn waves.
+  • No pause menu, settings, save data, or online leaderboards.
+  • Desktop keyboard controls not implemented (touch-first).
+  • Block collision uses default Arcade separation (adequate for demo scale).
+
+NEXT STEPS FOR A FULL GAME
+--------------------------
+  1. Level data: JSON arrays per level + loader scene; unlock progression.
+  2. Asset pipeline: TexturePacker atlases, SFX/music (Howler or Phaser sound).
+  3. Power-ups: multi-ball, wider paddle, laser — extend Power Bounce system.
+  4. Scene flow: Boot → Menu → Level Select → Game → Results → Shop.
+  5. Mobile polish: haptics (Capacitor), safe areas, adaptive HUD scaling.
+  6. Performance: object pooling for particles/blocks; static body batching.
+  7. Testing: unit tests for score math; Playwright/device farm for touch QA.
+  8. Monetization / analytics only if product requires — keep gameplay fair.
+
+================================================================================
+-->
+</body>
+</html>

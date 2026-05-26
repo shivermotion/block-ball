@@ -1,0 +1,14 @@
+{
+  "name": "block-ball",
+  "version": "1.0.0",
+  "description": "Block Ball — mobile-friendly Phaser 3 Breakout demo",
+  "private": true,
+  "scripts": {
+    "start": "serve . -l 8080",
+    "dev": "serve . -l 8080 --no-request-logging",
+    "open": "open http://localhost:8080/block-ball-demo.html"
+  },
+  "devDependencies": {
+    "serve": "^14.2.4"
+  }
+}
