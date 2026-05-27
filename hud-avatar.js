@@ -4,12 +4,12 @@
  */
 
 const HUD_AVATAR_STATES = {
-  default: { texture: 'hud_avatar_default', priority: 0 },
+  default: { texture: 'ball', fallback: 'hud_avatar_default', priority: 0 },
+  power: { texture: 'ball_determined', fallback: 'hud_avatar_power', priority: 40 },
   hurt: { texture: 'hud_avatar_hurt', priority: 10 },
   charging: { texture: 'hud_avatar_charging', priority: 20 },
   armed: { texture: 'hud_avatar_armed', priority: 25 },
   cooling: { texture: 'hud_avatar_cooling', priority: 30 },
-  power: { texture: 'hud_avatar_power', priority: 40 },
   level_clear: { texture: 'hud_avatar_happy', priority: 50 },
   game_over: { texture: 'hud_avatar_defeated', priority: 60 },
 };
@@ -34,9 +34,11 @@ function generateHudAvatarTextures(scene, size = 48) {
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
   const av = size;
 
-  g.clear();
-  drawAvatarFace(g, av, 0xffd4a8, 0x3d4f6f);
-  g.generateTexture('hud_avatar_default', av, av);
+  if (!scene.textures.exists('ball')) {
+    g.clear();
+    drawAvatarFace(g, av, 0xffd4a8, 0x3d4f6f);
+    g.generateTexture('hud_avatar_default', av, av);
+  }
 
   g.clear();
   drawAvatarFace(g, av, 0xffb8a8, 0x8b2942);
@@ -64,16 +66,18 @@ function generateHudAvatarTextures(scene, size = 48) {
   g.strokeCircle(av / 2, av / 2, av / 2 - 3);
   g.generateTexture('hud_avatar_cooling', av, av);
 
-  g.clear();
-  drawAvatarFace(g, av, 0xfff0a0, 0xffe66d);
-  g.lineStyle(3, 0xffffff, 0.95);
-  g.strokeCircle(av / 2, av / 2, av / 2 - 3);
-  g.fillStyle(0xffe66d, 1);
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 - Math.PI / 2;
-    g.fillCircle(av / 2 + Math.cos(a) * (av * 0.38), av / 2 + Math.sin(a) * (av * 0.38), 3);
+  if (!scene.textures.exists('ball_determined')) {
+    g.clear();
+    drawAvatarFace(g, av, 0xfff0a0, 0xffe66d);
+    g.lineStyle(3, 0xffffff, 0.95);
+    g.strokeCircle(av / 2, av / 2, av / 2 - 3);
+    g.fillStyle(0xffe66d, 1);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 - Math.PI / 2;
+      g.fillCircle(av / 2 + Math.cos(a) * (av * 0.38), av / 2 + Math.sin(a) * (av * 0.38), 3);
+    }
+    g.generateTexture('hud_avatar_power', av, av);
   }
-  g.generateTexture('hud_avatar_power', av, av);
 
   g.clear();
   drawAvatarFace(g, av, 0xffd4a8, 0x00d4aa);
@@ -124,10 +128,14 @@ function resolveHudAvatarState(snap) {
   return best;
 }
 
-function getHudAvatarTextureKey(stateId, avatarConfig = null) {
+function getHudAvatarTextureKey(stateId, avatarConfig = null, scene = null) {
   const override = avatarConfig?.states?.[stateId];
   if (override) return override;
-  return HUD_AVATAR_STATES[stateId]?.texture ?? HUD_AVATAR_STATES.default.texture;
+  const entry = HUD_AVATAR_STATES[stateId] ?? HUD_AVATAR_STATES.default;
+  const primary = entry.texture;
+  if (scene?.textures?.exists(primary)) return primary;
+  if (entry.fallback && scene?.textures?.exists(entry.fallback)) return entry.fallback;
+  return primary;
 }
 
 /**
@@ -138,9 +146,12 @@ function getHudAvatarTextureKey(stateId, avatarConfig = null) {
  */
 function applyHudAvatarState(image, stateId, avatarConfig = null) {
   if (!image?.setTexture) return stateId;
-  const key = getHudAvatarTextureKey(stateId, avatarConfig);
-  if (!image.scene?.textures?.exists(key)) return stateId;
+  const scene = image.scene;
+  const key = getHudAvatarTextureKey(stateId, avatarConfig, scene);
+  if (!scene?.textures?.exists(key)) return stateId;
   if (image.texture.key !== key) image.setTexture(key);
+  const size = image.getData('hudAvatarSize');
+  if (size) image.setDisplaySize(size, size);
   image.setData('avatarState', stateId);
   return stateId;
 }

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -16,26 +17,109 @@
       --power: #6b7280;
       --enemy: #ff6bcb;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
       font-family: system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      margin: 0;
+    }
+
+    .editor-layout {
+      display: flex;
+      min-height: 100vh;
+      align-items: stretch;
+    }
+
+    .editor-main {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 16px;
+      overflow: auto;
+      min-width: 0;
+    }
+
+    .editor-sidebar {
+      width: 300px;
+      flex-shrink: 0;
       display: flex;
       flex-direction: column;
+      gap: 16px;
+      padding: 16px;
+      border-left: 1px solid #333;
+      background: var(--panel);
+      overflow-y: auto;
+      max-height: 100vh;
     }
-    header {
-      padding: 12px 16px;
-      border-bottom: 1px solid #333;
+
+    .editor-sidebar h1 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .sidebar-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sidebar-heading {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #888;
+    }
+
+    .sidebar-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
+      gap: 6px;
     }
-    header h1 { font-size: 1.1rem; font-weight: 600; margin-right: auto; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    button, select {
+
+    .sidebar-row button {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .sidebar-row select,
+    .sidebar-full select {
+      width: 100%;
+    }
+
+    .sidebar-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sidebar-actions button {
+      width: 100%;
+    }
+
+    .sidebar-export {
+      flex: 1;
+      min-height: 120px;
+    }
+
+    .sidebar-export textarea {
+      flex: 1;
+      min-height: 160px;
+      width: 100%;
+    }
+
+    button,
+    select {
       background: var(--panel);
       color: var(--text);
       border: 1px solid #444;
@@ -44,17 +128,98 @@
       font-size: 13px;
       cursor: pointer;
     }
-    button.primary { background: #00d4aa33; border-color: #00d4aa; }
-    button.danger { border-color: #ff6b6b66; color: #ffaaaa; }
-    button.danger:disabled { opacity: 0.35; cursor: not-allowed; }
-    button.active { outline: 2px solid var(--accent); }
-    main {
-      flex: 1;
-      display: flex;
-      gap: 16px;
-      padding: 16px;
-      overflow: auto;
+
+    button.primary {
+      background: #00d4aa33;
+      border-color: #00d4aa;
     }
+
+    button.danger {
+      border-color: #ff6b6b66;
+      color: #ffaaaa;
+    }
+
+    button.danger:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    button.active {
+      outline: 2px solid var(--accent);
+    }
+
+    .brush-panel-pane[hidden] {
+      display: none;
+    }
+
+    .brush-panel-pane select {
+      width: 100%;
+    }
+
+    .entity-picker-scroll {
+      max-height: 220px;
+      overflow-y: auto;
+      border-radius: 6px;
+    }
+
+    .entity-picker,
+    .block-picker {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      padding: 2px;
+      background: #1a1630;
+      border: 1px solid #444;
+      border-radius: 6px;
+    }
+
+    .entity-picker-btn,
+    .block-picker-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 4px;
+      min-width: 0;
+      width: 100%;
+      border-radius: 5px;
+      border: 2px solid transparent;
+      background: #1e1638;
+    }
+
+    .entity-picker-btn:hover,
+    .block-picker-btn:hover {
+      border-color: #666;
+    }
+
+    .entity-picker-btn.active,
+    .block-picker-btn.active {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    .entity-picker-btn.is-placeholder .entity-picker-thumb,
+    .block-picker-btn.is-placeholder .block-picker-thumb {
+      opacity: 0.92;
+    }
+
+    .entity-picker-thumb,
+    .block-picker-thumb {
+      display: block;
+      width: 40px;
+      height: 40px;
+      image-rendering: auto;
+    }
+
+    .entity-picker-key,
+    .block-picker-key {
+      font-size: 10px;
+      line-height: 1;
+      color: #888;
+      font-family: ui-monospace, monospace;
+    }
+
     .canvas-wrap {
       flex-shrink: 0;
       background: #2d1b4e;
@@ -62,27 +227,12 @@
       border-radius: 8px;
       position: relative;
     }
+
     #level-canvas {
       display: block;
       cursor: crosshair;
     }
-    aside {
-      flex: 1;
-      min-width: 280px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .legend { font-size: 12px; line-height: 1.6; color: #aaa; }
-    .legend kbd {
-      display: inline-block;
-      min-width: 1.2em;
-      text-align: center;
-      background: #333;
-      padding: 0 4px;
-      border-radius: 3px;
-      color: var(--accent);
-    }
+
     textarea {
       flex: 1;
       min-height: 200px;
@@ -95,7 +245,12 @@
       font-size: 11px;
       resize: vertical;
     }
-    label { font-size: 12px; color: #888; }
+
+    label {
+      font-size: 12px;
+      color: #888;
+    }
+
     dialog {
       border: 1px solid #444;
       border-radius: 10px;
@@ -105,12 +260,37 @@
       max-width: 420px;
       width: calc(100% - 32px);
     }
-    dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
-    .save-dialog { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-    .save-dialog h2 { font-size: 1rem; font-weight: 600; }
-    .save-dialog p { font-size: 12px; color: #aaa; line-height: 1.5; }
-    .save-field { display: flex; flex-direction: column; gap: 4px; }
-    .save-field input, .save-field textarea {
+
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.55);
+    }
+
+    .save-dialog {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .save-dialog h2 {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .save-dialog p {
+      font-size: 12px;
+      color: #aaa;
+      line-height: 1.5;
+    }
+
+    .save-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .save-field input,
+    .save-field textarea {
       background: #111;
       color: var(--text);
       border: 1px solid #444;
@@ -119,66 +299,101 @@
       font-size: 13px;
       font-family: inherit;
     }
-    .save-field textarea { min-height: 72px; resize: vertical; }
-    .save-field small { font-size: 11px; color: #777; }
-    .save-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    .save-status { font-size: 12px; min-height: 1.2em; }
-    .save-status.error { color: #ff6b6b; }
-    .save-status.ok { color: #00d4aa; }
+
+    .save-field textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    .save-field small {
+      font-size: 11px;
+      color: #777;
+    }
+
+    .save-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .save-status {
+      font-size: 12px;
+      min-height: 1.2em;
+    }
+
+    .save-status.error {
+      color: #ff6b6b;
+    }
+
+    .save-status.ok {
+      color: #00d4aa;
+    }
   </style>
 </head>
+
 <body>
-  <header>
-    <h1>Block Ball Level Editor</h1>
-    <div class="toolbar">
-      <label>Mode</label>
-      <button type="button" id="mode-blocks" class="active">Blocks</button>
-      <button type="button" id="mode-enemies">Enemies</button>
-      <button type="button" id="mode-erase">Erase</button>
-      <label>Brush</label>
-      <select id="block-brush">
-        <option value="0">Empty</option>
-        <option value="1">Normal (1)</option>
-        <option value="2">Gray (g)</option>
-        <option value="3">Power (p)</option>
-        <option value="4">Spike (s)</option>
-        <option value="5">Indestructible (i)</option>
-      </select>
-      <select id="enemy-brush" hidden>
-        <option value="drifter">Drifter</option>
-      </select>
-      <label>Level</label>
-      <select id="level-picker" aria-label="Registered levels"></select>
-      <button type="button" id="btn-load-level">Load</button>
-      <button type="button" id="btn-delete-level" title="Remove selected level file from disk">Delete</button>
-      <button type="button" id="btn-play-test">Play test</button>
-      <button type="button" id="btn-clear">Clear</button>
-      <button type="button" id="btn-save" class="primary">Save</button>
-      <button type="button" id="btn-export">Export</button>
-    </div>
-  </header>
-  <main>
-    <div class="canvas-wrap">
-      <canvas id="level-canvas" width="390" height="780"></canvas>
-    </div>
-    <aside>
-      <p class="legend">
-        <strong>Blocks:</strong> click/drag any play cell (below HUD). Keys <kbd>1</kbd> <kbd>g</kbd> <kbd>p</kbd> <kbd>s</kbd> <kbd>i</kbd> <kbd>.</kbd>.<br />
-        <strong>Enemies:</strong> click a cell to place; click again to remove.<br />
-        Grid matches <code>390×780</code> playfield. Choose <strong>Blank</strong> or load a level, paint, then <strong>Save</strong> (writes <code>levels/your-id.js</code> via dev server). <strong>Play test</strong> opens the game. <strong>Export</strong> copies JS to clipboard.
-      </p>
-      <label for="export-json">Level template (export)</label>
-      <textarea id="export-json" readonly></textarea>
+  <div class="editor-layout">
+    <main class="editor-main">
+      <div class="canvas-wrap">
+        <canvas id="level-canvas" width="390" height="780"></canvas>
+      </div>
+    </main>
+    <aside class="editor-sidebar" aria-label="Editor controls">
+      <h1>Block Ball Level Editor</h1>
+
+      <section class="sidebar-section">
+        <h2 class="sidebar-heading">Mode</h2>
+        <div class="sidebar-row">
+          <button type="button" id="mode-blocks" class="active">Blocks</button>
+          <button type="button" id="mode-enemies">Enemies</button>
+          <button type="button" id="mode-erase">Erase</button>
+        </div>
+      </section>
+
+      <section class="sidebar-section" id="brush-panel">
+        <h2 class="sidebar-heading">Brush</h2>
+        <div id="block-brush-pane" class="brush-panel-pane">
+          <div id="block-brush" class="entity-picker" role="radiogroup" aria-label="Block brush"></div>
+        </div>
+        <div id="enemy-brush-pane" class="brush-panel-pane" hidden>
+          <div class="entity-picker-scroll">
+            <div id="enemy-brush" class="entity-picker" role="radiogroup" aria-label="Enemy brush"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sidebar-section sidebar-full">
+        <h2 class="sidebar-heading">Level</h2>
+        <select id="level-picker" aria-label="Registered levels"></select>
+        <div class="sidebar-row">
+          <button type="button" id="btn-load-level">Load</button>
+          <button type="button" id="btn-delete-level" title="Remove selected level file from disk">Delete</button>
+        </div>
+      </section>
+
+      <section class="sidebar-section sidebar-actions">
+        <button type="button" id="btn-play-test">Play test</button>
+        <button type="button" id="btn-clear">Clear</button>
+        <button type="button" id="btn-save" class="primary">Save</button>
+        <button type="button" id="btn-export">Export</button>
+      </section>
+
+      <section class="sidebar-section sidebar-export">
+        <label for="export-json">Level template (export)</label>
+        <textarea id="export-json" readonly></textarea>
+      </section>
     </aside>
-  </main>
+  </div>
 
   <dialog id="save-dialog">
     <form method="dialog" class="save-dialog" id="save-form">
       <h2>Save level</h2>
-      <p>Writes <code>levels/&lt;id&gt;.js</code> and updates <code>levels/manifest.json</code>. Requires <code>yarn start</code> (dev server).</p>
+      <p>Writes <code>levels/&lt;id&gt;.js</code> and updates <code>levels/manifest.json</code>. Requires
+        <code>yarn start</code> (dev server).</p>
       <div class="save-field">
         <label for="save-id">Level id</label>
-        <input type="text" id="save-id" name="id" pattern="[a-z0-9]+(-[a-z0-9]+)*" required autocomplete="off" spellcheck="false" />
+        <input type="text" id="save-id" name="id" pattern="[a-z0-9]+(-[a-z0-9]+)*" required autocomplete="off"
+          spellcheck="false" />
         <small>Lowercase letters, numbers, hyphens — e.g. <code>my-level</code></small>
       </div>
       <div class="save-field">
@@ -187,7 +402,8 @@
       </div>
       <div class="save-field">
         <label for="save-description">Description</label>
-        <textarea id="save-description" name="description" maxlength="500" placeholder="Optional notes for meta.description"></textarea>
+        <textarea id="save-description" name="description" maxlength="500"
+          placeholder="Optional notes for meta.description"></textarea>
       </div>
       <div class="save-field">
         <label for="save-lives">Starting lives</label>
@@ -203,6 +419,7 @@
 
   <script src="block-types.js"></script>
   <script src="enemy-types.js"></script>
+  <script src="editor-entity-art.js"></script>
   <script src="level-grid.js"></script>
   <script src="levels/registry.js"></script>
   <script>
@@ -224,12 +441,227 @@
     let mode = 'blocks';
     let painting = false;
 
-    const blockBrush = document.getElementById('block-brush');
-    const enemyBrush = document.getElementById('enemy-brush');
+    const blockBrushPane = document.getElementById('block-brush-pane');
+    const blockBrushRoot = document.getElementById('block-brush');
+    const enemyBrushPane = document.getElementById('enemy-brush-pane');
+    const enemyBrushRoot = document.getElementById('enemy-brush');
+
+    const PICKER_THUMB = 40;
+    const BLOCK_OPTS = EditorEntityArt.BLOCK_PICKER_OPTIONS;
+    const BLOCK_COLORS = EditorEntityArt.BLOCK_FALLBACK_COLORS;
+
+    let blockBrushValue = 1;
+    let enemyBrushValue = 'drifter';
+    let entityArt = null;
+    let entityArtKey = '';
+
+    function getBlockBrushValue() {
+      return blockBrushValue;
+    }
+
+    function setBlockBrushValue(val) {
+      blockBrushValue = Number(val);
+      blockBrushRoot.querySelectorAll('.entity-picker-btn').forEach((btn) => {
+        const on = Number(btn.dataset.value) === blockBrushValue;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+    }
+
+    function getEnemyBrushValue() {
+      return enemyBrushValue;
+    }
+
+    function setEnemyBrushValue(id) {
+      enemyBrushValue = id;
+      enemyBrushRoot.querySelectorAll('.entity-picker-btn').forEach((btn) => {
+        const on = btn.dataset.entityId === enemyBrushValue;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+    }
+
+    function paintPickerThumb(canvas, sprite, empty) {
+      const c = canvas.getContext('2d');
+      if (empty) {
+        EditorEntityArt.drawEmptyThumb(c, PICKER_THUMB);
+        return;
+      }
+      if (sprite) {
+        EditorEntityArt.drawThumbContained(c, sprite, PICKER_THUMB, 3);
+        return;
+      }
+      c.clearRect(0, 0, PICKER_THUMB, PICKER_THUMB);
+      c.fillStyle = '#444';
+      c.fillRect(4, 4, PICKER_THUMB - 8, PICKER_THUMB - 8);
+    }
+
+    function updateBlockPickerThumbs() {
+      blockBrushRoot.querySelectorAll('.entity-picker-btn').forEach((btn) => {
+        const v = Number(btn.dataset.value);
+        const canvas = btn.querySelector('canvas');
+        if (!canvas) return;
+        if (v === 0) {
+          paintPickerThumb(canvas, null, true);
+          return;
+        }
+        paintPickerThumb(canvas, entityArt?.blocks?.[v], false);
+      });
+    }
+
+    function updateEnemyPickerThumbs() {
+      enemyBrushRoot.querySelectorAll('.entity-picker-btn').forEach((btn) => {
+        const id = btn.dataset.entityId;
+        const canvas = btn.querySelector('canvas');
+        if (!canvas) return;
+        paintPickerThumb(canvas, entityArt?.enemies?.[id], false);
+      });
+    }
+
+    function createPickerButton({ value, entityId, label, keyHint, placeholder, onPick }) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'entity-picker-btn';
+      if (placeholder) btn.classList.add('is-placeholder');
+      if (value != null) btn.dataset.value = String(value);
+      if (entityId) btn.dataset.entityId = entityId;
+      btn.title = label;
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('aria-checked', 'false');
+
+      const thumb = document.createElement('canvas');
+      thumb.className = 'entity-picker-thumb';
+      thumb.width = PICKER_THUMB;
+      thumb.height = PICKER_THUMB;
+      thumb.setAttribute('aria-hidden', 'true');
+      btn.appendChild(thumb);
+
+      if (keyHint) {
+        const keyEl = document.createElement('span');
+        keyEl.className = 'entity-picker-key';
+        keyEl.textContent = keyHint;
+        btn.appendChild(keyEl);
+      }
+
+      btn.addEventListener('click', onPick);
+      return btn;
+    }
+
+    function initBlockPicker() {
+      blockBrushRoot.innerHTML = '';
+      for (const opt of BLOCK_OPTS) {
+        const placeholder = !opt.image && !opt.procedural;
+        blockBrushRoot.appendChild(
+          createPickerButton({
+            value: opt.value,
+            label: `${opt.label} (${opt.key})`,
+            keyHint: opt.key,
+            placeholder,
+            onPick: () => {
+              setBlockBrushValue(opt.value);
+              setMode('blocks');
+            },
+          })
+        );
+      }
+      setBlockBrushValue(1);
+    }
+
+    function initEnemyPicker() {
+      enemyBrushRoot.innerHTML = '';
+      const entries = EditorEntityArt.getEnemyPickerOptions();
+      for (const entry of entries) {
+        enemyBrushRoot.appendChild(
+          createPickerButton({
+            entityId: entry.id,
+            label: entry.name + (entry.implemented ? '' : ' (no art yet)'),
+            keyHint: entry.implemented ? undefined : '?',
+            placeholder: !entry.implemented,
+            onPick: () => {
+              setEnemyBrushValue(entry.id);
+              setMode('enemies');
+            },
+          })
+        );
+      }
+      if (entries.some((e) => e.id === enemyBrushValue)) {
+        setEnemyBrushValue(enemyBrushValue);
+      } else if (entries[0]) {
+        setEnemyBrushValue(entries[0].id);
+      }
+    }
+
+    initBlockPicker();
+    initEnemyPicker();
+
+    async function ensureEntityArt() {
+      const g = levelGrid.config;
+      const key = `${g.cellWidth}|${g.cellHeight}`;
+      if (entityArt && entityArtKey === key) return;
+
+      entityArt = await EditorEntityArt.buildEntityArt(g.cellWidth, g.cellHeight);
+      entityArtKey = key;
+      updateBlockPickerThumbs();
+      updateEnemyPickerThumbs();
+      editorLog('entity art ready', key);
+    }
+
+    function drawBlockCell(tl, cellW, cellH, v) {
+      if (v === 0) return;
+      const sprite = entityArt?.blocks?.[v];
+      if (sprite) {
+        EditorEntityArt.drawContained(ctx, sprite, tl.x, tl.y, cellW, cellH, 2);
+        if (v === 4) {
+          ctx.strokeStyle = '#cc1144';
+          ctx.strokeRect(tl.x + 0.5, tl.y + 0.5, cellW - 1, cellH - 1);
+        } else if (v === 5) {
+          ctx.strokeStyle = '#3d4d5d';
+          ctx.strokeRect(tl.x + 0.5, tl.y + 0.5, cellW - 1, cellH - 1);
+        }
+        return;
+      }
+      ctx.fillStyle = BLOCK_COLORS[v] || '#fff';
+      ctx.fillRect(tl.x + 1, tl.y + 1, cellW - 2, cellH - 2);
+      ctx.strokeStyle = v === 4 ? '#cc1144' : v === 5 ? '#3d4d5d' : '#ffb347';
+      ctx.strokeRect(tl.x, tl.y, cellW, cellH);
+    }
+
+    function drawEnemyCell(x, y, size, typeId) {
+      const sprite = entityArt?.enemies?.[typeId];
+      if (sprite) {
+        EditorEntityArt.drawContained(ctx, sprite, x - size / 2, y - size / 2, size, size, 2);
+        return;
+      }
+      ctx.fillStyle = '#ff6bcb';
+      ctx.fillRect(x - size / 2, y - size / 2, size, size);
+      ctx.fillStyle = '#fff';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(typeId[0].toUpperCase(), x, y + 3);
+    }
+
+    async function redrawWithEntityArt() {
+      try {
+        await ensureEntityArt();
+      } catch (err) {
+        editorLog('entity art load failed', err?.message || err);
+        entityArt = null;
+        entityArtKey = '';
+      }
+      updateBlockPickerThumbs();
+      updateEnemyPickerThumbs();
+      draw();
+    }
 
     function syncGrid() {
       levelGrid = createLevelGrid(level, GAME_H, GAME_W);
       ensurePlayBlockCells(level, levelGrid);
+      const g = levelGrid.config;
+      const key = `${g.cellWidth}|${g.cellHeight}`;
+      if (entityArtKey !== key) {
+        entityArt = null;
+        entityArtKey = '';
+      }
     }
 
     function getPlayCells() {
@@ -263,7 +695,7 @@
       if (idx >= 0) {
         level.enemies.splice(idx, 1);
       } else if (mode === 'enemies') {
-        level.enemies.push({ col, row, type: enemyBrush.value });
+        level.enemies.push({ col, row, type: getEnemyBrushValue() });
       }
       draw();
       refreshExport();
@@ -354,28 +786,19 @@
       }
 
       const cells = getPlayCells();
-      const colors = { 1: '#fff5e6', 2: '#9ca3af', 3: '#6b7280', 4: '#ff3366', 5: '#6b7c8c' };
       for (let row = 0; row < cells.length; row++) {
         for (let col = 0; col < cells[row].length; col++) {
           const v = cells[row][col];
           if (!v) continue;
           const tl = levelGrid.cellTopLeft(col, row);
-          ctx.fillStyle = colors[v] || '#fff';
-          ctx.fillRect(tl.x + 1, tl.y + 1, g.cellWidth - 2, g.cellHeight - 2);
-          ctx.strokeStyle = v === 4 ? '#cc1144' : v === 5 ? '#3d4d5d' : '#ffb347';
-          ctx.strokeRect(tl.x, tl.y, g.cellWidth, g.cellHeight);
+          drawBlockCell(tl, g.cellWidth, g.cellHeight, v);
         }
       }
 
       for (const e of level.enemies) {
         const { x, y } = levelGrid.cellCenter(e.col, e.row);
-        const half = Math.min(g.cellWidth, g.cellHeight) / 2 - 2;
-        ctx.fillStyle = '#ff6bcb';
-        ctx.fillRect(x - half, y - half, half * 2, half * 2);
-        ctx.fillStyle = '#fff';
-        ctx.font = '9px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(e.type[0].toUpperCase(), x, y + 3);
+        const size = Math.min(g.cellWidth, g.cellHeight) - 4;
+        drawEnemyCell(x, y, size, e.type);
       }
 
       const pd = level.paddle || { col: 4, colSpan: 2, rowFromBottom: 2 };
@@ -435,7 +858,7 @@
     function applyLevelToEditor(data) {
       level = structuredClone(data);
       syncGrid();
-      draw();
+      redrawWithEntityArt();
       refreshExport();
     }
 
@@ -580,11 +1003,13 @@
 
     function setMode(next) {
       mode = next;
+      const isBlocks = mode === 'blocks' || mode === 'erase';
+      const isEnemies = mode === 'enemies';
       document.getElementById('mode-blocks').classList.toggle('active', mode === 'blocks');
-      document.getElementById('mode-enemies').classList.toggle('active', mode === 'enemies');
+      document.getElementById('mode-enemies').classList.toggle('active', isEnemies);
       document.getElementById('mode-erase').classList.toggle('active', mode === 'erase');
-      blockBrush.hidden = mode === 'enemies';
-      enemyBrush.hidden = mode !== 'enemies';
+      blockBrushPane.hidden = !isBlocks;
+      enemyBrushPane.hidden = !isEnemies;
     }
 
     function pointerWorldY(ev) {
@@ -604,7 +1029,7 @@
         return;
       }
 
-      const val = mode === 'erase' ? 0 : Number(blockBrush.value);
+      const val = mode === 'erase' ? 0 : getBlockBrushValue();
       paintBlock(cell.col, cell.row, val);
     }
 
@@ -753,25 +1178,20 @@
     };
 
     window.addEventListener('keydown', (ev) => {
-      const map = { '1': '1', g: '2', G: '2', p: '3', P: '3', s: '4', S: '4', i: '5', I: '5', '.': '0', '0': '0' };
+      const map = { '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5' };
       if (map[ev.key] != null) {
-        blockBrush.value = map[ev.key];
+        setBlockBrushValue(map[ev.key]);
         setMode('blocks');
       }
     });
 
-    if (typeof ENEMY_TYPES !== 'undefined') {
-      enemyBrush.innerHTML = '';
-      Object.keys(ENEMY_TYPES).forEach((id) => {
-        const opt = document.createElement('option');
-        opt.value = id;
-        opt.textContent = id;
-        enemyBrush.appendChild(opt);
-      });
-    }
-
     (async function bootEditor() {
       editorLog('editor boot', window.location.href);
+      try {
+        await ensureEntityArt();
+      } catch (err) {
+        editorLog('initial entity art preload failed', err?.message || err);
+      }
       await ensureLevelRegistry();
       populateLevelSelect(
         levelPicker,
@@ -809,4 +1229,5 @@
     })();
   </script>
 </body>
+
 </html>

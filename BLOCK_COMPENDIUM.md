@@ -6,14 +6,40 @@ Blocks are the main targets you destroy to clear each round. Each type has its o
 
 ---
 
+## Block art (demo)
+
+Sprites are keyed in Phaser as `block_<type>` (see `BLOCK_TYPES` in [`block-types.js`](block-types.js)). PNGs are preloaded in `GameScene.preload()`; anything not loaded is drawn procedurally in `generateTextures()` when the level starts.
+
+| Type | Texture key | Asset / source | Sizing |
+|------|-------------|----------------|--------|
+| **Normal** | `block_normal` | [`assets/blocks/normal.png`](assets/blocks/normal.png) — pale blue-grey molded clay (RGBA, black background removed) | `contain` — fits inside cell without stretch |
+| **Spike** | `block_spike` | [`assets/blocks/spike.png`](assets/blocks/spike.png) — hazard art (RGBA) | `contain` |
+| **Gray** | `block_gray` | Procedural — dark grey rounded rect + score band | Fills cell |
+| **Power** | `block_power` | Procedural — dark grey block + yellow glow stroke | Fills cell |
+| **Indestructible** | `block_indestructible` | Procedural — steel grey + **X** mark | Fills cell |
+
+**Pipeline for PNG blocks:** run [`scripts/process-ball-sprite.py`](scripts/process-ball-sprite.py) on new art (edge flood-fill removes black, crops to content). Example:
+
+```bash
+python3 scripts/process-ball-sprite.py assets/blocks/normal.png
+```
+
+**Spike fallback:** if `block_spike` is missing at runtime, the demo generates a red triple-triangle hazard texture per cell size.
+
+**Destroy VFX:** normal blocks use clay-chunk particles (`clay_debris` atlas); tint keyed in `CLAY_DEBRIS_TINT` in [`block-ball-demo.html`](block-ball-demo.html).
+
+**Level editor:** [`level-editor.html`](level-editor.html) + [`editor-entity-art.js`](editor-entity-art.js) — image pickers for every block and enemy. PNGs under `assets/blocks/` and `assets/enemies/<id>.png`; missing art uses procedural previews (implemented types) or **?** placeholders (tier-colored).
+
+---
+
 ## Core block types
 
 | Block type | Appearance | Base points | Normal bounce | Power bounce | Notes |
 |------------|------------|-------------|---------------|--------------|-------|
-| **Normal** | Bright white / cream rectangle | 50–100 | 1 hit, destroyed | 1 hit, destroyed (+ bonus) | Level filler; colored variants (Flip item) often double points |
-| **Gray** | Dark gray, shaded | 200 | **Damaged → becomes Normal** (2 hits total) | 1 hit, destroyed | Use Power Bounce for efficiency |
-| **Power** | Glowing / dark gray highlight | 500 | **Immune** (no damage) | 1 hit, destroyed | Gatekeeper; protects clusters behind it |
-| **Spike** | Red triangular hazard (one cell) | 0 | **Hazard** (lose life) | Safe bounce while powered | Floor hazard; indestructible |
+| **Normal** | Blue-grey clay cube sprite (`normal.png`) | 100 | 1 hit, destroyed | 1 hit, destroyed (+ bonus) | Level filler; downgraded Gray blocks use this texture |
+| **Gray** | Dark gray procedural rectangle | 200 | **Damaged → becomes Normal** (2 hits total) | 1 hit, destroyed | Use Power Bounce for efficiency |
+| **Power** | Dark gray procedural block + glow | 500 | **Immune** (no damage) | 1 hit, destroyed | Gatekeeper; protects clusters behind it |
+| **Spike** | Spike sprite (`spike.png`) or red triangle fallback | 0 | **Hazard** (lose life) | Safe bounce while powered | Floor hazard; indestructible |
 | **Splitting** | Large white or gray | 200 / 50–100 pieces | Splits into 4 smaller blocks | Splits or destroys | Large pieces behave like normal/gray when small |
 | **Ability** | Special pattern | Varies | Weak / no effect | Stronger | Often needs active Copy Ability to break |
 | **Indestructible** | Metallic, X mark | 0 | **Immune** (bounces) | **Immune** | Walls; not cleared for level win |
@@ -82,6 +108,7 @@ Blocks are the main targets you destroy to clear each round. Each type has its o
 | `1` | Normal |
 | `2` | Gray |
 | `3` | Power |
+| `4` | Spike |
 | `5` | Indestructible |
 
 String keys: `.` empty, `1` normal, `g` gray, `p` power, `s` spike, `i` indestructible.
@@ -93,5 +120,6 @@ Spike blocks use cell value `4` in `blocks.cells` (full play grid). Legacy `bloc
 ## Source of truth in code
 
 - Registry & helpers: [`block-types.js`](block-types.js)
+- Block PNGs: [`assets/blocks/`](assets/blocks/)
+- Texture preload + procedural fallbacks: `preload()` / `generateTextures()` in [`block-ball-demo.html`](block-ball-demo.html)
 - Enemies (HP, movement, drops): [`ENEMY_COMPENDIUM.md`](ENEMY_COMPENDIUM.md) · [`enemy-types.js`](enemy-types.js)
-- Playable level: [`block-ball-demo.html`](block-ball-demo.html)

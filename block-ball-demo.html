@@ -188,6 +188,15 @@ const COLORS = {
   danger: '#ff3366',
 };
 
+/** Clay debris tints when blocks break (warm, matte — not neon sparkles). */
+const CLAY_DEBRIS_TINT = {
+  normal: 0xe8dcc8,
+  gray: 0xb8b0a8,
+  power: 0xc9c4b0,
+  spike: 0xd4a8a8,
+  indestructible: 0x9aa8b0,
+};
+
 const PHYSICS = {
   ballSpeed: 380,
   ballMaxSpeed: 520,
@@ -196,6 +205,26 @@ const PHYSICS = {
   powerBounceSpeed: 680,
   powerAngleAmp: 1.38,
   paddleBounceFactor: 1.05,
+  /** Rolling spin: rotation rate ≈ speed / radius (rad/s). */
+  ballSpin: 0.15,
+};
+
+const BALL_TRAIL = {
+  /** Must match speed_line texture size in generateTextures(). */
+  texWidth: 24,
+  texHeight: 6,
+  frequency: 20,
+  frequencyPower: 14,
+  lifespan: 140,
+  lifespanPower: 170,
+  tint: 0xc8eed4,
+  tintPower: 0xfff0b0,
+  /** Thickness vs ball diameter (1 = full ball width; original ≈ 0.1). */
+  widthMul: 0.5,
+  widthMulPower: 0.58,
+  /** Streak length vs ball diameter. */
+  lengthMul: 1.1,
+  lengthMulPower: 1.28,
 };
 
 /** Aim while ball on paddle: left 45° → straight up → right 45° (screen coords, y down). */
@@ -230,7 +259,12 @@ const POWER_BALL = {
   durationMs: 2800,
   cooldownMs: 500,
   scale: 1.24,
-  tint: 0xfff0a0,
+};
+
+/** Ball sprite sheets in assets/ball/ */
+const BALL_TEXTURE = {
+  neutral: 'ball',
+  determined: 'ball_determined',
 };
 
 // =============================================================================
@@ -265,7 +299,10 @@ function generateTextures(scene, cellW, cellH) {
     g.generateTexture(key, cellW, cellH);
   }
 
-  drawBlockTexture('block_normal', COLORS.blockNormal, COLORS.blockNormalBorder);
+  // Normal block — assets/blocks/normal.png (preload); procedural fallback if missing
+  if (!scene.textures.exists('block_normal')) {
+    drawBlockTexture('block_normal', COLORS.blockNormal, COLORS.blockNormalBorder);
+  }
   drawBlockTexture('block_gray', COLORS.blockGray, COLORS.blockGrayBorder, (gfx, w, h) => {
     gfx.lineStyle(1, 0x6b7280, 0.8);
     gfx.strokeRect(w * 0.2, h * 0.35, w * 0.6, h * 0.3);
@@ -277,20 +314,22 @@ function generateTextures(scene, cellW, cellH) {
     gfx.fillRect(6, 6, w - 12, Math.max(4, h * 0.2));
   });
 
-  // Spike hazard block (one cell)
-  g.clear();
-  g.fillStyle(0x4a1028, 1);
-  g.fillRoundedRect(0, 0, innerW, innerH, 3);
-  g.fillStyle(COLORS.spike, 1);
-  const spikeW = innerW / 3;
-  for (let i = 0; i < 3; i++) {
-    const cx = spikeW * i + spikeW * 0.5;
-    const half = spikeW * 0.38;
-    g.fillTriangle(cx - half, innerH, cx, innerH * 0.12, cx + half, innerH);
+  // Spike hazard — assets/blocks/spike.png (preload); procedural fallback if missing
+  if (!scene.textures.exists('block_spike')) {
+    g.clear();
+    g.fillStyle(0x4a1028, 1);
+    g.fillRoundedRect(0, 0, innerW, innerH, 3);
+    g.fillStyle(COLORS.spike, 1);
+    const spikeW = innerW / 3;
+    for (let i = 0; i < 3; i++) {
+      const cx = spikeW * i + spikeW * 0.5;
+      const half = spikeW * 0.38;
+      g.fillTriangle(cx - half, innerH, cx, innerH * 0.12, cx + half, innerH);
+    }
+    g.lineStyle(2, 0xcc1144, 0.7);
+    g.strokeRect(1, innerH - 2, innerW - 2, 2);
+    g.generateTexture('block_spike', cellW, cellH);
   }
-  g.lineStyle(2, 0xcc1144, 0.7);
-  g.strokeRect(1, innerH - 2, innerW - 2, 2);
-  g.generateTexture('block_spike', cellW, cellH);
 
   // Indestructible (steel + X; never breaks)
   drawBlockTexture('block_indestructible', 0x6b7c8c, 0x3d4d5d, (gfx, w, h) => {
@@ -299,26 +338,7 @@ function generateTextures(scene, cellW, cellH) {
     gfx.lineBetween(w - 4, 4, 4, h - 4);
   });
 
-  // Ball (inscribed in one cell)
-  const r = ballRadiusForCell({ config: { cellWidth: cellW, cellHeight: cellH } });
-  g.clear();
-  g.fillStyle(COLORS.ball, 1);
-  g.fillCircle(r, r, r);
-  g.fillStyle(COLORS.ballHighlight, 0.6);
-  g.fillEllipse(r - 3, r - 4, r * 0.55, r * 0.4);
-  g.fillStyle(0x1e3a5f, 1);
-  g.fillCircle(r - r * 0.35, r - r * 0.05, Math.max(2, r * 0.22));
-  g.fillCircle(r + r * 0.35, r - r * 0.05, Math.max(2, r * 0.22));
-  g.fillStyle(0xffffff, 1);
-  g.fillCircle(r - r * 0.3, r - r * 0.12, Math.max(1, r * 0.08));
-  g.fillCircle(r + r * 0.42, r - r * 0.12, Math.max(1, r * 0.08));
-  g.lineStyle(2, 0x1e3a5f, 1);
-  g.beginPath();
-  g.arc(r, r + r * 0.25, r * 0.35, 0.2, Math.PI - 0.2, false);
-  g.strokePath();
-  g.generateTexture('ball', r * 2, r * 2);
-
-  // Life icon (mini ball)
+  // Life icon (mini ball; main ball uses assets/ball/neutral.png + determined.png)
   g.clear();
   g.fillStyle(COLORS.ball, 1);
   g.fillCircle(8, 8, 8);
@@ -342,11 +362,58 @@ function generateTextures(scene, cellW, cellH) {
   g.fillEllipse(cellW / 2, cellH * 0.72, cellW * 0.15, cellH * 0.1);
   g.generateTexture('enemy', cellW, cellH);
 
-  // Particle spark
+  // Particle spark (ball lose, enemies)
   g.clear();
   g.fillStyle(0xffffff, 1);
   g.fillCircle(4, 4, 4);
   g.generateTexture('particle', 8, 8);
+
+  const clayAtlasH = 12;
+  const clayFrames = [
+    { name: 'chunk_a', x: 0, w: 12, h: 10 },
+    { name: 'chunk_b', x: 14, w: 10, h: 12 },
+    { name: 'chunk_c', x: 26, w: 14, h: 9 },
+    { name: 'chunk_d', x: 42, w: 7, h: 7 },
+  ];
+  const clayAtlasW = 50;
+
+  function drawClayChunkAt(ox, oy, w, h) {
+    g.fillStyle(0xf0e6d8, 1);
+    const cx = ox + w / 2;
+    const cy = oy + h / 2;
+    g.fillCircle(cx, cy, Math.min(w, h) * 0.44);
+    g.fillCircle(cx - w * 0.22, cy + h * 0.12, Math.min(w, h) * 0.3);
+    g.fillCircle(cx + w * 0.2, cy - h * 0.1, Math.min(w, h) * 0.28);
+    g.fillCircle(cx + w * 0.08, cy + h * 0.22, Math.min(w, h) * 0.22);
+    g.fillStyle(0x000000, 0.12);
+    g.fillCircle(cx - 1, cy + 1, Math.max(1, Math.min(w, h) * 0.08));
+    g.fillStyle(0xffffff, 0.15);
+    g.fillCircle(cx + 1, cy - 2, Math.max(1, Math.min(w, h) * 0.06));
+  }
+
+  g.clear();
+  for (const f of clayFrames) {
+    const oy = Math.floor((clayAtlasH - f.h) / 2);
+    drawClayChunkAt(f.x, oy, f.w, f.h);
+  }
+  g.generateTexture('clay_debris', clayAtlasW, clayAtlasH);
+  const clayTex = scene.textures.get('clay_debris');
+  for (const f of clayFrames) {
+    const oy = Math.floor((clayAtlasH - f.h) / 2);
+    clayTex.add(f.name, 0, f.x, oy, f.w, f.h);
+  }
+
+  // Speed line (horizontal streak; rotated per velocity in updateBallTrail)
+  const lineW = BALL_TRAIL.texWidth;
+  const lineH = BALL_TRAIL.texHeight;
+  g.clear();
+  for (let i = 0; i < lineW; i++) {
+    const t = i / (lineW - 1);
+    const a = Math.min(1, t * 3, (1 - t) * 3) * 0.95;
+    g.fillStyle(0xffffff, a);
+    g.fillRect(i, 0, 1, lineH);
+  }
+  g.generateTexture('speed_line', lineW, lineH);
 
   g.destroy();
 }
@@ -358,6 +425,64 @@ function generateTextures(scene, cellW, cellH) {
 class GameScene extends Phaser.Scene {
   constructor() {
     super({ key: 'GameScene' });
+  }
+
+  preload() {
+    const v = '4';
+    this.load.image(BALL_TEXTURE.neutral, `assets/ball/neutral.png?v=${v}`);
+    this.load.image(BALL_TEXTURE.determined, `assets/ball/determined.png?v=${v}`);
+    this.load.image('block_normal', `assets/blocks/normal.png?v=${v}`);
+    this.load.image('block_spike', `assets/blocks/spike.png?v=${v}`);
+  }
+
+  /** Match inscribed cell ball size (setTexture resets to native image dimensions). */
+  syncBallDisplaySize(worldRadius) {
+    if (!this.ball || this.ballRadius == null) return;
+    const diameter = this.ballRadius * 2;
+    this.ball.setDisplaySize(diameter, diameter);
+    // setDisplaySize adjusts scaleX/Y (~0.07 for 420px art); store for power tweens.
+    this.ballBaseScale = this.ball.scaleX;
+    this.syncBallPhysicsBody(worldRadius);
+  }
+
+  /** Arcade circle is scaled with the sprite — divide by scaleX so world radius matches art. */
+  syncBallPhysicsBody(worldRadius) {
+    if (!this.ball?.body || this.ballRadius == null) return;
+    const worldR = worldRadius ?? this.ballRadius;
+    const s = Math.abs(this.ball.scaleX);
+    if (!s) return;
+    this.ball.body.setCircle(worldR / s);
+  }
+
+  ballPowerScale() {
+    return this.ballBaseScale * POWER_BALL.scale;
+  }
+
+  updateBallSpin(delta) {
+    if (!this.ball?.active || this.ballOnPaddle || !this.ball.body?.moves) return;
+
+    const vx = this.ball.body.velocity.x;
+    const vy = this.ball.body.velocity.y;
+    const speed = Math.hypot(vx, vy);
+    if (speed < 8) return;
+
+    const r = this.ball.displayWidth * 0.5;
+    if (r <= 0) return;
+
+    const omega = (speed / r) * PHYSICS.ballSpin;
+    const spinSign = vx === 0 ? (vy > 0 ? 1 : -1) : Math.sign(vx);
+    this.ball.rotation += spinSign * omega * (delta / 1000);
+  }
+
+  /** Neutral face by default; determined face while power mode is active. */
+  applyBallTexture() {
+    if (!this.ball?.active) return;
+    const key = this.ballPowerMode ? BALL_TEXTURE.determined : BALL_TEXTURE.neutral;
+    if (this.textures.exists(key)) {
+      this.ball.setTexture(key);
+    }
+    this.syncBallDisplaySize();
+    this.ball.clearTint();
   }
 
   clearPaddleTweenRefs() {
@@ -488,7 +613,8 @@ class GameScene extends Phaser.Scene {
       const def = getBlockDef(typeId);
 
       const block = this.blocks.create(x, y, def.texture);
-      fitEntityToCell(block, this.levelGrid);
+      const containSprite = typeId === 'spike' || typeId === 'normal';
+      fitEntityToCell(block, this.levelGrid, containSprite ? { contain: true } : {});
       block.refreshBody();
       block.setDepth(def.isHazard ? 8 : 5);
       block.setData('typeId', typeId);
@@ -576,20 +702,101 @@ class GameScene extends Phaser.Scene {
   }
 
   createBall() {
-    this.ballAura = this.add.graphics().setDepth(10);
-    this.ball = this.physics.add.image(this.paddle.x, this.paddle.y, 'ball');
-    this.ball.setDisplaySize(this.ballRadius * 2, this.ballRadius * 2);
-    this.ball.body.setCircle(this.ballRadius);
+    this.ball = this.physics.add.image(this.paddle.x, this.paddle.y, BALL_TEXTURE.neutral);
+    this.applyBallTexture();
     this.ball.setBounce(1);
     this.ball.setCollideWorldBounds(true);
     this.ball.body.onWorldBounds = true;
     this.ball.setDepth(11);
     this.ball.setOrigin(0.5, 0.5);
     this.ball.body.allowGravity = false;
-    this.ballBaseScale = 1;
     this.physics.world.gravity.y = 0;
 
+    this.createBallTrail();
     this.attachBallToPaddle(false);
+  }
+
+  createBallTrail() {
+    this.ballTrail = this.add.particles(0, 0, 'speed_line', {
+      ...this.ballTrailBaseConfig(false),
+      emitting: false,
+    });
+    this.ballTrail.setDepth(10);
+    this.ballTrail.startFollow(this.ball);
+    this._ballTrailPowered = false;
+  }
+
+  /** Streak angle: opposite travel direction (degrees, Phaser rotation). */
+  ballTrailRotateDeg() {
+    const vx = this.ball.body.velocity.x;
+    const vy = this.ball.body.velocity.y;
+    return Phaser.Math.RadToDeg(Math.atan2(vy, vx)) + 180;
+  }
+
+  syncBallTrailRotate() {
+    if (!this.ballTrail) return;
+    const deg = this.ballTrailRotateDeg();
+    const rot = { min: deg, max: deg };
+    if (this.ballTrail.setParticleRotate) {
+      this.ballTrail.setParticleRotate(rot);
+    } else if (this.ballTrail.ops?.rotate) {
+      this.ballTrail.ops.rotate.loadConfig({ rotate: rot });
+    }
+  }
+
+  ballTrailBaseConfig(powered) {
+    const diam = this.ball?.active ? this.ball.displayWidth : this.ballRadius * 2;
+    const lengthMul = powered ? BALL_TRAIL.lengthMulPower : BALL_TRAIL.lengthMul;
+    const widthMul = powered ? BALL_TRAIL.widthMulPower : BALL_TRAIL.widthMul;
+    const scaleY = (diam / BALL_TRAIL.texHeight) * widthMul;
+    const scaleX = (diam * lengthMul) / BALL_TRAIL.texWidth;
+    return {
+      lifespan: powered ? BALL_TRAIL.lifespanPower : BALL_TRAIL.lifespan,
+      scaleX: { start: scaleX, end: scaleX * 0.2 },
+      scaleY: { start: scaleY, end: scaleY * 0.35 },
+      alpha: { start: 0.7, end: 0 },
+      speed: 0,
+      rotate: { min: 0, max: 0 },
+      tint: powered ? BALL_TRAIL.tintPower : BALL_TRAIL.tint,
+      blendMode: 'ADD',
+      frequency: powered ? BALL_TRAIL.frequencyPower : BALL_TRAIL.frequency,
+      quantity: 1,
+    };
+  }
+
+  /** Reconfigure trail for normal vs power (not every frame — loadConfig each frame broke emission). */
+  syncBallTrailStyle() {
+    if (!this.ballTrail) return;
+    const powered = !!this.ballPowerMode;
+    if (this._ballTrailPowered !== powered) {
+      this._ballTrailPowered = powered;
+      const wasEmitting = this.ballTrail.emitting;
+      this.ballTrail.setConfig(this.ballTrailBaseConfig(powered));
+      this.ballTrail.startFollow(this.ball);
+      if (wasEmitting) this.ballTrail.start();
+    }
+    this.syncBallTrailRotate();
+  }
+
+  startBallTrail() {
+    if (!this.ballTrail || !this.ball?.active) return;
+    this.syncBallTrailStyle();
+    if (!this.ballTrail.emitting) this.ballTrail.start();
+  }
+
+  stopBallTrail() {
+    if (this.ballTrail?.emitting) this.ballTrail.stop();
+  }
+
+  updateBallTrail() {
+    if (!this.ballTrail || !this.ball?.active || this.ballOnPaddle) return;
+    const speed = Math.hypot(this.ball.body.velocity.x, this.ball.body.velocity.y);
+    if (speed < 50) {
+      this.stopBallTrail();
+      return;
+    }
+    this.syncBallTrailStyle();
+    if (!this.ballTrail.emitting) this.ballTrail.start();
   }
 
   attachBallToPaddle(deferAim = false) {
@@ -599,7 +806,9 @@ class GameScene extends Phaser.Scene {
     this.ball.body.setVelocity(0, 0);
     this.ball.body.moves = false;
     this.clearBallPowerState();
+    this.stopBallTrail();
     this.finishPaddleSpring();
+    this.ball.rotation = 0;
     this.syncBallToPaddle();
     this.launchAimIndex = 0;
     this.launchAimDirection = 1;
@@ -692,6 +901,7 @@ class GameScene extends Phaser.Scene {
     this.ballLaunched = true;
     this.ball.body.moves = true;
     this.ball.setVelocity(d.vx * PHYSICS.launchSpeed, d.vy * PHYSICS.launchSpeed);
+    this.startBallTrail();
   }
 
   // ---------------------------------------------------------------------------
@@ -872,9 +1082,9 @@ class GameScene extends Phaser.Scene {
   }
 
   destroyBlock(block) {
-    const tints = { normal: 0xffb347, gray: 0x9ca3af, power: 0xffe66d, spike: COLORS.spike };
     const typeId = block.getData('typeId') || 'normal';
-    this.spawnDestroyParticles(block.x, block.y, tints[typeId] || 0xffffff);
+    const tint = CLAY_DEBRIS_TINT[typeId] ?? CLAY_DEBRIS_TINT.normal;
+    this.spawnBlockClayDebris(block.x, block.y, tint);
     block.destroy();
     this.blocksRemaining--;
     if (this.blocksRemaining <= 0) {
@@ -901,11 +1111,13 @@ class GameScene extends Phaser.Scene {
     this.isLosingBall = true;
     this.lives--;
     this.updateUI();
+    this.stopBallTrail();
     this.spawnDestroyParticles(this.ball.x, this.ball.y, COLORS.ball);
 
     if (this.lives <= 0) {
       this.stopLaunchAimCycle();
       this.ball.setActive(false).setVisible(false);
+      this.stopBallTrail();
       this.showGameOver();
       return;
     }
@@ -1096,11 +1308,12 @@ class GameScene extends Phaser.Scene {
     this.hudAvatar = null;
     if (hudLayout.right && hudLayout.right.includes('avatar')) {
       const avSize = pos.avatar.size;
-      const startKey = getHudAvatarTextureKey('default', this.hudAvatarConfig);
+      const startKey = getHudAvatarTextureKey('default', this.hudAvatarConfig, this);
       this.hudAvatar = this.add
         .image(pos.avatar.x, pos.avatar.y, startKey)
         .setDisplaySize(avSize, avSize)
-        .setOrigin(0.5, 0.5);
+        .setOrigin(0.5, 0.5)
+        .setData('hudAvatarSize', avSize);
       this.hudContainer.add(this.hudAvatar);
       this.updateHudAvatar();
     }
@@ -1235,26 +1448,6 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  updateBallPowerVisual(time) {
-    this.ballAura.clear();
-    if (!this.ball.active || this.ballOnPaddle) return;
-
-    const scale = this.ball.scaleX;
-    const baseR = this.ballRadius * scale;
-    const pulse = 1 + 0.12 * Math.sin(time / 90);
-
-    if (this.ballPowerMode) {
-      this.ballAura.lineStyle(3, 0xffe66d, 0.95);
-      this.ballAura.strokeCircle(this.ball.x, this.ball.y, baseR * pulse + 4);
-      this.ballAura.lineStyle(2, 0xffffff, 0.45);
-      this.ballAura.strokeCircle(this.ball.x, this.ball.y, baseR * pulse + 8);
-    } else if (this.ballPowerCooling) {
-      const coolPulse = 1 + 0.06 * Math.sin(time / 120);
-      this.ballAura.lineStyle(2, 0x9ca3af, 0.35);
-      this.ballAura.strokeCircle(this.ball.x, this.ball.y, baseR * coolPulse + 2);
-    }
-  }
-
   clearBallPowerState() {
     if (this.powerBallTimer) {
       this.powerBallTimer.remove(false);
@@ -1265,10 +1458,7 @@ class GameScene extends Phaser.Scene {
     this.ballPowerCooling = false;
     this.powerBounceActive = false;
     this.powerBounceMultiplier = false;
-    this.ball.setScale(this.ballBaseScale);
-    this.ball.body.setCircle(this.ballRadius);
-    this.ball.clearTint();
-    this.ballAura.clear();
+    this.applyBallTexture();
   }
 
   refreshPowerBallTimer() {
@@ -1289,16 +1479,23 @@ class GameScene extends Phaser.Scene {
     this.powerBounceActive = true;
     this.powerBounceMultiplier = true;
 
-    this.ball.setTint(POWER_BALL.tint);
+    this.applyBallTexture();
+    const powerScale = this.ballPowerScale();
+    const powerWorldR = this.ballRadius * POWER_BALL.scale;
+    const syncPowerBody = () => this.syncBallPhysicsBody(powerWorldR);
     if (!chaining) {
       this.tweens.add({
         targets: this.ball,
-        scale: POWER_BALL.scale,
+        scale: powerScale,
         duration: 120,
         ease: 'Back.easeOut',
+        onUpdate: syncPowerBody,
+        onComplete: syncPowerBody,
       });
+    } else {
+      this.ball.setScale(powerScale);
+      syncPowerBody();
     }
-    this.ball.body.setCircle(this.ballRadius * POWER_BALL.scale);
     this.refreshPowerBallTimer();
   }
 
@@ -1309,18 +1506,20 @@ class GameScene extends Phaser.Scene {
     this.ballPowerCooling = true;
     this.powerBounceActive = false;
     this.powerBounceMultiplier = false;
+    this.applyBallTexture();
 
     this.tweens.killTweensOf(this.ball);
+    const normalScale = this.ballBaseScale;
+    const syncNormalBody = () => this.syncBallPhysicsBody(this.ballRadius);
     this.tweens.add({
       targets: this.ball,
-      scale: this.ballBaseScale,
+      scale: normalScale,
       duration: POWER_BALL.cooldownMs,
       ease: 'Sine.easeInOut',
+      onUpdate: syncNormalBody,
       onComplete: () => {
-        this.ball.clearTint();
-        this.ball.body.setCircle(this.ballRadius);
+        syncNormalBody();
         this.ballPowerCooling = false;
-        this.ballAura.clear();
       },
     });
 
@@ -1462,7 +1661,7 @@ class GameScene extends Phaser.Scene {
     this.ball.setTint(0xffffff);
     this.time.delayedCall(90, () => {
       if (this.ball.active && this.ballPowerMode) {
-        this.ball.setTint(POWER_BALL.tint);
+        this.ball.clearTint();
       }
     });
   }
@@ -1502,11 +1701,32 @@ class GameScene extends Phaser.Scene {
       angle: { min: 0, max: 360 },
       scale: { start: 1.2, end: 0 },
       lifespan: 350,
-      quantity: 10,
-      tint: tint,
+      tint,
       blendMode: 'ADD',
+      emitting: false,
     });
+    emitter.explode(10);
     this.time.delayedCall(400, () => emitter.destroy());
+  }
+
+  /** Chunky clay crumbs when a block is destroyed. */
+  spawnBlockClayDebris(x, y, tint) {
+    const emitter = this.add.particles(x, y, 'clay_debris', {
+      frame: ['chunk_a', 'chunk_b', 'chunk_c', 'chunk_d'],
+      speed: { min: 45, max: 130 },
+      angle: { min: 0, max: 360 },
+      gravityY: 420,
+      scale: { start: 1, end: 0.2, random: true },
+      alpha: { start: 1, end: 0 },
+      rotate: { min: 0, max: 360 },
+      lifespan: { min: 500, max: 800 },
+      tint,
+      blendMode: 'NORMAL',
+      emitting: false,
+    });
+    emitter.setDepth(12);
+    emitter.explode(14);
+    this.time.delayedCall(900, () => emitter.destroy());
   }
 
   // ---------------------------------------------------------------------------
@@ -1587,7 +1807,8 @@ class GameScene extends Phaser.Scene {
           this.loseBall();
         }
         this.clampBallSpeed();
-        this.updateBallPowerVisual(time);
+        this.updateBallSpin(delta);
+        this.updateBallTrail();
       }
 
       this.updatePaddleCharge();
@@ -1719,7 +1940,7 @@ bootGame();
 LIMITATIONS (this demo)
 -----------------------
   • Level select bar + ?level=id URL; register levels in levels/registry.js.
-  • Procedural textures only — no sprite atlases or audio.
+  • Ball sprites: assets/ball/neutral.png, assets/ball/determined.png (power mode).
   • Power Bounce: release-only timing before contact; spike immunity while powered.
   • Enemies use simple tweens, not true AI or spawn waves.
   • No pause menu, settings, save data, or online leaderboards.

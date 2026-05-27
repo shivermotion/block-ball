@@ -396,7 +396,15 @@ function fitEntityToCell(gameObject, levelGrid, options = {}) {
   const w = cellWidth - pad * 2;
   const h = cellHeight - pad * 2;
 
-  gameObject.setDisplaySize(w, h);
+  if (options.contain) {
+    const frame = gameObject.texture?.get?.();
+    const tw = frame?.width > 0 ? frame.width : w;
+    const th = frame?.height > 0 ? frame.height : h;
+    const scale = Math.min(w / tw, h / th);
+    gameObject.setDisplaySize(tw * scale, th * scale);
+  } else {
+    gameObject.setDisplaySize(w, h);
+  }
 
   if (gameObject.body && options.circle) {
     const r = Math.min(w, h) / 2;
