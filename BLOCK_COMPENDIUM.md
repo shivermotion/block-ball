@@ -2,7 +2,7 @@
 
 Blocks are the main targets you destroy to clear each round. Each type has its own durability, scoring, and rules for **Normal Bounce** vs **Power Bounce** (timed release before paddle contact).
 
-**Demo implementation today:** `normal`, `gray`, `power`, `spike` (see `block-types.js`).
+**Demo implementation today:** `normal`, `gray`, `power`, `spike`, `indestructible` (see `block-types.js`).
 
 ---
 
@@ -16,7 +16,7 @@ Blocks are the main targets you destroy to clear each round. Each type has its o
 | **Spike** | Red triangular hazard (one cell) | 0 | **Hazard** (lose life) | Safe bounce while powered | Floor hazard; indestructible |
 | **Splitting** | Large white or gray | 200 / 50–100 pieces | Splits into 4 smaller blocks | Splits or destroys | Large pieces behave like normal/gray when small |
 | **Ability** | Special pattern | Varies | Weak / no effect | Stronger | Often needs active Copy Ability to break |
-| **Indestructible** | Metallic, X mark | 0 | No effect | No effect | Needs Crash (bomb) or specific ability |
+| **Indestructible** | Metallic, X mark | 0 | **Immune** (bounces) | **Immune** | Walls; not cleared for level win |
 | **Score / Bonus** | Numbered / flashing | Escalating | Points per hit | Higher | Up to ~7 hits; max hits + ability → 1-Ups |
 | **Star / Switch** | Star mark | Varies | Collect / destroy | Same | Collect all → Bonus Chance (Through blocks) |
 | **Through** | Semi-transparent | Per pass | Ball passes through | Same | Bonus Chance only; no bounce |
@@ -33,7 +33,7 @@ Blocks are the main targets you destroy to clear each round. Each type has its o
 - **Gray:** first hit converts to Normal (second hit destroys)
 - **Power:** immune
 - **Spike:** costs a life (not destroyed)
-- Weak vs indestructible / ability-gated blocks
+- **Indestructible:** immune; ball bounces off (same as Power for damage, but never destroyed)
 
 ### Power bounce (release timing before contact)
 
@@ -42,6 +42,7 @@ Blocks are the main targets you destroy to clear each round. Each type has its o
 - One-shots **Gray** blocks
 - Often **+50% score** (or more) while ball is powered
 - **Spike blocks:** safe bounce while powered; otherwise costs a life (demo)
+- **Indestructible:** always immune; does not count toward blocks remaining for level clear
 
 ---
 
@@ -81,9 +82,9 @@ Blocks are the main targets you destroy to clear each round. Each type has its o
 | `1` | Normal |
 | `2` | Gray |
 | `3` | Power |
-| `4` | Spike |
+| `5` | Indestructible |
 
-String keys: `.` empty, `1` normal, `g` gray, `p` power, `s` spike.
+String keys: `.` empty, `1` normal, `g` gray, `p` power, `s` spike, `i` indestructible.
 
 Spike blocks use cell value `4` in `blocks.cells` (full play grid). Legacy `blocks.spikes` is migrated at load.
 

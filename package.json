@@ -4,11 +4,12 @@
   "description": "Block Ball — mobile-friendly Phaser 3 Breakout demo",
   "private": true,
   "scripts": {
-    "start": "serve . -l 8080",
-    "dev": "serve . -l 8080 --no-request-logging",
+    "start": "node scripts/dev-server.mjs",
+    "dev": "node scripts/dev-server.mjs",
     "open": "open http://localhost:8080/block-ball-demo.html"
   },
   "devDependencies": {
-    "serve": "^14.2.4"
+    "serve": "^14.2.4",
+    "serve-handler": "^6.1.6"
   }
 }

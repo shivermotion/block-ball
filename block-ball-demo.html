@@ -122,7 +122,7 @@ PACKAGING FOR REAL MOBILE APPS
   <label for="level-select">Level</label>
   <select id="level-select" aria-label="Select level"></select>
   <button type="button" id="level-restart">Restart</button>
-  <a href="level-editor.html">Editor</a>
+  <a href="level-editor?restore=1">Editor</a>
 </nav>
 <div id="game-container"></div>
 
@@ -291,6 +291,13 @@ function generateTextures(scene, cellW, cellH) {
   g.lineStyle(2, 0xcc1144, 0.7);
   g.strokeRect(1, innerH - 2, innerW - 2, 2);
   g.generateTexture('block_spike', cellW, cellH);
+
+  // Indestructible (steel + X; never breaks)
+  drawBlockTexture('block_indestructible', 0x6b7c8c, 0x3d4d5d, (gfx, w, h) => {
+    gfx.lineStyle(Math.max(2, Math.floor(Math.min(w, h) * 0.08)), 0x1e2832, 0.95);
+    gfx.lineBetween(4, 4, w - 4, h - 4);
+    gfx.lineBetween(w - 4, 4, 4, h - 4);
+  });
 
   // Ball (inscribed in one cell)
   const r = ballRadiusForCell({ config: { cellWidth: cellW, cellHeight: cellH } });
@@ -1670,18 +1677,34 @@ function initLevelBar(activeEntry) {
 
 async function bootGame() {
   const status = document.getElementById('boot-status');
+  bbLog('bootGame start', {
+    href: window.location.href,
+    search: window.location.search,
+    previewFlag: URL_PARAMS.get('preview'),
+  });
   try {
     const { level, entry } = await resolveActiveLevel();
     ACTIVE_LEVEL = level;
-    bbLog('active level', entry.id, level.name);
+    const cells = level.blocks?.cells;
+    let filled = 0;
+    if (cells) for (const row of cells) for (const c of row) if (c) filled += 1;
+    bbLog('bootGame active level', {
+      entryId: entry.id,
+      entryName: entry.name,
+      levelId: level.id,
+      levelName: level.name,
+      filledCells: filled,
+      grid: cells ? `${cells.length}×${cells[0]?.length}` : 'none',
+      enemies: level.enemies?.length ?? 0,
+    });
     status.remove();
     initLevelBar(entry);
     new Phaser.Game(config);
     bbLog('Phaser.Game created');
   } catch (err) {
-    bbError('boot', err);
+    bbError('bootGame failed', err);
     status.className = 'error';
-    status.textContent = `Failed to load level: ${err.message}. Check levels/registry.js and your level script.`;
+    status.textContent = `Failed to load level: ${err.message}`;
   }
 }
 

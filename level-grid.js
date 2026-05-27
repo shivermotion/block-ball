@@ -167,6 +167,9 @@ const BLOCK_LAYOUT_CHARS = {
   '4': 4,
   s: 4,
   S: 4,
+  '5': 5,
+  i: 5,
+  I: 5,
 };
 
 function createLevelGrid(level, gameHeight = 780, gameWidth = 390) {
@@ -432,7 +435,7 @@ function parseBlockLayoutRows(rows) {
 }
 
 function layoutToStrings(layout) {
-  const inv = { 0: '.', 1: '1', 2: 'g', 3: 'p', 4: 's' };
+  const inv = { 0: '.', 1: '1', 2: 'g', 3: 'p', 4: 's', 5: 'i' };
   return layout.map((row) => row.map((c) => inv[c] ?? '.').join(''));
 }
 

@@ -68,12 +68,12 @@ const BLOCK_COMPENDIUM = [
   {
     id: 'indestructible',
     name: 'Indestructible Block',
-    implemented: false,
+    implemented: true,
     appearance: 'Metallic, X mark',
     points: 0,
     normalHit: 'immune',
     powerHit: 'immune',
-    notes: 'Crash item (bomb) or specific ability required.',
+    notes: 'Bounces off; never destroyed or damaged. Does not count toward level clear.',
   },
   {
     id: 'score',
@@ -157,6 +157,15 @@ const BLOCK_TYPES = {
     countsTowardClear: false,
     isHazard: true,
   },
+  indestructible: {
+    id: 'indestructible',
+    texture: 'block_indestructible',
+    points: 0,
+    powerOnly: false,
+    normalHit: 'immune',
+    powerHit: 'immune',
+    countsTowardClear: false,
+  },
 };
 
 /** Level grid cell → block type id */
@@ -166,6 +175,7 @@ const BLOCK_CELL_MAP = {
   2: 'gray',
   3: 'power',
   4: 'spike',
+  5: 'indestructible',
 };
 
 function getBlockDef(typeId) {

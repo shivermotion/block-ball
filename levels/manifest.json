@@ -1,0 +1,8 @@
+[
+  {
+    "id": "demo-01",
+    "name": "Demo Pyramid",
+    "script": "levels/demo-level-01.js",
+    "global": "DEMO_LEVEL_01"
+  }
+]

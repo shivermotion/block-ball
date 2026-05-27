@@ -45,6 +45,8 @@
       cursor: pointer;
     }
     button.primary { background: #00d4aa33; border-color: #00d4aa; }
+    button.danger { border-color: #ff6b6b66; color: #ffaaaa; }
+    button.danger:disabled { opacity: 0.35; cursor: not-allowed; }
     button.active { outline: 2px solid var(--accent); }
     main {
       flex: 1;
@@ -94,6 +96,35 @@
       resize: vertical;
     }
     label { font-size: 12px; color: #888; }
+    dialog {
+      border: 1px solid #444;
+      border-radius: 10px;
+      padding: 0;
+      background: var(--panel);
+      color: var(--text);
+      max-width: 420px;
+      width: calc(100% - 32px);
+    }
+    dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+    .save-dialog { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .save-dialog h2 { font-size: 1rem; font-weight: 600; }
+    .save-dialog p { font-size: 12px; color: #aaa; line-height: 1.5; }
+    .save-field { display: flex; flex-direction: column; gap: 4px; }
+    .save-field input, .save-field textarea {
+      background: #111;
+      color: var(--text);
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .save-field textarea { min-height: 72px; resize: vertical; }
+    .save-field small { font-size: 11px; color: #777; }
+    .save-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .save-status { font-size: 12px; min-height: 1.2em; }
+    .save-status.error { color: #ff6b6b; }
+    .save-status.ok { color: #00d4aa; }
   </style>
 </head>
 <body>
@@ -111,6 +142,7 @@
         <option value="2">Gray (g)</option>
         <option value="3">Power (p)</option>
         <option value="4">Spike (s)</option>
+        <option value="5">Indestructible (i)</option>
       </select>
       <select id="enemy-brush" hidden>
         <option value="drifter">Drifter</option>
@@ -118,9 +150,11 @@
       <label>Level</label>
       <select id="level-picker" aria-label="Registered levels"></select>
       <button type="button" id="btn-load-level">Load</button>
+      <button type="button" id="btn-delete-level" title="Remove selected level file from disk">Delete</button>
       <button type="button" id="btn-play-test">Play test</button>
       <button type="button" id="btn-clear">Clear</button>
-      <button type="button" id="btn-export" class="primary">Export</button>
+      <button type="button" id="btn-save" class="primary">Save</button>
+      <button type="button" id="btn-export">Export</button>
     </div>
   </header>
   <main>
@@ -129,14 +163,43 @@
     </div>
     <aside>
       <p class="legend">
-        <strong>Blocks:</strong> click/drag any play cell (below HUD). Keys <kbd>1</kbd> <kbd>g</kbd> <kbd>p</kbd> <kbd>s</kbd> <kbd>.</kbd>.<br />
+        <strong>Blocks:</strong> click/drag any play cell (below HUD). Keys <kbd>1</kbd> <kbd>g</kbd> <kbd>p</kbd> <kbd>s</kbd> <kbd>i</kbd> <kbd>.</kbd>.<br />
         <strong>Enemies:</strong> click a cell to place; click again to remove.<br />
-        Grid matches <code>390×780</code> playfield. <strong>Play test</strong> runs the current layout (save not required). To play from disk, register in <code>levels/registry.js</code> and use the game level bar or <code>?level=id</code>.
+        Grid matches <code>390×780</code> playfield. Choose <strong>Blank</strong> or load a level, paint, then <strong>Save</strong> (writes <code>levels/your-id.js</code> via dev server). <strong>Play test</strong> opens the game. <strong>Export</strong> copies JS to clipboard.
       </p>
       <label for="export-json">Level template (export)</label>
       <textarea id="export-json" readonly></textarea>
     </aside>
   </main>
+
+  <dialog id="save-dialog">
+    <form method="dialog" class="save-dialog" id="save-form">
+      <h2>Save level</h2>
+      <p>Writes <code>levels/&lt;id&gt;.js</code> and updates <code>levels/manifest.json</code>. Requires <code>yarn start</code> (dev server).</p>
+      <div class="save-field">
+        <label for="save-id">Level id</label>
+        <input type="text" id="save-id" name="id" pattern="[a-z0-9]+(-[a-z0-9]+)*" required autocomplete="off" spellcheck="false" />
+        <small>Lowercase letters, numbers, hyphens — e.g. <code>my-level</code></small>
+      </div>
+      <div class="save-field">
+        <label for="save-name">Display name</label>
+        <input type="text" id="save-name" name="name" required maxlength="80" />
+      </div>
+      <div class="save-field">
+        <label for="save-description">Description</label>
+        <textarea id="save-description" name="description" maxlength="500" placeholder="Optional notes for meta.description"></textarea>
+      </div>
+      <div class="save-field">
+        <label for="save-lives">Starting lives</label>
+        <input type="number" id="save-lives" name="lives" min="1" max="9" value="3" />
+      </div>
+      <p class="save-status" id="save-status" aria-live="polite"></p>
+      <div class="save-actions">
+        <button type="button" id="save-cancel">Cancel</button>
+        <button type="submit" id="save-submit" class="primary">Save to disk</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="block-types.js"></script>
   <script src="enemy-types.js"></script>
@@ -150,7 +213,13 @@
     const exportTa = document.getElementById('export-json');
     const levelPicker = document.getElementById('level-picker');
 
+    function editorLog(...args) {
+      console.log('[BlockBall editor]', ...args);
+    }
+
     let level = null;
+    /** Registered level id on disk (null for Blank / unsaved). */
+    let savedLevelId = null;
     let levelGrid = createLevelGrid({ grid: { cols: 10 }, hud: { rows: 2, cols: 10 } }, GAME_H, GAME_W);
     let mode = 'blocks';
     let painting = false;
@@ -186,6 +255,7 @@
       cells[gridRow][gridCol] = value;
       draw();
       refreshExport();
+      scheduleEditorDraftSave();
     }
 
     function toggleEnemy(col, row) {
@@ -197,6 +267,7 @@
       }
       draw();
       refreshExport();
+      scheduleEditorDraftSave();
     }
 
     function drawDevBorders() {
@@ -283,7 +354,7 @@
       }
 
       const cells = getPlayCells();
-      const colors = { 1: '#fff5e6', 2: '#9ca3af', 3: '#6b7280', 4: '#ff3366' };
+      const colors = { 1: '#fff5e6', 2: '#9ca3af', 3: '#6b7280', 4: '#ff3366', 5: '#6b7c8c' };
       for (let row = 0; row < cells.length; row++) {
         for (let col = 0; col < cells[row].length; col++) {
           const v = cells[row][col];
@@ -291,7 +362,7 @@
           const tl = levelGrid.cellTopLeft(col, row);
           ctx.fillStyle = colors[v] || '#fff';
           ctx.fillRect(tl.x + 1, tl.y + 1, g.cellWidth - 2, g.cellHeight - 2);
-          ctx.strokeStyle = v === 4 ? '#cc1144' : '#ffb347';
+          ctx.strokeStyle = v === 4 ? '#cc1144' : v === 5 ? '#3d4d5d' : '#ffb347';
           ctx.strokeRect(tl.x, tl.y, g.cellWidth, g.cellHeight);
         }
       }
@@ -326,20 +397,19 @@
 
     function buildLevelExport() {
       return {
-        version: level.version,
-        id: level.id,
-        name: level.name,
+        version: level.version ?? 1,
+        id: level.id ?? 'editor-preview',
+        name: level.name ?? 'Editor preview',
         hud: { ...level.hud },
         hudLayout: level.hudLayout ? { ...level.hudLayout } : undefined,
-        hudGap: level.hudGap,
+        hudGap: level.hudGap ?? 8,
         grid: { ...level.grid },
         blocks: {
           cells: getPlayCells().map((row) => [...row]),
         },
-        enemies: [...level.enemies],
-        ui: { ...level.ui },
-        paddle: { ...level.paddle },
-        meta: { ...level.meta },
+        enemies: [...(level.enemies || [])],
+        paddle: { ...(level.paddle || { col: 4, colSpan: 2, rowFromBottom: 2 }) },
+        meta: { lives: 3, ...(level.meta || {}) },
       };
     }
 
@@ -354,14 +424,159 @@
       return `LEVEL_${raw.toUpperCase()}`;
     }
 
-    async function loadRegisteredLevel(entry) {
-      const data = await loadLevelScript(entry);
+    function suggestLevelId(name) {
+      const slug = String(name || 'my-level')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      return slug || 'my-level';
+    }
+
+    function applyLevelToEditor(data) {
       level = structuredClone(data);
       syncGrid();
       draw();
       refreshExport();
-      levelPicker.value = entry.id;
     }
+
+    let draftSaveTimer = null;
+    function scheduleEditorDraftSave() {
+      clearTimeout(draftSaveTimer);
+      draftSaveTimer = setTimeout(() => {
+        if (!level) return;
+        try {
+          if (typeof storeEditorDraft === 'function') {
+            storeEditorDraft(buildLevelExport());
+          }
+        } catch (err) {
+          editorLog('draft save failed', err?.message || err);
+        }
+      }, 400);
+    }
+
+    async function loadRegisteredLevel(entry, options = {}) {
+      editorLog('load level', entry.id, entry.script);
+      const data = await loadLevelScript(entry, options);
+      applyLevelToEditor(data);
+      levelPicker.value = entry.id;
+      savedLevelId = entry.builtin ? null : entry.id;
+      scheduleEditorDraftSave();
+      editorLog('load complete', { id: level.id, name: level.name, savedLevelId });
+    }
+
+    function restoreEditorDraft(draft) {
+      editorLog('restore draft', { id: draft?.id, name: draft?.name });
+      applyLevelToEditor(draft);
+      savedLevelId = draft?.id && typeof isValidLevelId === 'function' && isValidLevelId(draft.id) ? draft.id : null;
+    }
+
+    const saveDialog = document.getElementById('save-dialog');
+    const saveForm = document.getElementById('save-form');
+    const saveStatus = document.getElementById('save-status');
+    const saveIdInput = document.getElementById('save-id');
+    const saveNameInput = document.getElementById('save-name');
+    const saveDescriptionInput = document.getElementById('save-description');
+    const saveLivesInput = document.getElementById('save-lives');
+    const saveSubmitBtn = document.getElementById('save-submit');
+
+    function openSaveDialog() {
+      if (!level) return;
+      saveStatus.textContent = '';
+      saveStatus.className = 'save-status';
+
+      const currentId = level.id;
+      const idOk = typeof isValidLevelId === 'function' && isValidLevelId(currentId);
+      saveIdInput.value = idOk ? currentId : suggestLevelId(level.name);
+      saveNameInput.value = level.name && level.name !== 'Blank' ? level.name : '';
+      saveDescriptionInput.value = level.meta?.description || '';
+      saveLivesInput.value = String(level.meta?.lives ?? 3);
+      saveSubmitBtn.disabled = false;
+      saveDialog.showModal();
+      saveNameInput.focus();
+    }
+
+    document.getElementById('save-cancel').onclick = () => saveDialog.close();
+    saveDialog.addEventListener('cancel', () => {
+      saveStatus.textContent = '';
+    });
+
+    saveForm.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      saveStatus.className = 'save-status';
+      saveStatus.textContent = '';
+
+      const id = saveIdInput.value.trim().toLowerCase();
+      const name = saveNameInput.value.trim();
+      const description = saveDescriptionInput.value.trim();
+      const lives = Number(saveLivesInput.value);
+
+      if (typeof isValidLevelId === 'function' && !isValidLevelId(id)) {
+        saveStatus.textContent = 'Invalid id — use lowercase letters, numbers, and hyphens.';
+        saveStatus.className = 'save-status error';
+        return;
+      }
+      if (!name) {
+        saveStatus.textContent = 'Name is required.';
+        saveStatus.className = 'save-status error';
+        return;
+      }
+
+      const canSave = typeof isLevelSaveAvailable === 'function' && (await isLevelSaveAvailable());
+      if (!canSave) {
+        saveStatus.textContent = 'Save API unavailable. Run yarn start and open the editor at localhost:8080.';
+        saveStatus.className = 'save-status error';
+        return;
+      }
+
+      refreshExport();
+      const payload = buildLevelExport();
+      payload.meta = { ...payload.meta, lives: Number.isFinite(lives) ? lives : 3 };
+
+      saveSubmitBtn.disabled = true;
+      saveStatus.textContent = 'Saving…';
+
+      try {
+        const result = await saveLevelToServer({
+          id,
+          originalId: savedLevelId || null,
+          name,
+          description,
+          level: payload,
+        });
+        editorLog('saved to disk', result);
+
+        if (savedLevelId && savedLevelId !== id) {
+          const oldEntry = findLevelEntry(savedLevelId);
+          if (oldEntry?.global) invalidateLevelScript(oldEntry.global);
+        }
+
+        await ensureLevelRegistry(true);
+        populateLevelSelect(levelPicker, id);
+
+        const entry = findLevelEntry(id);
+        if (entry) {
+          await loadRegisteredLevel(entry, { reload: true });
+        } else {
+          level.id = id;
+          level.name = name;
+          level.meta = { ...level.meta, description: description || undefined, lives: payload.meta.lives };
+          refreshExport();
+        }
+
+        savedLevelId = id;
+        saveStatus.textContent = `Saved ${result.filePath}`;
+        saveStatus.className = 'save-status ok';
+        scheduleEditorDraftSave();
+        setTimeout(() => saveDialog.close(), 600);
+      } catch (err) {
+        console.error('[BlockBall editor] save failed', err);
+        saveStatus.textContent = err.message || String(err);
+        saveStatus.className = 'save-status error';
+        saveSubmitBtn.disabled = false;
+      }
+    });
+
+    document.getElementById('btn-save').onclick = () => openSaveDialog();
 
     function setMode(next) {
       mode = next;
@@ -410,6 +625,16 @@
     document.getElementById('mode-enemies').onclick = () => setMode('enemies');
     document.getElementById('mode-erase').onclick = () => setMode('erase');
 
+    const btnDeleteLevel = document.getElementById('btn-delete-level');
+    btnDeleteLevel.classList.add('danger');
+
+    function updateDeleteButtonState() {
+      const entry = findLevelEntry(levelPicker.value);
+      btnDeleteLevel.disabled = !entry || !!entry.builtin;
+    }
+
+    levelPicker.addEventListener('change', updateDeleteButtonState);
+
     document.getElementById('btn-load-level').onclick = async () => {
       const entry = findLevelEntry(levelPicker.value);
       if (!entry) return;
@@ -417,26 +642,108 @@
         await loadRegisteredLevel(entry);
       } catch (err) {
         alert(err.message);
+      } finally {
+        updateDeleteButtonState();
+      }
+    };
+
+    btnDeleteLevel.onclick = async () => {
+      const entry = findLevelEntry(levelPicker.value);
+      if (!entry || entry.builtin) {
+        alert('Select a saved level to delete (not Blank).');
+        return;
+      }
+
+      const canSave = typeof isLevelSaveAvailable === 'function' && (await isLevelSaveAvailable());
+      if (!canSave) {
+        alert('Delete requires the dev server. Run yarn start and open the editor at localhost:8080.');
+        return;
+      }
+
+      const label = entry.name || entry.id;
+      if (
+        !confirm(
+          `Delete "${label}" (${entry.id})?\n\nRemoves ${entry.script} and unregisters the level. This cannot be undone.`
+        )
+      ) {
+        return;
+      }
+
+      btnDeleteLevel.disabled = true;
+      try {
+        const result = await deleteLevelFromServer(entry.id);
+        editorLog('deleted from disk', result);
+        if (entry.global) invalidateLevelScript(entry.global);
+
+        await ensureLevelRegistry(true);
+        savedLevelId = null;
+
+        const blankEntry = findLevelEntry('blank');
+        if (blankEntry) {
+          await loadRegisteredLevel(blankEntry);
+          levelPicker.value = 'blank';
+        }
+
+        populateLevelSelect(levelPicker, 'blank');
+        updateDeleteButtonState();
+      } catch (err) {
+        console.error('[BlockBall editor] delete failed', err);
+        alert(err.message || String(err));
+        updateDeleteButtonState();
       }
     };
 
     document.getElementById('btn-play-test').onclick = () => {
+      editorLog('Play test clicked', { origin: window.location.href });
       refreshExport();
+      const payload = buildLevelExport();
+      const cells = payload.blocks?.cells || [];
+      let filled = 0;
+      for (const row of cells) for (const c of row) if (c) filled += 1;
+      editorLog('preview payload', {
+        id: payload.id,
+        name: payload.name,
+        rows: cells.length,
+        cols: cells[0]?.length,
+        filledCells: filled,
+        enemies: payload.enemies?.length ?? 0,
+      });
       try {
-        sessionStorage.setItem('blockBall.previewLevel', JSON.stringify(buildLevelExport()));
+        if (typeof storeEditorPreviewLevel === 'function') {
+          storeEditorPreviewLevel(payload);
+        } else {
+          editorLog('storeEditorPreviewLevel missing — using localStorage fallback');
+          if (typeof markEditorRestoreAfterPlayTest === 'function') markEditorRestoreAfterPlayTest();
+          localStorage.setItem('blockBall.editorDraft', JSON.stringify(payload));
+          localStorage.setItem('blockBall.previewLevel', JSON.stringify(payload));
+        }
       } catch (err) {
+        console.error('[BlockBall editor] preview store failed', err);
         alert(`Could not store preview: ${err.message}`);
         return;
       }
-      window.open('block-ball-demo.html?preview=1', '_blank', 'noopener');
+      const url = new URL('/block-ball-demo', window.location.origin);
+      url.searchParams.set('preview', '1');
+      url.searchParams.set('t', String(Date.now()));
+      url.hash = 'preview';
+      editorLog('opening game', url.href);
+      const win = window.open(url.href, 'blockball_playtest');
+      if (!win) {
+        editorLog('window.open blocked');
+        alert('Popup blocked. Allow popups for this site, or open:\n' + url.href);
+      } else {
+        editorLog('game tab opened', { name: 'blockball_playtest' });
+      }
     };
 
     document.getElementById('btn-clear').onclick = () => {
       const { cols, rows } = levelGrid.config;
       level.blocks = { cells: Array.from({ length: rows }, () => Array(cols).fill(0)) };
       level.enemies = [];
+      savedLevelId = null;
       draw();
       refreshExport();
+      scheduleEditorDraftSave();
     };
 
     document.getElementById('btn-export').onclick = () => {
@@ -446,7 +753,7 @@
     };
 
     window.addEventListener('keydown', (ev) => {
-      const map = { '1': '1', g: '2', G: '2', p: '3', P: '3', s: '4', S: '4', '.': '0', '0': '0' };
+      const map = { '1': '1', g: '2', G: '2', p: '3', P: '3', s: '4', S: '4', i: '5', I: '5', '.': '0', '0': '0' };
       if (map[ev.key] != null) {
         blockBrush.value = map[ev.key];
         setMode('blocks');
@@ -463,15 +770,40 @@
       });
     }
 
-    populateLevelSelect(levelPicker, new URLSearchParams(window.location.search).get('level') || getDefaultLevelId());
-
     (async function bootEditor() {
-      const startId = new URLSearchParams(window.location.search).get('level') || getDefaultLevelId();
+      editorLog('editor boot', window.location.href);
+      await ensureLevelRegistry();
+      populateLevelSelect(
+        levelPicker,
+        new URLSearchParams(window.location.search).get('level') || getDefaultLevelId()
+      );
+      const params = new URLSearchParams(window.location.search);
+      const explicitLevelId = params.get('level');
+      const shouldRestore =
+        params.get('restore') === '1' ||
+        (typeof consumeEditorRestoreAfterPlayTest === 'function' && consumeEditorRestoreAfterPlayTest());
+
+      if (shouldRestore) {
+        const draft =
+          (typeof loadEditorDraft === 'function' && loadEditorDraft()) ||
+          (typeof loadEditorPreviewLevel === 'function' && loadEditorPreviewLevel());
+        if (draft) {
+          restoreEditorDraft(draft);
+          updateDeleteButtonState();
+          editorLog('boot → restored draft after play test');
+          return;
+        }
+        editorLog('boot → restore requested but no draft found');
+      }
+
+      const startId = explicitLevelId || getDefaultLevelId();
       const entry = findLevelEntry(startId) || findLevelEntry(getDefaultLevelId());
       if (!entry) return;
       try {
         await loadRegisteredLevel(entry);
+        updateDeleteButtonState();
       } catch (err) {
+        console.error('[BlockBall editor] boot failed', err);
         alert(`Failed to load level: ${err.message}`);
       }
     })();

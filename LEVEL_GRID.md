@@ -101,8 +101,9 @@ Blocks (including **spike** hazards), enemies, and paddle use **only** the playf
 | `2` | Gray |
 | `3` | Power |
 | `4` | Spike |
+| `5` | Indestructible |
 
-String keys in row strings (legacy import): `.` `1` `g` `p` `s`. Older levels may use `anchor` + `layer` + `spikes`; they are migrated to `blocks.cells` at load time.
+String keys in row strings (legacy import): `.` `1` `g` `p` `s` `i`. Older levels may use `anchor` + `layer` + `spikes`; they are migrated to `blocks.cells` at load time.
 
 ## Files
 
@@ -111,16 +112,25 @@ String keys in row strings (legacy import): `.` `1` `g` `p` `s`. Older levels ma
 | `level-grid.js` | `createHudGrid`, `resolveHudLayout`, play origin, `fitEntityToCell` |
 | `hud-avatar.js` | Avatar state → texture; procedural placeholders |
 | `levels/demo-level-01.js` | Reference level |
-| `levels/registry.js` | Level list for playtest + editor load |
-| `level-editor.html` | Paint play cells; HUD preview (score + avatar) |
+| `levels/manifest.json` | Registered file levels (updated when you **Save** in editor) |
+| `levels/registry.js` | Built-in **Blank** + manifest loader |
+| `level-editor.html` | Paint play cells; **Save** writes `levels/<id>.js` |
 | `block-ball-demo.html` | HUD bar; level select + `?level=id` |
+| `scripts/dev-server.mjs` | `yarn start` — static server + `POST /api/levels/save` |
+
+### Saving levels
+
+1. Run **`yarn start`** and open **`/level-editor`** (Save needs the dev server; opening HTML directly won’t write files).
+2. Paint your layout, click **Save**, set **id**, **name**, **description**, and **lives**.
+3. The server writes **`levels/<id>.js`** and updates **`levels/manifest.json`** — the level appears in the editor and game dropdowns.
+4. Renaming the id on save moves the file (old id is removed from manifest).
+5. **Delete** removes the selected level’s `.js` file and its manifest entry (not **Blank**).
 
 ### Playtesting levels
 
-1. Save export as `levels/my-level.js` with a unique `const` (see export) and `id` field.
-2. Register in `levels/registry.js`.
-3. Open `block-ball-demo.html?level=my-level` or use the in-game level dropdown.
-4. From the editor: **Play test** launches a preview of the current layout (no save needed). **Load** opens a registered level file.
+1. **Play test** from the editor opens the game with your current layout (preview in `localStorage`).
+2. Return via the game **Editor** link (`?restore=1`) to restore your draft.
+3. Or play a saved level: **`/block-ball-demo?level=my-level`** or the in-game dropdown.
 
 ## Debug
 
