@@ -102,6 +102,16 @@ Blocks (including **spike** hazards), enemies, and paddle use **only** the playf
 | `3` | Power |
 | `4` | Spike |
 | `5` | Indestructible |
+| `6` + `7` | Normal long **horizontal** (2×1; anchor `6` left, `7` right) |
+| `8` + `9` | Normal long **vertical** (1×2; anchor `8` top, `9` bottom) |
+| `10` + `11` | Gray long **horizontal** (anchor `10`, extension `11`) |
+| `12` + `13` | Gray long **vertical** (anchor `12`, extension `13`) |
+| `14` + `15` | Power long **horizontal** (2×1; anchor `14` left, `15` right) |
+| `16` + `17` | Power long **vertical** (1×2; anchor `16` top, `17` bottom) |
+
+Power blocks use portrait art rotated 90° (↔) or upright (↕), stretched to fill the footprint.
+
+Long blocks use the same hit rules and art as their 1×1 type; the game spawns one physics body across the footprint. Paint from the **anchor** cell (top-left for ↔, top for ↕).
 
 String keys in row strings (legacy import): `.` `1` `g` `p` `s` `i`. Older levels may use `anchor` + `layer` + `spikes`; they are migrated to `blocks.cells` at load time.
 

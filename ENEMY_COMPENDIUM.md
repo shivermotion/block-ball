@@ -92,3 +92,4 @@ One per stage. Multi-phase; need Power Bounces + abilities.
 - Registry: [`enemy-types.js`](enemy-types.js)
 - Playable spawns: [`block-ball-demo.html`](block-ball-demo.html) → `createEnemies()`
 - Block interactions: [`BLOCK_COMPENDIUM.md`](BLOCK_COMPENDIUM.md)
+- Item drops: [`ITEM_COMPENDIUM.md`](ITEM_COMPENDIUM.md) · [`item-types.js`](item-types.js)

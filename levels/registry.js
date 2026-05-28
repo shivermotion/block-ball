@@ -24,6 +24,7 @@ function summarizeLevel(level) {
     gridCols: cells?.[0]?.length,
     filledCells: filled,
     enemies: level?.enemies?.length ?? 0,
+    items: level?.items?.length ?? 0,
   };
 }
 
@@ -160,6 +161,7 @@ function createBlankLevel() {
     },
     blocks: { cells: [] },
     enemies: [],
+    items: [],
     paddle: { col: 4, colSpan: 2, rowFromBottom: 2 },
     meta: { lives: 3, description: 'Empty canvas for level design.' },
   };

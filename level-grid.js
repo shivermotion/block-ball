@@ -426,6 +426,20 @@ function fitEntityToCellSpan(gameObject, levelGrid, colSpan, rowSpan = 1, option
   const hFrac = options.heightFraction ?? 1;
   const w = colSpan * cellWidth - pad * 2;
   const h = (rowSpan * cellHeight - pad * 2) * hFrac;
+
+  if (options.contain) {
+    const frame = gameObject.texture?.get?.();
+    const tw = frame?.width > 0 ? frame.width : w;
+    const th = frame?.height > 0 ? frame.height : h;
+    const scale = Math.min(w / tw, h / th);
+    const dw = tw * scale;
+    const dh = th * scale;
+    gameObject.setDisplaySize(dw, dh);
+    if (gameObject.body && options.setBody !== false) {
+      gameObject.body.setSize(dw, dh);
+    }
+    return { width: dw, height: dh, slotWidth: w, slotHeight: h };
+  }
   gameObject.setDisplaySize(w, h);
   if (gameObject.body && options.setBody !== false) {
     gameObject.body.setSize(w, h);

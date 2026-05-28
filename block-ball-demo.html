@@ -127,13 +127,16 @@ PACKAGING FOR REAL MOBILE APPS
 <div id="game-container"></div>
 
 <script src="block-types.js"></script>
+<script src="block-power-art.js"></script>
 <script src="enemy-types.js"></script>
+<script src="item-types.js"></script>
+<script src="score-popup.js"></script>
 <script src="level-grid.js"></script>
 <script src="hud-avatar.js"></script>
 <script src="levels/registry.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
 <script>
-/* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, resolveBlockHit, getEnemyDef, resolveEnemyHit, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, fitEntityToCell, fitEntityToCellSpan, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES */
+/* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemImagePath, getItemTextureKey, getItemFootprint, ITEM_ART_VERSION, ITEM_CATEGORY, spawnFloatingScore, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, fitEntityToCell, fitEntityToCellSpan, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES */
 
 let ACTIVE_LEVEL = null;
 const URL_PARAMS = new URLSearchParams(window.location.search);
@@ -188,8 +191,8 @@ const COLORS = {
   danger: '#ff3366',
 };
 
-/** Clay debris tints when blocks break (warm, matte — not neon sparkles). */
-const CLAY_DEBRIS_TINT = {
+/** Fallback debris tint if texture sampling fails. */
+const CLAY_DEBRIS_TINT_FALLBACK = {
   normal: 0xe8dcc8,
   gray: 0xb8b0a8,
   power: 0xc9c4b0,
@@ -207,6 +210,14 @@ const PHYSICS = {
   paddleBounceFactor: 1.05,
   /** Rolling spin: rotation rate ≈ speed / radius (rad/s). */
   ballSpin: 0.15,
+};
+
+/** Level-placed pickups bob in place (classic Kirby-style float). */
+const ITEM_FLOAT = {
+  amplitudeFrac: 0.09,
+  durationBase: 820,
+  durationStep: 100,
+  delayStep: 85,
 };
 
 const BALL_TRAIL = {
@@ -239,6 +250,22 @@ const SCORE = {
   powerMultiplier: 1.5,
 };
 
+/** Neutral hit on power blocks — “needs Power Bounce” feedback (not indestructible). */
+const POWER_BLOCK_RESIST = {
+  squashScaleX: 1.07,
+  squashScaleY: 0.86,
+  squashInMs: 42,
+  ballSpeedMul: 0.9,
+  cameraShakeMs: 48,
+  cameraShakeIntensity: 0.0022,
+  godRayAngleDeg: -36,
+  godRaySweepMs: 360,
+  godRayCoreScale: 0.3,
+  godRayHaloScale: 0.62,
+  godRayCoreAlpha: 0.9,
+  godRayHaloAlpha: 0.38,
+};
+
 const POWER_BOUNCE = {
   /** Release arms power; paddle hit must occur within this window (ms) */
   queueWindowMs: 1100,
@@ -267,27 +294,95 @@ const BALL_TEXTURE = {
   determined: 'ball_determined',
 };
 
+/** Matches legacy procedural paddle texture size (see generateTextures). */
+const PADDLE_PAD = 2;
+
+function getPaddleDisplaySize(cellW, cellH, colSpan = 2) {
+  return {
+    width: Math.max(1, Math.round(colSpan * cellW - PADDLE_PAD)),
+    height: Math.max(1, Math.round(cellH * 0.5)),
+  };
+}
+
+/** Scale preloaded paddle PNG to exact playfield paddle dimensions (1:1 in game). */
+function bakePaddleTexture(scene, cellW, cellH, colSpan) {
+  const { width: w, height: h } = getPaddleDisplaySize(cellW, cellH, colSpan);
+  const sourceKey = 'paddle';
+  const bakedKey = 'paddle_baked';
+
+  if (!scene.textures.exists(sourceKey)) {
+    return { key: sourceKey, width: w, height: h };
+  }
+
+  if (scene.textures.exists(bakedKey)) {
+    scene.textures.remove(bakedKey);
+  }
+
+  const canvasTex = scene.textures.createCanvas(bakedKey, w, h);
+  const ctx = canvasTex.getContext();
+  const src = scene.textures.get(sourceKey).getSourceImage();
+  if (src) {
+    ctx.drawImage(src, 0, 0, w, h);
+  }
+  canvasTex.refresh();
+  return { key: bakedKey, width: w, height: h };
+}
+
+/** Soft band for power-block god-ray sweep (canvas; ADD blend in scene). */
+function ensurePowerGodRayTexture(scene) {
+  if (scene.textures.exists('power_godray')) return;
+
+  const w = 64;
+  const h = 168;
+  const tex = scene.textures.createCanvas('power_godray', w, h);
+  const ctx = tex.getContext();
+
+  const hGrad = ctx.createLinearGradient(0, 0, w, 0);
+  hGrad.addColorStop(0, 'rgba(255,255,255,0)');
+  hGrad.addColorStop(0.4, 'rgba(255,255,255,0)');
+  hGrad.addColorStop(0.5, 'rgba(255,255,255,1)');
+  hGrad.addColorStop(0.6, 'rgba(255,255,255,0)');
+  hGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = hGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  const vGrad = ctx.createLinearGradient(0, 0, 0, h);
+  vGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  vGrad.addColorStop(0.1, 'rgba(255,255,255,1)');
+  vGrad.addColorStop(0.9, 'rgba(255,255,255,1)');
+  vGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = vGrad;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = 'source-over';
+
+  tex.refresh();
+}
+
 // =============================================================================
 // TEXTURE GENERATION (generic shapes — no franchise assets)
 // =============================================================================
 
 function generateTextures(scene, cellW, cellH) {
+  ensurePowerGodRayTexture(scene);
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
   const pad = 2;
   const innerW = cellW - pad * 2;
   const innerH = cellH - pad * 2;
   const paddleColSpan = (ACTIVE_LEVEL?.paddle?.colSpan) ?? 2;
-  const paddleW = paddleColSpan * cellW - pad;
-  const paddleTexH = cellH * 0.5;
-  const paddleInnerH = paddleTexH - pad - 2;
-
-  // Paddle (colSpan wide × half cell tall)
-  g.clear();
-  g.fillStyle(COLORS.paddleDark, 1);
-  g.fillRoundedRect(0, 2, paddleW, paddleInnerH, 6);
-  g.fillStyle(COLORS.paddle, 1);
-  g.fillRoundedRect(0, 0, paddleW, paddleInnerH, 6);
-  g.generateTexture('paddle', paddleW, paddleTexH);
+  if (scene.textures.exists('paddle')) {
+    bakePaddleTexture(scene, cellW, cellH, paddleColSpan);
+  } else {
+    const paddleW = paddleColSpan * cellW - pad;
+    const paddleTexH = cellH * 0.5;
+    const paddleInnerH = paddleTexH - pad - 2;
+    g.clear();
+    g.fillStyle(COLORS.paddleDark, 1);
+    g.fillRoundedRect(0, 2, paddleW, paddleInnerH, 6);
+    g.fillStyle(COLORS.paddle, 1);
+    g.fillRoundedRect(0, 0, paddleW, paddleInnerH, 6);
+    g.generateTexture('paddle', paddleW, paddleTexH);
+  }
 
   function drawBlockTexture(key, fill, border, extra) {
     g.clear();
@@ -299,20 +394,25 @@ function generateTextures(scene, cellW, cellH) {
     g.generateTexture(key, cellW, cellH);
   }
 
-  // Normal block — assets/blocks/normal.png (preload); procedural fallback if missing
+  // Normal / gray — assets/blocks/*.png (preload); procedural fallback if missing
   if (!scene.textures.exists('block_normal')) {
     drawBlockTexture('block_normal', COLORS.blockNormal, COLORS.blockNormalBorder);
   }
-  drawBlockTexture('block_gray', COLORS.blockGray, COLORS.blockGrayBorder, (gfx, w, h) => {
-    gfx.lineStyle(1, 0x6b7280, 0.8);
-    gfx.strokeRect(w * 0.2, h * 0.35, w * 0.6, h * 0.3);
-  });
-  drawBlockTexture('block_power', COLORS.blockPower, COLORS.blockPowerBorder, (gfx, w, h) => {
-    gfx.lineStyle(2, COLORS.blockPowerGlow, 0.85);
-    gfx.strokeRoundedRect(4, 4, w - 8, h - 8, 3);
-    gfx.fillStyle(COLORS.blockPowerGlow, 0.35);
-    gfx.fillRect(6, 6, w - 12, Math.max(4, h * 0.2));
-  });
+  if (!scene.textures.exists('block_gray')) {
+    drawBlockTexture('block_gray', COLORS.blockGray, COLORS.blockGrayBorder, (gfx, w, h) => {
+      gfx.lineStyle(1, 0x6b7280, 0.8);
+      gfx.strokeRect(w * 0.2, h * 0.35, w * 0.6, h * 0.3);
+    });
+  }
+  if (!scene.textures.exists('block_power')) {
+    drawBlockTexture('block_power', COLORS.blockPower, COLORS.blockPowerBorder, (gfx, w, h) => {
+      gfx.lineStyle(2, COLORS.blockPowerGlow, 0.85);
+      gfx.strokeRoundedRect(4, 4, w - 8, h - 8, 3);
+      gfx.fillStyle(COLORS.blockPowerGlow, 0.35);
+      gfx.fillRect(6, 6, w - 12, Math.max(4, h * 0.2));
+    });
+  }
+  bakePowerBlockTextures(scene, cellW, cellH);
 
   // Spike hazard — assets/blocks/spike.png (preload); procedural fallback if missing
   if (!scene.textures.exists('block_spike')) {
@@ -361,6 +461,8 @@ function generateTextures(scene, cellW, cellH) {
   g.fillStyle(0x1e3a5f, 0.8);
   g.fillEllipse(cellW / 2, cellH * 0.72, cellW * 0.15, cellH * 0.1);
   g.generateTexture('enemy', cellW, cellH);
+
+  generateItemTextures(scene, cellW, cellH, g);
 
   // Particle spark (ball lose, enemies)
   g.clear();
@@ -418,6 +520,43 @@ function generateTextures(scene, cellW, cellH) {
   g.destroy();
 }
 
+const ITEM_CATEGORY_COLORS = {
+  [ITEM_CATEGORY.food]: { fill: 0xc45c5c, border: 0x8b3a3a },
+  [ITEM_CATEGORY.powerUp]: { fill: 0x3d9a6a, border: 0x2a6b4a },
+  [ITEM_CATEGORY.copyAbility]: { fill: 0x6b8cce, border: 0x4a6299 },
+  [ITEM_CATEGORY.life]: { fill: 0x9b7ede, border: 0x6b5a9e },
+};
+
+function uniqueLevelItemIds() {
+  const spawns = ACTIVE_LEVEL?.items || [];
+  return [...new Set(spawns.map((s) => s.type).filter(Boolean))];
+}
+
+/** Procedural item icons for types without PNG art in preload. */
+function generateItemTextures(scene, cellW, cellH, g) {
+  const ids = uniqueLevelItemIds();
+  if (!ids.length) return;
+
+  const size = Math.max(8, Math.min(cellW, cellH) - 4);
+
+  for (const id of ids) {
+    const key = getItemTextureKey(id);
+    if (scene.textures.exists(key)) continue;
+
+    const def = getItemDef(id);
+    const colors = ITEM_CATEGORY_COLORS[def?.category] || { fill: 0x888888, border: 0x555555 };
+
+    g.clear();
+    g.fillStyle(colors.border, 1);
+    g.fillRoundedRect(0, 0, size, size, 4);
+    g.fillStyle(colors.fill, 1);
+    g.fillRoundedRect(2, 2, size - 4, size - 4, 3);
+    g.fillStyle(0xffffff, 0.35);
+    g.fillCircle(size * 0.72, size * 0.28, Math.max(2, size * 0.1));
+    g.generateTexture(key, size, size);
+  }
+}
+
 // =============================================================================
 // MAIN SCENE
 // =============================================================================
@@ -428,11 +567,23 @@ class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    const v = '4';
+    const v = '13';
     this.load.image(BALL_TEXTURE.neutral, `assets/ball/neutral.png?v=${v}`);
     this.load.image(BALL_TEXTURE.determined, `assets/ball/determined.png?v=${v}`);
+    this.load.image('paddle', `assets/paddle/paddle.png?v=${v}`);
     this.load.image('block_normal', `assets/blocks/normal.png?v=${v}`);
+    this.load.image('block_gray', `assets/blocks/gray.png?v=${v}`);
     this.load.image('block_spike', `assets/blocks/spike.png?v=${v}`);
+    this.load.image('block_power', `assets/blocks/power.png?v=${v}`);
+
+    const itemV = typeof ITEM_ART_VERSION !== 'undefined' ? ITEM_ART_VERSION : '1';
+    for (const id of uniqueLevelItemIds()) {
+      const path = getItemImagePath(id);
+      const key = getItemTextureKey(id);
+      if (path) {
+        this.load.image(key, `${path}?v=${itemV}`);
+      }
+    }
   }
 
   /** Match inscribed cell ball size (setTexture resets to native image dimensions). */
@@ -553,6 +704,7 @@ class GameScene extends Phaser.Scene {
     this.launchAimDirection = 1;
     this.launchAimTickEvent = null;
     this.aimArrowGfx = null;
+    this.blockDebrisTintCache = new Map();
 
     const { width, height } = this.scale;
     this.level = ACTIVE_LEVEL;
@@ -579,6 +731,7 @@ class GameScene extends Phaser.Scene {
 
     this.createBlocks();
     this.createEnemies();
+    this.createItems();
     this.createPaddle();
     this.createBall();
     this.setupCollisions();
@@ -607,14 +760,25 @@ class GameScene extends Phaser.Scene {
     this.blocks = this.physics.add.staticGroup();
     this.blocksRemaining = 0;
 
-    const spawnBlock = (x, y, cell, gridCol, gridRow) => {
-      const typeId = BLOCK_CELL_MAP[cell];
+    const spawnBlock = (gridCol, gridRow, cell) => {
+      if (isBlockExtensionCell(cell)) return;
+      const typeId = getBlockTypeFromCell(cell);
       if (!typeId) return;
       const def = getBlockDef(typeId);
+      const { colSpan, rowSpan } = getBlockFootprint(typeId);
+      const isLong = colSpan > 1 || rowSpan > 1;
+      const { x, y } = isLong
+        ? this.levelGrid.cellSpanCenter(gridCol, gridRow, colSpan, rowSpan)
+        : this.levelGrid.cellCenter(gridCol, gridRow);
 
       const block = this.blocks.create(x, y, def.texture);
-      const containSprite = typeId === 'spike' || typeId === 'normal';
-      fitEntityToCell(block, this.levelGrid, containSprite ? { contain: true } : {});
+      const isPower = isPowerBlockType(typeId);
+      const containSprite = typeId === 'spike' || typeId === 'normal' || typeId === 'gray';
+      if (isLong || isPower) {
+        fitEntityToCellSpan(block, this.levelGrid, colSpan, rowSpan);
+      } else {
+        fitEntityToCell(block, this.levelGrid, containSprite ? { contain: true } : {});
+      }
       block.refreshBody();
       block.setDepth(def.isHazard ? 8 : 5);
       block.setData('typeId', typeId);
@@ -623,6 +787,8 @@ class GameScene extends Phaser.Scene {
       block.setData('isHazard', Boolean(def.isHazard));
       block.setData('gridCol', gridCol);
       block.setData('gridRow', gridRow);
+      block.setData('colSpan', colSpan);
+      block.setData('rowSpan', rowSpan);
       if (def.countsTowardClear !== false) this.blocksRemaining++;
     };
 
@@ -630,8 +796,7 @@ class GameScene extends Phaser.Scene {
       for (let col = 0; col < cells[row].length; col++) {
         const cell = cells[row][col];
         if (cell === 0) continue;
-        const { x, y } = this.levelGrid.cellCenter(col, row);
-        spawnBlock(x, y, cell, col, row);
+        spawnBlock(col, row, cell);
       }
     }
   }
@@ -644,6 +809,59 @@ class GameScene extends Phaser.Scene {
       const { x, y } = this.levelGrid.cellCenter(spawn.col, spawn.row);
       this.spawnEnemy(spawn.type, x, y, i);
     });
+  }
+
+  applyItemFloatTween(item, baseY, spawn, index) {
+    const amp = Math.max(2, this.levelGrid.config.cellHeight * ITEM_FLOAT.amplitudeFrac);
+    this.tweens.add({
+      targets: item,
+      y: baseY - amp,
+      duration: ITEM_FLOAT.durationBase + (index % 4) * ITEM_FLOAT.durationStep,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+      delay: ((spawn.col * 3 + spawn.row) % 6) * ITEM_FLOAT.delayStep,
+    });
+  }
+
+  createItems() {
+    const spawns = this.level.items || [];
+    this.levelItems = this.add.group();
+
+    spawns.forEach((spawn, index) => {
+      const key = getItemTextureKey(spawn.type);
+      if (!this.textures.exists(key)) {
+        bbLog('createItems: missing texture', spawn.type);
+        return;
+      }
+      const foot = getItemFootprint(spawn.type);
+      const { x, y } = this.levelGrid.cellSpanCenter(
+        spawn.col,
+        spawn.row,
+        foot.colSpan,
+        foot.rowSpan
+      );
+      const item = this.add.image(x, y, key);
+      this.physics.add.existing(item);
+      item.body.setImmovable(true);
+      item.body.allowGravity = false;
+      if (foot.colSpan > 1 || foot.rowSpan > 1) {
+        fitEntityToCellSpan(item, this.levelGrid, foot.colSpan, foot.rowSpan, { contain: true });
+      } else {
+        fitEntityToCell(item, this.levelGrid, { contain: true });
+      }
+      item.setDepth(6);
+      item.setData('typeId', spawn.type);
+      item.setData('gridCol', spawn.col);
+      item.setData('gridRow', spawn.row);
+      item.setData('colSpan', foot.colSpan);
+      item.setData('rowSpan', foot.rowSpan);
+      item.setData('baseY', y);
+      this.levelItems.add(item);
+      this.applyItemFloatTween(item, y, spawn, index);
+    });
+
+    bbLog('createItems', { count: this.levelItems.getLength() });
   }
 
   spawnEnemy(typeId, x, y, index) {
@@ -692,8 +910,17 @@ class GameScene extends Phaser.Scene {
       colSpan,
       1
     );
-    this.paddle = this.physics.add.image(paddleX, paddleY, 'paddle');
-    fitEntityToCellSpan(this.paddle, this.levelGrid, colSpan, 1, { heightFraction: 0.5 });
+    const { cellWidth, cellHeight } = this.levelGrid.config;
+    const paddleSize = getPaddleDisplaySize(cellWidth, cellHeight, colSpan);
+    const paddleKey = this.textures.exists('paddle_baked') ? 'paddle_baked' : 'paddle';
+
+    this.paddle = this.physics.add.image(paddleX, paddleY, paddleKey);
+    this.paddle.setDisplaySize(paddleSize.width, paddleSize.height);
+    this.paddleBaseW = paddleSize.width;
+    this.paddleBaseH = paddleSize.height;
+    if (this.paddle.body) {
+      this.paddle.body.setSize(paddleSize.width, paddleSize.height);
+    }
     this.paddle.setImmovable(true);
     this.paddle.body.allowGravity = false;
     this.paddle.setCollideWorldBounds(true);
@@ -912,6 +1139,7 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.ball, this.blocks, this.onBallBlock, null, this);
     this.physics.add.collider(this.ball, this.paddle, this.onBallPaddle, null, this);
     this.physics.add.collider(this.ball, this.enemies, this.onBallEnemy, null, this);
+    this.physics.add.overlap(this.ball, this.levelItems, this.onBallItem, null, this);
     this.physics.add.collider(this.enemies, this.blocks);
     this.physics.world.on('worldbounds', (body) => {
       if (body.gameObject === this.ball && body.blocked.down === false) {
@@ -927,7 +1155,12 @@ class GameScene extends Phaser.Scene {
     const result = resolveBlockHit(typeId, this.powerBounceActive || this.ballPowerMode);
 
     if (result.action === 'immune') {
-      this.flashBlock(block, 0xaaaaaa);
+      const def = getBlockDef(typeId);
+      if (def.powerOnly) {
+        this.onPowerBlockResist(ball, block);
+      } else {
+        this.flashBlock(block, 0xaaaaaa);
+      }
       return;
     }
 
@@ -947,7 +1180,7 @@ class GameScene extends Phaser.Scene {
       if (this.powerBounceMultiplier) {
         points = Math.floor(points * SCORE.powerMultiplier);
       }
-      this.addScore(points);
+      this.awardDestroyPoints(points, block.x, block.y);
       this.destroyBlock(block);
       this.clampBallSpeed();
     }
@@ -955,10 +1188,29 @@ class GameScene extends Phaser.Scene {
 
   downgradeBlock(block, toTypeId) {
     const def = getBlockDef(toTypeId);
+    const col = block.getData('gridCol');
+    const row = block.getData('gridRow');
+    const { colSpan, rowSpan } = getBlockFootprint(toTypeId);
     block.setTexture(def.texture);
     block.setData('typeId', toTypeId);
     block.setData('points', def.points);
     block.setData('isPower', def.powerOnly);
+    block.setData('colSpan', colSpan);
+    block.setData('rowSpan', rowSpan);
+    const isLong = colSpan > 1 || rowSpan > 1;
+    const isPower = isPowerBlockType(toTypeId);
+    const contain = toTypeId === 'normal' || toTypeId === 'gray';
+    if (isLong || isPower) {
+      const { x, y } = isLong
+        ? this.levelGrid.cellSpanCenter(col, row, colSpan, rowSpan)
+        : this.levelGrid.cellCenter(col, row);
+      block.setPosition(x, y);
+      fitEntityToCellSpan(block, this.levelGrid, colSpan, rowSpan);
+    } else {
+      const { x, y } = this.levelGrid.cellCenter(col, row);
+      block.setPosition(x, y);
+      fitEntityToCell(block, this.levelGrid, contain ? { contain: true } : {});
+    }
     block.refreshBody();
     this.flashBlock(block, 0xdddddd);
     bbLog('block downgraded', { to: toTypeId });
@@ -1024,6 +1276,26 @@ class GameScene extends Phaser.Scene {
     }
   }
 
+  onBallItem(ball, item) {
+    if (!item?.active || this.gameState !== 'playing') return;
+
+    const typeId = item.getData('typeId');
+    let points = getItemPoints(typeId);
+    if (this.powerBounceMultiplier) {
+      points = Math.floor(points * SCORE.powerMultiplier);
+    }
+
+    const { x, y } = item;
+    this.tweens.killTweensOf(item);
+    this.awardDestroyPoints(points, x, y, { color: '#ff9de2' });
+    if (points > 0) {
+      this.spawnDestroyParticles(x, y, 0xff9de2);
+    }
+    item.destroy();
+    this.clampBallSpeed();
+    bbLog('item collected', { typeId, points });
+  }
+
   onBallEnemy(ball, enemy) {
     if (!enemy.active) return;
 
@@ -1043,8 +1315,9 @@ class GameScene extends Phaser.Scene {
     if (this.powerBounceMultiplier) {
       points = Math.floor(points * SCORE.powerMultiplier);
     }
-    this.addScore(points);
-    this.spawnDestroyParticles(enemy.x, enemy.y, COLORS.enemy);
+    const { x, y } = enemy;
+    this.awardDestroyPoints(points, x, y);
+    this.spawnDestroyParticles(x, y, COLORS.enemy);
     enemy.destroy();
     this.clampBallSpeed();
     bbLog('enemy defeated', { typeId, points });
@@ -1081,9 +1354,62 @@ class GameScene extends Phaser.Scene {
     this.loseBall();
   }
 
-  destroyBlock(block) {
+  /** Average opaque color from block texture (cached per texture frame). */
+  getBlockDebrisTint(block) {
     const typeId = block.getData('typeId') || 'normal';
-    const tint = CLAY_DEBRIS_TINT[typeId] ?? CLAY_DEBRIS_TINT.normal;
+    const fallback = CLAY_DEBRIS_TINT_FALLBACK[typeId] ?? CLAY_DEBRIS_TINT_FALLBACK.normal;
+    const texKey = block.texture?.key;
+    if (!texKey || !this.textures.exists(texKey)) return fallback;
+
+    const frame = block.frame;
+    const cacheKey = `${texKey}:${frame?.name ?? '__BASE'}`;
+    if (this.blockDebrisTintCache.has(cacheKey)) {
+      return this.blockDebrisTintCache.get(cacheKey);
+    }
+
+    const source = this.textures.get(texKey).getSourceImage();
+    if (!source) {
+      this.blockDebrisTintCache.set(cacheKey, fallback);
+      return fallback;
+    }
+
+    const fw = frame?.cutWidth ?? source.width;
+    const fh = frame?.cutHeight ?? source.height;
+    const fx = frame?.cutX ?? 0;
+    const fy = frame?.cutY ?? 0;
+    const sw = Math.max(8, Math.floor(fw * 0.55));
+    const sh = Math.max(8, Math.floor(fh * 0.55));
+    const canvas = document.createElement('canvas');
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(source, fx + (fw - sw) / 2, fy + (fh - sh) / 2, sw, sh, 0, 0, sw, sh);
+
+    const data = ctx.getImageData(0, 0, sw, sh).data;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let weight = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a < 40) continue;
+      const w = a / 255;
+      r += data[i] * w;
+      g += data[i + 1] * w;
+      b += data[i + 2] * w;
+      weight += w;
+    }
+
+    const tint =
+      weight > 0
+        ? ((Math.round(r / weight) << 16) | (Math.round(g / weight) << 8) | Math.round(b / weight))
+        : fallback;
+    this.blockDebrisTintCache.set(cacheKey, tint);
+    return tint;
+  }
+
+  destroyBlock(block) {
+    const tint = this.getBlockDebrisTint(block);
     this.spawnBlockClayDebris(block.x, block.y, tint);
     block.destroy();
     this.blocksRemaining--;
@@ -1098,6 +1424,89 @@ class GameScene extends Phaser.Scene {
       alpha: 0.5,
       duration: 60,
       yoyo: true,
+    });
+  }
+
+  onPowerBlockResist(ball, block) {
+    if (!block?.active) return;
+
+    this.playPowerBlockResistFx(block);
+
+    const body = ball?.body;
+    if (body) {
+      body.velocity.x *= POWER_BLOCK_RESIST.ballSpeedMul;
+      body.velocity.y *= POWER_BLOCK_RESIST.ballSpeedMul;
+    }
+
+    this.cameras.main.shake(
+      POWER_BLOCK_RESIST.cameraShakeMs,
+      POWER_BLOCK_RESIST.cameraShakeIntensity
+    );
+  }
+
+  playPowerBlockResistFx(block) {
+    this.tweens.killTweensOf(block);
+    this.playPowerBlockGodRay(block);
+
+    const baseX = block.scaleX;
+    const baseY = block.scaleY;
+
+    this.tweens.add({
+      targets: block,
+      scaleX: baseX * POWER_BLOCK_RESIST.squashScaleX,
+      scaleY: baseY * POWER_BLOCK_RESIST.squashScaleY,
+      duration: POWER_BLOCK_RESIST.squashInMs,
+      ease: 'Quad.easeOut',
+      yoyo: true,
+      onComplete: () => {
+        if (!block.active) return;
+        block.setScale(baseX, baseY);
+      },
+    });
+  }
+
+  /** Diagonal white god-ray sweep clipped to the block silhouette. */
+  playPowerBlockGodRay(block) {
+    if (!block?.active || !this.textures.exists('power_godray')) return;
+
+    const bw = block.displayWidth;
+    const bh = block.displayHeight;
+    const span = Math.hypot(bw, bh);
+
+    const root = this.add.container(block.x, block.y);
+    root.setDepth(block.depth + 2);
+    root.setAngle(POWER_BLOCK_RESIST.godRayAngleDeg);
+
+    const mover = this.add.container(0, 0);
+    root.add(mover);
+
+    const rayH = span * 1.4;
+    const halo = this.add.image(0, 0, 'power_godray');
+    halo.setBlendMode(Phaser.BlendModes.ADD);
+    halo.setDisplaySize(span * POWER_BLOCK_RESIST.godRayHaloScale, rayH);
+    halo.setAlpha(POWER_BLOCK_RESIST.godRayHaloAlpha);
+
+    const core = this.add.image(0, 0, 'power_godray');
+    core.setBlendMode(Phaser.BlendModes.ADD);
+    core.setDisplaySize(span * POWER_BLOCK_RESIST.godRayCoreScale, rayH * 0.92);
+    core.setAlpha(POWER_BLOCK_RESIST.godRayCoreAlpha);
+
+    mover.add([halo, core]);
+
+    if (typeof block.createBitmapMask === 'function') {
+      root.setMask(block.createBitmapMask());
+    }
+
+    const travel = span * 1.4;
+    mover.x = -travel;
+    this.tweens.add({
+      targets: mover,
+      x: travel,
+      duration: POWER_BLOCK_RESIST.godRaySweepMs,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        if (root.active) root.destroy();
+      },
     });
   }
 
@@ -1355,6 +1764,11 @@ class GameScene extends Phaser.Scene {
     this.updateHudAvatar();
   }
 
+  /** HUD score + arcade float at world position (blocks, enemies, items). */
+  awardDestroyPoints(pts, worldX, worldY, popupOptions) {
+    awardPointsAt(this, pts, worldX, worldY, popupOptions);
+  }
+
   addScore(pts) {
     this.score += pts;
     this.scoreText.setText(`Score: ${this.score}`);
@@ -1372,6 +1786,12 @@ class GameScene extends Phaser.Scene {
     this.paddle.setScale(1);
     this.paddle.angle = 0;
     this.paddle.clearTint();
+    if (this.paddleBaseW != null) {
+      this.paddle.setDisplaySize(this.paddleBaseW, this.paddleBaseH);
+      if (this.paddle.body) {
+        this.paddle.body.setSize(this.paddleBaseW, this.paddleBaseH);
+      }
+    }
   }
 
   startPaddleCharge() {
@@ -1917,6 +2337,7 @@ async function bootGame() {
       filledCells: filled,
       grid: cells ? `${cells.length}×${cells[0]?.length}` : 'none',
       enemies: level.enemies?.length ?? 0,
+      items: level.items?.length ?? 0,
     });
     status.remove();
     initLevelBar(entry);

@@ -2,25 +2,50 @@
  * Level editor — entity thumbnails, placeholders, and canvas sprites.
  * PNG paths: assets/blocks/{type}.png, assets/enemies/{id}.png (optional).
  */
-/* global ENEMY_COMPENDIUM, ENEMY_TIER */
+/* global ENEMY_COMPENDIUM, ENEMY_TIER, ITEM_COMPENDIUM, ITEM_CATEGORY */
 
-const EDITOR_ART_VERSION = '4';
+const EDITOR_ART_VERSION = '13';
 
 const BLOCK_PICKER_OPTIONS = [
   { value: 0, label: 'Empty', key: '0' },
   { value: 1, label: 'Normal', key: '1', image: 'assets/blocks/normal.png' },
-  { value: 2, label: 'Gray', key: '2', procedural: 'gray' },
-  { value: 3, label: 'Power', key: '3', procedural: 'power' },
+  { value: 2, label: 'Gray', key: '2', image: 'assets/blocks/gray.png' },
+  { value: 6, label: 'Normal Long ↔', key: '6', image: 'assets/blocks/normal.png', long: 'h' },
+  { value: 8, label: 'Normal Long ↕', key: '8', image: 'assets/blocks/normal.png', long: 'v' },
+  { value: 10, label: 'Gray Long ↔', key: 'a', image: 'assets/blocks/gray.png', long: 'h' },
+  { value: 12, label: 'Gray Long ↕', key: 'b', image: 'assets/blocks/gray.png', long: 'v' },
+  { value: 3, label: 'Power', key: '3', image: 'assets/blocks/power.png', power: true },
+  { value: 14, label: 'Power Long ↔', key: 'c', image: 'assets/blocks/power.png', power: true, long: 'h' },
+  { value: 16, label: 'Power Long ↕', key: 'd', image: 'assets/blocks/power.png', power: true, long: 'v' },
   { value: 4, label: 'Spike', key: '4', image: 'assets/blocks/spike.png' },
   { value: 5, label: 'Indestructible', key: '5', procedural: 'indestructible' },
 ];
 
-const BLOCK_FALLBACK_COLORS = { 1: '#fff5e6', 2: '#9ca3af', 3: '#6b7280', 4: '#ff3366', 5: '#6b7c8c' };
+const BLOCK_FALLBACK_COLORS = {
+  1: '#fff5e6',
+  2: '#9ca3af',
+  6: '#fff5e6',
+  8: '#fff5e6',
+  10: '#9ca3af',
+  12: '#9ca3af',
+  3: '#6b7280',
+  14: '#6b7280',
+  16: '#6b7280',
+  4: '#ff3366',
+  5: '#6b7c8c',
+};
 
 const ENEMY_TIER_COLORS = {
   mob: '#ff6bcb',
   midBoss: '#e879f9',
   boss: '#a855f7',
+};
+
+const ITEM_CATEGORY_COLORS = {
+  food: '#c45c5c',
+  powerUp: '#3d9a6a',
+  copyAbility: '#6b8cce',
+  life: '#9b7ede',
 };
 
 function loadImage(src) {
@@ -182,6 +207,109 @@ function getEnemyPickerOptions() {
   });
 }
 
+function itemAbbrev(id) {
+  const parts = id.split('_').filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return id.slice(0, 2).toUpperCase();
+}
+
+function itemCategoryHint(category) {
+  if (category === ITEM_CATEGORY?.food) return 'food';
+  if (category === ITEM_CATEGORY?.powerUp) return 'pwr';
+  if (category === ITEM_CATEGORY?.copyAbility) return 'abil';
+  if (category === ITEM_CATEGORY?.life) return 'life';
+  return 'item';
+}
+
+function getItemPickerOptions() {
+  const list = typeof ITEM_COMPENDIUM !== 'undefined' ? [...ITEM_COMPENDIUM] : [];
+  return list.sort((a, b) => {
+    const artA = Boolean(a.image);
+    const artB = Boolean(b.image);
+    if (artA !== artB) return artA ? -1 : 1;
+    const catOrder = { food: 0, powerUp: 1, copyAbility: 2, life: 3 };
+    const ca = catOrder[a.category] ?? 9;
+    const cb = catOrder[b.category] ?? 9;
+    if (ca !== cb) return ca - cb;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+/** Stretch sprite to fill rect; optional 90° CW rotation (power blocks). */
+function drawStretchedRotated(ctx, sprite, x, y, w, h, pad, rotate) {
+  if (!sprite) return;
+  const px = x + pad;
+  const py = y + pad;
+  const pw = w - pad * 2;
+  const ph = h - pad * 2;
+  if (pw <= 0 || ph <= 0) return;
+
+  if (rotate === 'cw') {
+    ctx.save();
+    ctx.translate(px + pw / 2, py + ph / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(sprite, -ph / 2, -pw / 2, ph, pw);
+    ctx.restore();
+  } else {
+    ctx.drawImage(sprite, px, py, pw, ph);
+  }
+}
+
+/** Stretch sprite to fill rect (same art as 1×1, scaled to footprint). */
+function drawStretched(ctx, sprite, x, y, w, h, pad = 0) {
+  if (!sprite) return;
+  const px = x + pad;
+  const py = y + pad;
+  const pw = w - pad * 2;
+  const ph = h - pad * 2;
+  if (pw <= 0 || ph <= 0) return;
+  ctx.drawImage(sprite, px, py, pw, ph);
+}
+
+/** Picker thumbnail for long brushes — stretched normal/gray PNG in a bar shape. */
+function drawPowerPickerThumb(c, size, sprite, opt) {
+  c.clearRect(0, 0, size, size);
+  const pad = 2;
+  if (!sprite) {
+    c.fillStyle = BLOCK_FALLBACK_COLORS[opt.value] || '#6b7280';
+    if (opt.long === 'h') {
+      c.fillRect(pad, pad + size * 0.2, size - pad * 2, size * 0.55);
+    } else if (opt.long === 'v') {
+      c.fillRect(pad + size * 0.2, pad, size * 0.55, size - pad * 2);
+    } else {
+      c.fillRect(pad, pad, size - pad * 2, size - pad * 2);
+    }
+    return;
+  }
+  const rotate = opt.long === 'v' ? 'none' : 'cw';
+  if (opt.long === 'h') {
+    drawStretchedRotated(c, sprite, pad, pad + size * 0.2, size - pad * 2, size * 0.55, 0, rotate);
+  } else if (opt.long === 'v') {
+    drawStretchedRotated(c, sprite, pad + size * 0.2, pad, size * 0.55, size - pad * 2, 0, rotate);
+  } else {
+    drawStretchedRotated(c, sprite, pad, pad, size - pad * 2, size - pad * 2, 0, rotate);
+  }
+}
+
+function drawLongPickerThumb(c, size, sprite, opt) {
+  const pad = 2;
+  c.clearRect(0, 0, size, size);
+  if (sprite) {
+    if (opt.long === 'h') {
+      drawStretched(c, sprite, pad, pad + size * 0.2, size - pad * 2, size * 0.55, 0);
+    } else if (opt.long === 'v') {
+      drawStretched(c, sprite, pad + size * 0.2, pad, size * 0.55, size - pad * 2, 0);
+    }
+    return;
+  }
+  c.fillStyle = BLOCK_FALLBACK_COLORS[opt.value] || '#888';
+  if (opt.long === 'h') {
+    c.fillRect(pad, pad + size * 0.2, size - pad * 2, size * 0.55);
+  } else {
+    c.fillRect(pad + size * 0.2, pad, size * 0.55, size - pad * 2);
+  }
+}
+
 async function resolveBlockSprite(opt, cellW, cellH) {
   if (opt.value === 0) return null;
   if (opt.image) {
@@ -211,6 +339,18 @@ async function resolveEnemySprite(entry, cellW, cellH) {
   });
 }
 
+async function resolveItemSprite(entry, cellW, cellH) {
+  if (entry.image) {
+    const img = await tryLoadImage(entry.image);
+    if (img) return img;
+  }
+  return buildPlaceholderCanvas(cellW, cellH, {
+    bg: ITEM_CATEGORY_COLORS[entry.category] || '#555',
+    label: itemAbbrev(entry.id),
+    hint: itemCategoryHint(entry.category),
+  });
+}
+
 async function buildEntityArt(cellW, cellH) {
   const blocks = {};
   await Promise.all(
@@ -227,7 +367,15 @@ async function buildEntityArt(cellW, cellH) {
     })
   );
 
-  return { blocks, enemies };
+  const items = {};
+  const itemOpts = getItemPickerOptions();
+  await Promise.all(
+    itemOpts.map(async (entry) => {
+      items[entry.id] = await resolveItemSprite(entry, cellW, cellH);
+    })
+  );
+
+  return { blocks, enemies, items };
 }
 
 function drawThumbContained(c, sprite, size, pad) {
@@ -278,10 +426,15 @@ const EditorEntityArt = {
   BLOCK_PICKER_OPTIONS,
   BLOCK_FALLBACK_COLORS,
   getEnemyPickerOptions,
+  getItemPickerOptions,
   buildEntityArt,
   drawThumbContained,
   drawEmptyThumb,
   drawContained,
+  drawStretched,
+  drawStretchedRotated,
+  drawPowerPickerThumb,
+  drawLongPickerThumb,
   buildPlaceholderCanvas,
 };
 

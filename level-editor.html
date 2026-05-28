@@ -156,6 +156,32 @@
       width: 100%;
     }
 
+    .brush-selection-wrap {
+      margin: 0 0 6px;
+      padding: 8px 10px;
+      background: #1a1630;
+      border: 1px solid #444;
+      border-radius: 6px;
+      line-height: 1.35;
+    }
+
+    .brush-selection-label {
+      display: block;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #888;
+      margin-bottom: 2px;
+    }
+
+    .brush-selection-name {
+      display: block;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
     .entity-picker-scroll {
       max-height: 220px;
       overflow-y: auto;
@@ -346,18 +372,28 @@
         <div class="sidebar-row">
           <button type="button" id="mode-blocks" class="active">Blocks</button>
           <button type="button" id="mode-enemies">Enemies</button>
+          <button type="button" id="mode-items">Items</button>
           <button type="button" id="mode-erase">Erase</button>
         </div>
       </section>
 
       <section class="sidebar-section" id="brush-panel">
         <h2 class="sidebar-heading">Brush</h2>
+        <p class="brush-selection-wrap">
+          <span class="brush-selection-label" id="brush-selection-label">Selected block</span>
+          <strong class="brush-selection-name" id="brush-selection" aria-live="polite">Normal</strong>
+        </p>
         <div id="block-brush-pane" class="brush-panel-pane">
           <div id="block-brush" class="entity-picker" role="radiogroup" aria-label="Block brush"></div>
         </div>
         <div id="enemy-brush-pane" class="brush-panel-pane" hidden>
           <div class="entity-picker-scroll">
             <div id="enemy-brush" class="entity-picker" role="radiogroup" aria-label="Enemy brush"></div>
+          </div>
+        </div>
+        <div id="item-brush-pane" class="brush-panel-pane" hidden>
+          <div class="entity-picker-scroll">
+            <div id="item-brush" class="entity-picker" role="radiogroup" aria-label="Item brush"></div>
           </div>
         </div>
       </section>
@@ -418,7 +454,9 @@
   </dialog>
 
   <script src="block-types.js"></script>
+  <script src="block-power-art.js"></script>
   <script src="enemy-types.js"></script>
+  <script src="item-types.js"></script>
   <script src="editor-entity-art.js"></script>
   <script src="level-grid.js"></script>
   <script src="levels/registry.js"></script>
@@ -445,6 +483,10 @@
     const blockBrushRoot = document.getElementById('block-brush');
     const enemyBrushPane = document.getElementById('enemy-brush-pane');
     const enemyBrushRoot = document.getElementById('enemy-brush');
+    const itemBrushPane = document.getElementById('item-brush-pane');
+    const itemBrushRoot = document.getElementById('item-brush');
+    const brushSelectionLabel = document.getElementById('brush-selection-label');
+    const brushSelectionName = document.getElementById('brush-selection');
 
     const PICKER_THUMB = 40;
     const BLOCK_OPTS = EditorEntityArt.BLOCK_PICKER_OPTIONS;
@@ -452,11 +494,50 @@
 
     let blockBrushValue = 1;
     let enemyBrushValue = 'drifter';
+    let itemBrushValue = 'food_apple';
     let entityArt = null;
     let entityArtKey = '';
+    let paddleArt = null;
 
     function getBlockBrushValue() {
       return blockBrushValue;
+    }
+
+    function getEnemyBrushLabel(id) {
+      if (typeof getCompendiumEnemy === 'function') {
+        const entry = getCompendiumEnemy(id);
+        if (entry?.name) return entry.name;
+      }
+      return id;
+    }
+
+    function getItemBrushLabel(id) {
+      if (typeof getCompendiumItem === 'function') {
+        const entry = getCompendiumItem(id);
+        if (entry?.name) return entry.name;
+      }
+      return id;
+    }
+
+    function updateBrushSelectionLabel() {
+      if (mode === 'erase') {
+        brushSelectionLabel.textContent = 'Tool';
+        brushSelectionName.textContent = 'Erase';
+        return;
+      }
+      if (mode === 'enemies') {
+        brushSelectionLabel.textContent = 'Selected enemy';
+        brushSelectionName.textContent = getEnemyBrushLabel(enemyBrushValue);
+        return;
+      }
+      if (mode === 'items') {
+        brushSelectionLabel.textContent = 'Selected item';
+        brushSelectionName.textContent = getItemBrushLabel(itemBrushValue);
+        return;
+      }
+      brushSelectionLabel.textContent = 'Selected block';
+      const opt = BLOCK_OPTS.find((o) => o.value === blockBrushValue);
+      brushSelectionName.textContent = opt?.label ?? 'Unknown';
     }
 
     function setBlockBrushValue(val) {
@@ -466,6 +547,7 @@
         btn.classList.toggle('active', on);
         btn.setAttribute('aria-checked', on ? 'true' : 'false');
       });
+      if (mode === 'blocks' || mode === 'erase') updateBrushSelectionLabel();
     }
 
     function getEnemyBrushValue() {
@@ -479,6 +561,21 @@
         btn.classList.toggle('active', on);
         btn.setAttribute('aria-checked', on ? 'true' : 'false');
       });
+      if (mode === 'enemies') updateBrushSelectionLabel();
+    }
+
+    function getItemBrushValue() {
+      return itemBrushValue;
+    }
+
+    function setItemBrushValue(id) {
+      itemBrushValue = id;
+      itemBrushRoot.querySelectorAll('.entity-picker-btn').forEach((btn) => {
+        const on = btn.dataset.entityId === itemBrushValue;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+      if (mode === 'items') updateBrushSelectionLabel();
     }
 
     function paintPickerThumb(canvas, sprite, empty) {
@@ -505,7 +602,16 @@
           paintPickerThumb(canvas, null, true);
           return;
         }
-        paintPickerThumb(canvas, entityArt?.blocks?.[v], false);
+        const opt = BLOCK_OPTS.find((o) => o.value === v);
+        if (opt?.power) {
+          const c = canvas.getContext('2d');
+          EditorEntityArt.drawPowerPickerThumb(c, PICKER_THUMB, entityArt?.blocks?.[3], opt);
+        } else if (opt?.long) {
+          const c = canvas.getContext('2d');
+          EditorEntityArt.drawLongPickerThumb(c, PICKER_THUMB, entityArt?.blocks?.[v], opt);
+        } else {
+          paintPickerThumb(canvas, entityArt?.blocks?.[v], false);
+        }
       });
     }
 
@@ -515,6 +621,15 @@
         const canvas = btn.querySelector('canvas');
         if (!canvas) return;
         paintPickerThumb(canvas, entityArt?.enemies?.[id], false);
+      });
+    }
+
+    function updateItemPickerThumbs() {
+      itemBrushRoot.querySelectorAll('.entity-picker-btn').forEach((btn) => {
+        const id = btn.dataset.entityId;
+        const canvas = btn.querySelector('canvas');
+        if (!canvas) return;
+        paintPickerThumb(canvas, entityArt?.items?.[id], false);
       });
     }
 
@@ -591,23 +706,82 @@
       }
     }
 
+    function initItemPicker() {
+      itemBrushRoot.innerHTML = '';
+      const entries = EditorEntityArt.getItemPickerOptions();
+      for (const entry of entries) {
+        const hasArt = Boolean(entry.image);
+        itemBrushRoot.appendChild(
+          createPickerButton({
+            entityId: entry.id,
+            label: entry.name + (hasArt ? '' : ' (no art yet)'),
+            keyHint: hasArt ? undefined : '?',
+            placeholder: !hasArt,
+            onPick: () => {
+              setItemBrushValue(entry.id);
+              setMode('items');
+            },
+          })
+        );
+      }
+      if (entries.some((e) => e.id === itemBrushValue)) {
+        setItemBrushValue(itemBrushValue);
+      } else if (entries[0]) {
+        setItemBrushValue(entries[0].id);
+      }
+    }
+
     initBlockPicker();
     initEnemyPicker();
+    initItemPicker();
+
+    async function ensurePaddleArt() {
+      if (paddleArt) return;
+      try {
+        paddleArt = await loadImage('assets/paddle/paddle.png?v=13');
+      } catch {
+        paddleArt = null;
+      }
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load ${src}`));
+        img.src = src;
+      });
+    }
 
     async function ensureEntityArt() {
       const g = levelGrid.config;
       const key = `${g.cellWidth}|${g.cellHeight}`;
       if (entityArt && entityArtKey === key) return;
 
+      await ensurePaddleArt();
       entityArt = await EditorEntityArt.buildEntityArt(g.cellWidth, g.cellHeight);
       entityArtKey = key;
       updateBlockPickerThumbs();
       updateEnemyPickerThumbs();
+      updateItemPickerThumbs();
       editorLog('entity art ready', key);
+    }
+
+    function drawPowerBlock(tl, cellW, cellH, v, spanW, spanH) {
+      const typeId = getBlockTypeFromCell(v) || (v === 3 ? 'power' : null);
+      if (!typeId || typeof isPowerBlockType !== 'function' || !isPowerBlockType(typeId)) return false;
+      const sprite = entityArt?.blocks?.[3];
+      if (!sprite) return false;
+      const rotate = getPowerBlockRotate(typeId);
+      const w = spanW ?? cellW;
+      const h = spanH ?? cellH;
+      EditorEntityArt.drawStretchedRotated(ctx, sprite, tl.x, tl.y, w, h, 2, rotate);
+      return true;
     }
 
     function drawBlockCell(tl, cellW, cellH, v) {
       if (v === 0) return;
+      if (drawPowerBlock(tl, cellW, cellH, v)) return;
       const sprite = entityArt?.blocks?.[v];
       if (sprite) {
         EditorEntityArt.drawContained(ctx, sprite, tl.x, tl.y, cellW, cellH, 2);
@@ -626,6 +800,32 @@
       ctx.strokeRect(tl.x, tl.y, cellW, cellH);
     }
 
+    function drawBlockSpan(tl, cellW, cellH, anchorValue) {
+      const typeId = getBlockTypeFromCell(anchorValue);
+      if (!typeId) return;
+      const { colSpan, rowSpan } = getBlockFootprint(typeId);
+      const w = colSpan * cellW;
+      const h = rowSpan * cellH;
+      if (anchorValue === 14 || anchorValue === 16) {
+        if (drawPowerBlock(tl, cellW, cellH, anchorValue, w, h)) return;
+      }
+      const thumbKey =
+        anchorValue === 6 || anchorValue === 8
+          ? 1
+          : anchorValue === 10 || anchorValue === 12
+            ? 2
+            : anchorValue;
+      const sprite = entityArt?.blocks?.[anchorValue] ?? entityArt?.blocks?.[thumbKey];
+      if (sprite) {
+        EditorEntityArt.drawStretched(ctx, sprite, tl.x, tl.y, w, h, 2);
+        return;
+      }
+      ctx.fillStyle = BLOCK_COLORS[anchorValue] || '#fff';
+      ctx.fillRect(tl.x + 1, tl.y + 1, w - 2, h - 2);
+      ctx.strokeStyle = '#ffb347';
+      ctx.strokeRect(tl.x, tl.y, w, h);
+    }
+
     function drawEnemyCell(x, y, size, typeId) {
       const sprite = entityArt?.enemies?.[typeId];
       if (sprite) {
@@ -638,6 +838,75 @@
       ctx.font = '9px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(typeId[0].toUpperCase(), x, y + 3);
+    }
+
+    function drawItemCell(x, y, width, height, typeId) {
+      const sprite = entityArt?.items?.[typeId];
+      if (sprite) {
+        EditorEntityArt.drawContained(ctx, sprite, x - width / 2, y - height / 2, width, height, 2);
+        return;
+      }
+      const r = Math.min(width, height) * 0.38;
+      ctx.fillStyle = '#c45c5c';
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '8px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(itemAbbrev(typeId), x, y + 3);
+    }
+
+    function canPlaceItem(typeId, col, row) {
+      const { colSpan, rowSpan } = getItemFootprint(typeId);
+      const { cols, rows } = levelGrid.config;
+      if (col < 0 || row < 0 || col + colSpan > cols || row + rowSpan > rows) return false;
+
+      const cells = getPlayCells();
+      for (let r = 0; r < rowSpan; r++) {
+        for (let c = 0; c < colSpan; c++) {
+          const gc = col + c;
+          const gr = row + r;
+          if (cells[gr][gc]) return false;
+          if (level.enemies.some((e) => e.col === gc && e.row === gr)) return false;
+          if (level.items.some((it) => itemCoversCell(it, gc, gr))) return false;
+        }
+      }
+      return true;
+    }
+
+    function itemAbbrev(id) {
+      const parts = id.split('_').filter(Boolean);
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return id.slice(0, 2).toUpperCase();
+    }
+
+    function itemFloatYOffset(col, row) {
+      const cellH = levelGrid?.config?.cellHeight ?? 36;
+      const amp = cellH * 0.09;
+      const t = performance.now() * 0.0022;
+      return Math.sin(t + col * 0.65 + row * 0.45) * amp;
+    }
+
+    let itemFloatRaf = 0;
+
+    function stopItemFloatLoop() {
+      if (itemFloatRaf) cancelAnimationFrame(itemFloatRaf);
+      itemFloatRaf = 0;
+    }
+
+    function syncItemFloatLoop() {
+      stopItemFloatLoop();
+      if (!level?.items?.length) return;
+      const loop = () => {
+        if (!level?.items?.length) {
+          itemFloatRaf = 0;
+          return;
+        }
+        draw(true);
+        itemFloatRaf = requestAnimationFrame(loop);
+      };
+      itemFloatRaf = requestAnimationFrame(loop);
     }
 
     async function redrawWithEntityArt() {
@@ -684,13 +953,32 @@
     function paintBlock(gridCol, gridRow, value) {
       const cells = getPlayCells();
       if (gridRow < 0 || gridRow >= cells.length || gridCol < 0 || gridCol >= cells[0].length) return;
-      cells[gridRow][gridCol] = value;
+      const { cols, rows } = levelGrid.config;
+
+      clearBlockFootprint(cells, gridCol, gridRow);
+
+      if (value !== 0) {
+        if (isBlockAnchorCell(value)) {
+          if (!canPaintLongBlock(cells, cols, rows, gridCol, gridRow, value)) return;
+          paintLongBlockCells(cells, gridCol, gridRow, value);
+        } else {
+          cells[gridRow][gridCol] = value;
+        }
+      }
+
       draw();
       refreshExport();
       scheduleEditorDraftSave();
     }
 
+    function ensureEntityLayers() {
+      if (!level) return;
+      if (!level.enemies) level.enemies = [];
+      if (!level.items) level.items = [];
+    }
+
     function toggleEnemy(col, row) {
+      ensureEntityLayers();
       const idx = level.enemies.findIndex((e) => e.col === col && e.row === row);
       if (idx >= 0) {
         level.enemies.splice(idx, 1);
@@ -700,6 +988,49 @@
       draw();
       refreshExport();
       scheduleEditorDraftSave();
+    }
+
+    function toggleItem(col, row) {
+      ensureEntityLayers();
+      const idx = level.items.findIndex((it) => itemCoversCell(it, col, row));
+      if (idx >= 0) {
+        level.items.splice(idx, 1);
+      } else if (mode === 'items') {
+        const type = getItemBrushValue();
+        if (!canPlaceItem(type, col, row)) return;
+        level.items.push({ col, row, type });
+      }
+      draw();
+      refreshExport();
+      scheduleEditorDraftSave();
+    }
+
+    function eraseAtCell(col, row) {
+      ensureEntityLayers();
+      let changed = false;
+      const ei = level.enemies.findIndex((e) => e.col === col && e.row === row);
+      if (ei >= 0) {
+        level.enemies.splice(ei, 1);
+        changed = true;
+      }
+      const ii = level.items.findIndex((it) => itemCoversCell(it, col, row));
+      if (ii >= 0) {
+        level.items.splice(ii, 1);
+        changed = true;
+      }
+      const cells = getPlayCells();
+      if (row >= 0 && row < cells.length && col >= 0 && col < cells[0].length && cells[row][col]) {
+        clearBlockFootprint(cells, col, row);
+        draw();
+        refreshExport();
+        scheduleEditorDraftSave();
+        return;
+      }
+      if (changed) {
+        draw();
+        refreshExport();
+        scheduleEditorDraftSave();
+      }
     }
 
     function drawDevBorders() {
@@ -758,7 +1089,7 @@
       ctx.fillText('avatar', b.x + pos.avatar.x, b.y + pos.avatar.y + 4);
     }
 
-    function draw() {
+    function draw(fromFloatLoop = false) {
       ctx.fillStyle = '#2d1b4e';
       ctx.fillRect(0, 0, GAME_W, GAME_H);
       ctx.strokeStyle = 'rgba(255,230,109,0.35)';
@@ -789,16 +1120,29 @@
       for (let row = 0; row < cells.length; row++) {
         for (let col = 0; col < cells[row].length; col++) {
           const v = cells[row][col];
-          if (!v) continue;
+          if (!v || isBlockExtensionCell(v)) continue;
           const tl = levelGrid.cellTopLeft(col, row);
-          drawBlockCell(tl, g.cellWidth, g.cellHeight, v);
+          if (isBlockAnchorCell(v)) {
+            drawBlockSpan(tl, g.cellWidth, g.cellHeight, v);
+          } else {
+            drawBlockCell(tl, g.cellWidth, g.cellHeight, v);
+          }
         }
       }
 
+      ensureEntityLayers();
+      const entitySize = Math.min(g.cellWidth, g.cellHeight) - 4;
       for (const e of level.enemies) {
         const { x, y } = levelGrid.cellCenter(e.col, e.row);
-        const size = Math.min(g.cellWidth, g.cellHeight) - 4;
-        drawEnemyCell(x, y, size, e.type);
+        drawEnemyCell(x, y, entitySize, e.type);
+      }
+      for (const it of level.items) {
+        const foot = getItemFootprint(it.type);
+        const { x, y } = levelGrid.cellSpanCenter(it.col, it.row, foot.colSpan, foot.rowSpan);
+        const floatY = y + itemFloatYOffset(it.col, it.row);
+        const itemW = foot.colSpan * g.cellWidth - 4;
+        const itemH = foot.rowSpan * g.cellHeight - 4;
+        drawItemCell(x, floatY, itemW, itemH, it.type);
       }
 
       const pd = level.paddle || { col: 4, colSpan: 2, rowFromBottom: 2 };
@@ -808,14 +1152,19 @@
           : pd.row ?? 0;
       const colSpan = pd.colSpan ?? 2;
       const paddlePos = levelGrid.cellSpanCenter(pd.col, paddleRow, colSpan, 1);
+      const paddlePad = 2;
+      const paddleW = colSpan * g.cellWidth - paddlePad;
       const paddleH = g.cellHeight * 0.5;
-      ctx.fillStyle = 'rgba(0,212,170,0.5)';
-      ctx.fillRect(
-        paddlePos.x - (colSpan * g.cellWidth) / 2 + 1,
-        paddlePos.y - paddleH / 2 + 1,
-        colSpan * g.cellWidth - 2,
-        paddleH - 2
-      );
+      const paddleX = paddlePos.x - paddleW / 2;
+      const paddleY = paddlePos.y - paddleH / 2;
+      if (paddleArt) {
+        EditorEntityArt.drawStretched(ctx, paddleArt, paddleX, paddleY, paddleW, paddleH);
+      } else {
+        ctx.fillStyle = 'rgba(0,212,170,0.5)';
+        ctx.fillRect(paddleX + 1, paddleY + 1, paddleW - 2, paddleH - 2);
+      }
+
+      if (!fromFloatLoop) syncItemFloatLoop();
     }
 
     function buildLevelExport() {
@@ -831,6 +1180,7 @@
           cells: getPlayCells().map((row) => [...row]),
         },
         enemies: [...(level.enemies || [])],
+        items: [...(level.items || [])],
         paddle: { ...(level.paddle || { col: 4, colSpan: 2, rowFromBottom: 2 }) },
         meta: { lives: 3, ...(level.meta || {}) },
       };
@@ -857,6 +1207,7 @@
 
     function applyLevelToEditor(data) {
       level = structuredClone(data);
+      ensureEntityLayers();
       syncGrid();
       redrawWithEntityArt();
       refreshExport();
@@ -1005,11 +1356,15 @@
       mode = next;
       const isBlocks = mode === 'blocks' || mode === 'erase';
       const isEnemies = mode === 'enemies';
+      const isItems = mode === 'items';
       document.getElementById('mode-blocks').classList.toggle('active', mode === 'blocks');
       document.getElementById('mode-enemies').classList.toggle('active', isEnemies);
+      document.getElementById('mode-items').classList.toggle('active', isItems);
       document.getElementById('mode-erase').classList.toggle('active', mode === 'erase');
       blockBrushPane.hidden = !isBlocks;
       enemyBrushPane.hidden = !isEnemies;
+      itemBrushPane.hidden = !isItems;
+      updateBrushSelectionLabel();
     }
 
     function pointerWorldY(ev) {
@@ -1024,13 +1379,20 @@
       const cell = cellFromEvent(ev);
       if (!cell) return;
 
-      if (mode === 'enemies' || (mode === 'erase' && level.enemies.some((e) => e.col === cell.col && e.row === cell.row))) {
+      if (mode === 'erase') {
+        eraseAtCell(cell.col, cell.row);
+        return;
+      }
+      if (mode === 'enemies') {
         if (ev.type === 'pointerdown') toggleEnemy(cell.col, cell.row);
         return;
       }
+      if (mode === 'items') {
+        if (ev.type === 'pointerdown') toggleItem(cell.col, cell.row);
+        return;
+      }
 
-      const val = mode === 'erase' ? 0 : getBlockBrushValue();
-      paintBlock(cell.col, cell.row, val);
+      paintBlock(cell.col, cell.row, getBlockBrushValue());
     }
 
     canvas.addEventListener('pointerdown', (ev) => {
@@ -1039,7 +1401,7 @@
       onPointer(ev);
     });
     canvas.addEventListener('pointermove', (ev) => {
-      if (!painting || mode === 'enemies') return;
+      if (!painting || mode === 'enemies' || mode === 'items') return;
       onPointer(ev);
     });
     canvas.addEventListener('pointerup', () => {
@@ -1048,6 +1410,7 @@
 
     document.getElementById('mode-blocks').onclick = () => setMode('blocks');
     document.getElementById('mode-enemies').onclick = () => setMode('enemies');
+    document.getElementById('mode-items').onclick = () => setMode('items');
     document.getElementById('mode-erase').onclick = () => setMode('erase');
 
     const btnDeleteLevel = document.getElementById('btn-delete-level');
@@ -1132,6 +1495,7 @@
         cols: cells[0]?.length,
         filledCells: filled,
         enemies: payload.enemies?.length ?? 0,
+        items: payload.items?.length ?? 0,
       });
       try {
         if (typeof storeEditorPreviewLevel === 'function') {
@@ -1165,6 +1529,7 @@
       const { cols, rows } = levelGrid.config;
       level.blocks = { cells: Array.from({ length: rows }, () => Array(cols).fill(0)) };
       level.enemies = [];
+      level.items = [];
       savedLevelId = null;
       draw();
       refreshExport();
@@ -1178,7 +1543,18 @@
     };
 
     window.addEventListener('keydown', (ev) => {
-      const map = { '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5' };
+      const map = {
+        '0': 0,
+        '1': 1,
+        '2': 2,
+        '3': 3,
+        '4': 4,
+        '5': 5,
+        '6': 6,
+        '8': 8,
+        a: 10,
+        b: 12,
+      };
       if (map[ev.key] != null) {
         setBlockBrushValue(map[ev.key]);
         setMode('blocks');
@@ -1188,6 +1564,7 @@
     (async function bootEditor() {
       editorLog('editor boot', window.location.href);
       try {
+        await ensurePaddleArt();
         await ensureEntityArt();
       } catch (err) {
         editorLog('initial entity art preload failed', err?.message || err);
