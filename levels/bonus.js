@@ -1,11 +1,11 @@
 /**
- * demo-level-01
+ * bonus chance
  */
 
-const LEVEL_DEMO_LEVEL_01 = {
+const LEVEL_BONUS = {
   "version": 1,
-  "id": "demo-level-01",
-  "name": "demo-level-01",
+  "id": "bonus",
+  "name": "bonus chance",
   "hud": {
     "height": 72,
     "padX": 12,
@@ -66,54 +66,6 @@ const LEVEL_DEMO_LEVEL_01 = {
         0,
         0,
         0,
-        1,
-        1,
-        0,
-        0,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        1,
-        1,
-        1,
-        1,
-        0,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        0,
-        0
-      ],
-      [
-        0,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        0,
         0,
         0,
         0,
@@ -122,52 +74,88 @@ const LEVEL_DEMO_LEVEL_01 = {
         0
       ],
       [
+        1,
+        1,
+        1,
+        16,
         0,
         0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        16,
+        1,
+        1,
+        1
       ],
       [
+        1,
+        1,
+        1,
+        17,
         0,
         0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        17,
+        1,
+        1,
+        1
       ],
       [
+        1,
+        1,
+        1,
+        16,
         0,
         0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
+        16,
+        1,
+        1,
+        1
       ],
       [
+        1,
+        1,
+        1,
+        17,
         0,
         0,
+        17,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        16,
         0,
         0,
+        16,
+        1,
+        1,
+        1
+      ],
+      [
+        1,
+        1,
+        1,
+        17,
         0,
         0,
+        17,
+        1,
+        1,
+        1
+      ],
+      [
+        14,
+        15,
+        14,
+        15,
         0,
         0,
-        0,
-        0
+        14,
+        15,
+        14,
+        15
       ],
       [
         0,
@@ -254,45 +242,36 @@ const LEVEL_DEMO_LEVEL_01 = {
         0
       ],
       [
-        4,
-        4,
-        4,
-        4,
-        4,
-        4,
-        4,
-        4,
-        4,
-        4
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
       ]
     ]
   },
-  "enemies": [
-    {
-      "col": 1,
-      "row": 1,
-      "type": "drifter"
-    },
-    {
-      "col": 8,
-      "row": 1,
-      "type": "drifter"
-    },
-    {
-      "col": 4,
-      "row": 9,
-      "type": "drifter"
-    },
-    {
-      "col": 5,
-      "row": 9,
-      "type": "drifter"
-    }
-  ],
+  "enemies": [],
   "items": [
     {
       "col": 4,
-      "row": 6,
+      "row": 7,
       "type": "item_bonus_chance"
     }
   ],
@@ -303,9 +282,9 @@ const LEVEL_DEMO_LEVEL_01 = {
   },
   "meta": {
     "lives": 3,
-    "description": "demo-level-01"
+    "description": "bonus chance"
   }
 };
 
 /** Dynamic loader (registry.js) reads `window`; `const` does not set that. */
-window.LEVEL_DEMO_LEVEL_01 = LEVEL_DEMO_LEVEL_01;
+window.LEVEL_BONUS = LEVEL_BONUS;

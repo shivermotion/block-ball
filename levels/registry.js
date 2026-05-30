@@ -42,12 +42,17 @@ const BUILTIN_LEVELS = [
 /** Used when manifest.json is unavailable (e.g. file://). */
 const FALLBACK_FILE_LEVELS = [
   {
-    id: 'demo-01',
+    id: 'demo-level-01',
     name: 'Demo Pyramid',
     script: 'levels/demo-level-01.js',
-    global: 'DEMO_LEVEL_01',
+    global: 'LEVEL_DEMO_LEVEL_01',
   },
 ];
+
+/** Legacy ids → current manifest id (e.g. saved localStorage / old links). */
+const LEVEL_ID_ALIASES = {
+  'demo-01': 'demo-level-01',
+};
 
 /** @type {BlockBallLevelEntry[]} */
 let BLOCK_BALL_LEVELS = [...BUILTIN_LEVELS, ...FALLBACK_FILE_LEVELS];
@@ -168,12 +173,13 @@ function createBlankLevel() {
 }
 
 function findLevelEntry(id) {
-  return BLOCK_BALL_LEVELS.find((e) => e.id === id) || null;
+  const resolved = LEVEL_ID_ALIASES[id] || id;
+  return BLOCK_BALL_LEVELS.find((e) => e.id === resolved) || null;
 }
 
 function getDefaultLevelId() {
-  const demo = findLevelEntry('demo-01');
-  return demo?.id ?? BLOCK_BALL_LEVELS[0]?.id ?? null;
+  const demo = findLevelEntry('demo-level-01');
+  return demo?.id ?? BLOCK_BALL_LEVELS.find((e) => e.id !== 'blank')?.id ?? null;
 }
 
 /**
@@ -361,12 +367,72 @@ function loadEditorPreviewLevel() {
 }
 
 /**
- * Resolve active level from ?preview=1, ?level= id, then localStorage, then default.
- * @returns {Promise<{ level: object, entry: BlockBallLevelEntry }>}
+ * Resolve level from campaign URL (?campaign=1&world=world-01&stage=1).
+ * Requires levels/campaign.js loaded first.
+ * @returns {Promise<{ level: object, entry: BlockBallLevelEntry, campaignCtx: object }>}
+ */
+async function resolveActiveCampaignLevel(options = {}) {
+  await ensureLevelRegistry();
+  const campaign = await fetchCampaign(options.forceCampaign);
+  const params = new URLSearchParams(window.location.search);
+  const worldId = params.get('world');
+  const stageIndex = parseStageParam(params.get('stage'));
+
+  if (!worldId || stageIndex == null) {
+    throw new Error('Campaign mode requires ?world=world-01&stage=1 (stage 1–5).');
+  }
+
+  const levelIds = new Set(BLOCK_BALL_LEVELS.map((e) => e.id));
+  const progress = loadCampaignProgress();
+
+  if (!isStagePlayable(campaign, worldId, stageIndex, levelIds, progress)) {
+    throw new Error(`Stage not playable: ${worldId} stage ${stageIndex + 1}. Unlock it from the campaign menu.`);
+  }
+
+  const stage = getStageEntry(campaign, worldId, stageIndex);
+  if (!stage?.levelId) {
+    throw new Error('Stage has no level assigned.');
+  }
+
+  const entry = findLevelEntry(stage.levelId);
+  if (!entry) {
+    throw new Error(`Level "${stage.levelId}" is not in the registry.`);
+  }
+
+  saveCampaignLastPosition(worldId, stageIndex);
+  const level = await loadLevelScript(entry);
+  bbLog('resolveActiveCampaignLevel', {
+    worldId,
+    stage: stageIndex + 1,
+    levelId: stage.levelId,
+  });
+
+  return {
+    level,
+    entry,
+    campaignCtx: {
+      campaign,
+      worldId: stage.worldId,
+      worldName: stage.worldName,
+      worldIndex: stage.worldIndex,
+      stageIndex: stage.stageIndex,
+      stageNumber: stage.stageIndex + 1,
+    },
+  };
+}
+
+/**
+ * Resolve active level from ?preview=1, ?campaign=1, ?level= id, then localStorage, then default.
+ * @returns {Promise<{ level: object, entry: BlockBallLevelEntry, campaignCtx?: object }>}
  */
 async function resolveActiveLevel(options = {}) {
   await ensureLevelRegistry();
   const params = new URLSearchParams(window.location.search);
+
+  if (params.get('campaign') === '1') {
+    return resolveActiveCampaignLevel(options);
+  }
+
   const storageKey = options.storageKey ?? 'blockBall.level';
   const previewWanted = wantsEditorPreviewMode(params);
   bbLog('resolveActiveLevel', {
@@ -396,7 +462,12 @@ async function resolveActiveLevel(options = {}) {
     );
   }
 
-  const requestedId = params.get('level') || localStorage.getItem(storageKey) || getDefaultLevelId();
+  const requestedId =
+    LEVEL_ID_ALIASES[params.get('level') || ''] ||
+    params.get('level') ||
+    LEVEL_ID_ALIASES[localStorage.getItem(storageKey) || ''] ||
+    localStorage.getItem(storageKey) ||
+    getDefaultLevelId();
   const entry = findLevelEntry(requestedId) || findLevelEntry(getDefaultLevelId());
   bbLog('resolveActiveLevel → registered level', { requestedId, entryId: entry?.id, script: entry?.script });
 

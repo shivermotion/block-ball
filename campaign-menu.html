@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Block Ball — Campaign</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --panel: #252545;
+      --text: #eee;
+      --accent: #ffe66d;
+      --muted: #888;
+      --locked: #444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .top-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #333;
+    }
+
+    .top-nav h1 {
+      font-size: 1.25rem;
+      margin-right: auto;
+    }
+
+    .top-nav a,
+    .top-nav button {
+      font: inherit;
+      color: var(--accent);
+      background: transparent;
+      border: 1px solid #555;
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .top-nav button.continue {
+      background: var(--accent);
+      color: #1a1a2e;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .top-nav button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      max-width: 900px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 2px solid #444;
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .card:hover:not(.locked) {
+      border-color: var(--accent);
+    }
+
+    .card.locked {
+      opacity: 0.45;
+      cursor: not-allowed;
+      border-color: var(--locked);
+    }
+
+    .card .title {
+      font-weight: 600;
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+
+    .card .meta {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .stage-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      max-width: 800px;
+    }
+
+    .stage-btn {
+      background: var(--panel);
+      border: 2px solid #444;
+      border-radius: 10px;
+      padding: 16px 12px;
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .stage-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+    }
+
+    .stage-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .stage-btn.done {
+      border-color: #3d9a6a;
+    }
+
+    .stage-btn .num {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .stage-btn .label {
+      font-size: 11px;
+      color: var(--muted);
+      word-break: break-word;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 16px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="top-nav">
+    <h1 id="page-title">Campaign</h1>
+    <button type="button" id="btn-continue" class="continue" hidden>Continue</button>
+    <a href="campaign-editor.html">Planner</a>
+    <a href="level-editor.html">Level Editor</a>
+    <a href="block-ball-demo.html">Free Play</a>
+    <button type="button" id="btn-reset" title="Clear unlock progress">Reset progress</button>
+  </nav>
+
+  <p class="subtitle" id="subtitle"></p>
+  <div id="content"></div>
+
+  <script src="levels/campaign.js"></script>
+  <script src="levels/registry.js"></script>
+  <script>
+    let campaign = null;
+    let levelMap = new Map();
+    let progress = loadCampaignProgress();
+
+    const params = new URLSearchParams(window.location.search);
+    const worldParam = params.get('world');
+
+    const pageTitle = document.getElementById('page-title');
+    const subtitle = document.getElementById('subtitle');
+    const content = document.getElementById('content');
+    const btnContinue = document.getElementById('btn-continue');
+    const btnReset = document.getElementById('btn-reset');
+
+    function levelName(id) {
+      return levelMap.get(id)?.name || id;
+    }
+
+    function setupContinue() {
+      const last = loadCampaignLastPosition();
+      if (!last || !campaign) {
+        btnContinue.hidden = true;
+        return;
+      }
+      const levelIds = new Set([...levelMap.keys()]);
+      if (!isStagePlayable(campaign, last.worldId, last.stageIndex, levelIds, progress)) {
+        btnContinue.hidden = true;
+        return;
+      }
+      btnContinue.hidden = false;
+      btnContinue.onclick = () => {
+        window.location.href = campaignPlayUrl(last.worldId, last.stageIndex + 1);
+      };
+    }
+
+    function renderWorldSelect() {
+      pageTitle.textContent = 'Select World';
+      subtitle.textContent = 'Complete all assigned stages in a world to unlock the next.';
+      content.innerHTML = '<div class="grid" id="world-grid"></div>';
+      const grid = document.getElementById('world-grid');
+
+      campaign.worlds.forEach((world, wi) => {
+        const { assigned, completed } = worldProgress(campaign, wi, progress);
+        const unlocked = isWorldUnlocked(campaign, wi, progress);
+        const card = document.createElement('div');
+        card.className = 'card' + (unlocked ? '' : ' locked');
+        card.innerHTML = `
+          <div class="title">${world.name}</div>
+          <div class="meta">${assigned ? `${completed}/${assigned} stages` : 'No levels assigned'}</div>
+          ${unlocked ? '' : '<div class="meta">Locked</div>'}
+        `;
+        if (unlocked) {
+          card.addEventListener('click', () => {
+            window.location.href = campaignMenuUrl(world.id);
+          });
+        }
+        grid.appendChild(card);
+      });
+    }
+
+    function renderStageSelect(worldId) {
+      const world = findWorld(campaign, worldId);
+      if (!world) {
+        window.location.href = campaignMenuUrl();
+        return;
+      }
+      const wi = findWorldIndex(campaign, worldId);
+      const levelIds = new Set([...levelMap.keys()]);
+
+      pageTitle.textContent = world.name;
+      subtitle.textContent = `Pick a stage to play. Stages unlock in order.`;
+      content.innerHTML = `<a class="back-link" href="${campaignMenuUrl()}">← All worlds</a><div class="stage-grid" id="stage-grid"></div>`;
+      const grid = document.getElementById('stage-grid');
+
+      world.stages.forEach((levelId, si) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'stage-btn';
+        const assigned = Boolean(levelId);
+        const playable = assigned && isStagePlayable(campaign, worldId, si, levelIds, progress);
+        const done = isStageCompleted(worldId, si, progress);
+
+        if (done) btn.classList.add('done');
+        btn.disabled = !playable;
+
+        btn.innerHTML = `
+          <div class="num">Stage ${si + 1}${done ? ' ✓' : ''}</div>
+          <div class="label">${assigned ? levelName(levelId) : 'Empty'}</div>
+        `;
+
+        if (playable) {
+          btn.addEventListener('click', () => {
+            window.location.href = campaignPlayUrl(worldId, si + 1);
+          });
+        }
+        grid.appendChild(btn);
+      });
+
+      if (!isWorldUnlocked(campaign, wi, progress)) {
+        subtitle.textContent = 'This world is locked.';
+      }
+    }
+
+    btnReset.addEventListener('click', () => {
+      if (confirm('Reset all campaign progress?')) {
+        resetCampaignProgress();
+        progress = loadCampaignProgress();
+        render();
+      }
+    });
+
+    function render() {
+      setupContinue();
+      if (worldParam) {
+        renderStageSelect(worldParam);
+      } else {
+        renderWorldSelect();
+      }
+    }
+
+    (async function boot() {
+      await ensureLevelRegistry();
+      BLOCK_BALL_LEVELS.forEach((e) => levelMap.set(e.id, e));
+      campaign = await fetchCampaign();
+      render();
+    })();
+  </script>
+</body>
+
+</html>

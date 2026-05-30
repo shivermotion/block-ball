@@ -170,6 +170,12 @@ const BLOCK_LAYOUT_CHARS = {
   '5': 5,
   i: 5,
   I: 5,
+  e: 18,
+  E: 18,
+  o: 18,
+  O: 18,
+  u: 22,
+  U: 22,
 };
 
 function createLevelGrid(level, gameHeight = 780, gameWidth = 390) {
@@ -356,6 +362,7 @@ function ensurePlayBlockCells(level, levelGrid) {
 
   if (sizeOk) {
     level.blocks.cells = parsed;
+    migrateScoreFootprints(parsed, cols, rows);
     return parsed;
   }
 
@@ -377,6 +384,7 @@ function ensurePlayBlockCells(level, levelGrid) {
   }
 
   level.blocks.cells = grid;
+  migrateScoreFootprints(grid, cols, rows);
   return grid;
 }
 
@@ -457,7 +465,7 @@ function parseBlockLayoutRows(rows) {
 }
 
 function layoutToStrings(layout) {
-  const inv = { 0: '.', 1: '1', 2: 'g', 3: 'p', 4: 's', 5: 'i' };
+  const inv = { 0: '.', 1: '1', 2: 'g', 3: 'p', 4: 's', 5: 'i', 18: 'e', 22: 'u' };
   return layout.map((row) => row.map((c) => inv[c] ?? '.').join(''));
 }
 

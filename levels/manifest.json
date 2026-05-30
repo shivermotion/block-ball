@@ -1,14 +1,20 @@
 [
   {
-    "id": "demo-01",
-    "name": "Demo Pyramid",
-    "script": "levels/demo-level-01.js",
-    "global": "DEMO_LEVEL_01"
+    "id": "bonus",
+    "name": "bonus chance",
+    "script": "levels/bonus.js",
+    "global": "LEVEL_BONUS"
   },
   {
     "id": "demo-level-01",
-    "name": "demo-level-01",
+    "name": "Demo Pyramid",
     "script": "levels/demo-level-01.js",
     "global": "LEVEL_DEMO_LEVEL_01"
+  },
+  {
+    "id": "demo-level-02",
+    "name": "demo-level-02",
+    "script": "levels/demo-level-02.js",
+    "global": "LEVEL_DEMO_LEVEL_02"
   }
 ]

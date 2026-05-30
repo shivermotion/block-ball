@@ -1,13 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Block Ball — Demo Level</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body {
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
       width: 100%;
       height: 100%;
       overflow: hidden;
@@ -17,10 +25,12 @@
       -webkit-user-select: none;
       user-select: none;
     }
+
     #game-container {
       width: 100%;
       height: 100%;
     }
+
     #level-bar {
       position: fixed;
       top: 0;
@@ -38,8 +48,14 @@
       font-size: 13px;
       color: #eee;
     }
-    #level-bar label { color: #aaa; }
-    #level-bar select, #level-bar button, #level-bar a {
+
+    #level-bar label {
+      color: #aaa;
+    }
+
+    #level-bar select,
+    #level-bar button,
+    #level-bar a {
       background: #252545;
       color: #eee;
       border: 1px solid #555;
@@ -48,8 +64,22 @@
       font-size: 13px;
       text-decoration: none;
     }
-    #level-bar button { cursor: pointer; }
-    #level-bar a:hover, #level-bar button:hover { border-color: #ffe66d; }
+
+    #level-bar button {
+      cursor: pointer;
+    }
+
+    #level-bar a:hover,
+    #level-bar button:hover {
+      border-color: #ffe66d;
+    }
+
+    #campaign-label {
+      font-weight: 600;
+      color: #ffe66d;
+      margin-right: 4px;
+    }
+
     #boot-status {
       position: fixed;
       inset: 0;
@@ -61,11 +91,18 @@
       font-family: system-ui, sans-serif;
       z-index: 999;
     }
-    #boot-status.error { color: #ff6b6b; padding: 24px; text-align: center; max-width: 420px; }
+
+    #boot-status.error {
+      color: #ff6b6b;
+      padding: 24px;
+      text-align: center;
+      max-width: 420px;
+    }
   </style>
 </head>
+
 <body>
-<!--
+  <!--
 ================================================================================
   BLOCK BALL — Single-Level Demo (Phaser 3 + Arcade Physics)
 ================================================================================
@@ -117,2243 +154,2638 @@ PACKAGING FOR REAL MOBILE APPS
 ================================================================================
 -->
 
-<div id="boot-status">Loading level…</div>
-<nav id="level-bar" hidden>
-  <label for="level-select">Level</label>
-  <select id="level-select" aria-label="Select level"></select>
-  <button type="button" id="level-restart">Restart</button>
-  <a href="level-editor?restore=1">Editor</a>
-</nav>
-<div id="game-container"></div>
+  <div id="boot-status">Loading level…</div>
+  <nav id="level-bar" hidden>
+    <span id="campaign-label" hidden></span>
+    <label for="level-select" id="level-select-label">Level</label>
+    <select id="level-select" aria-label="Select level"></select>
+    <button type="button" id="level-restart">Restart</button>
+    <a href="campaign-menu.html" id="nav-campaign-menu">Campaign</a>
+    <a href="campaign-editor.html" id="nav-campaign-planner">Planner</a>
+    <a href="level-editor.html?restore=1" id="nav-editor">Editor</a>
+  </nav>
+  <div id="game-container"></div>
 
-<script src="block-types.js"></script>
-<script src="block-power-art.js"></script>
-<script src="enemy-types.js"></script>
-<script src="item-types.js"></script>
-<script src="score-popup.js"></script>
-<script src="level-grid.js"></script>
-<script src="hud-avatar.js"></script>
-<script src="levels/registry.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
-<script>
-/* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemImagePath, getItemTextureKey, getItemFootprint, ITEM_ART_VERSION, ITEM_CATEGORY, spawnFloatingScore, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, fitEntityToCell, fitEntityToCellSpan, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES */
+  <script src="block-types.js"></script>
+  <script src="block-power-art.js"></script>
+  <script src="enemy-types.js"></script>
+  <script src="item-types.js"></script>
+  <script src="score-popup.js"></script>
+  <script src="level-grid.js"></script>
+  <script src="hud-avatar.js"></script>
+  <script src="levels/campaign.js"></script>
+  <script src="levels/registry.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+  <script>
+    /* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, canBlockBecomeBonus, getBonusCollectPoints, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemEffect, getItemTextureKey, getItemFootprint, ITEM_CATEGORY, spawnFloatingScore, spawnFloatingHint, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, fitEntityToCell, fitEntityToCellSpan, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES, markStageCompleted, getNextStage, campaignPlayUrl, campaignMenuUrl */
 
-let ACTIVE_LEVEL = null;
-const URL_PARAMS = new URLSearchParams(window.location.search);
-const SHOW_LEVEL_GRID = URL_PARAMS.has('debugGrid');
-/** Full game / HUD / play outlines. Disable with ?devBorders=0 */
-const DEV_BORDERS = URL_PARAMS.get('devBorders') !== '0';
+    let ACTIVE_LEVEL = null;
+    /** @type {{ campaign: object, worldId: string, worldName: string, worldIndex: number, stageIndex: number, stageNumber: number } | null} */
+    let ACTIVE_CAMPAIGN_CTX = null;
+    const URL_PARAMS = new URLSearchParams(window.location.search);
+    const SHOW_LEVEL_GRID = URL_PARAMS.has('debugGrid');
+    /** Full game / HUD / play outlines. Disable with ?devBorders=0 */
+    const DEV_BORDERS = URL_PARAMS.get('devBorders') !== '0';
 
-const DEBUG_LOG = true;
+    const DEBUG_LOG = true;
 
-function bbLog(...args) {
-  if (DEBUG_LOG) console.log('[BlockBall]', ...args);
-}
+    function bbLog(...args) {
+      if (DEBUG_LOG) console.log('[BlockBall]', ...args);
+    }
 
-function bbError(context, err) {
-  console.error('[BlockBall]', context, err);
-}
+    function bbError(context, err) {
+      console.error('[BlockBall]', context, err);
+    }
 
-window.addEventListener('error', (e) => {
-  bbError('window.error', e.error || e.message);
-});
+    window.addEventListener('error', (e) => {
+      bbError('window.error', e.error || e.message);
+    });
 
-window.addEventListener('unhandledrejection', (e) => {
-  bbError('unhandledrejection', e.reason);
-});
+    window.addEventListener('unhandledrejection', (e) => {
+      bbError('unhandledrejection', e.reason);
+    });
 
-// =============================================================================
-// GAME CONFIG
-// =============================================================================
+    // =============================================================================
+    // GAME CONFIG
+    // =============================================================================
 
-const GAME_WIDTH = 390;
-const GAME_HEIGHT = 780;
+    const GAME_WIDTH = 390;
+    const GAME_HEIGHT = 780;
 
-const COLORS = {
-  bg: 0x2d1b4e,
-  bgLight: 0x4a2c7a,
-  paddle: 0x00d4aa,
-  paddleDark: 0x00a080,
-  ball: 0x4da6ff,
-  ballHighlight: 0x8ec8ff,
-  blockNormal: 0xfff5e6,
-  blockNormalBorder: 0xffb347,
-  blockGray: 0x9ca3af,
-  blockGrayBorder: 0x4b5563,
-  blockPower: 0x6b7280,
-  blockPowerBorder: 0x374151,
-  blockPowerGlow: 0xffe66d,
-  spike: 0xff3366,
-  enemy: 0xff6bcb,
-  enemyDark: 0xc94d9a,
-  text: '#ffffff',
-  accent: '#ffe66d',
-  danger: '#ff3366',
-};
+    const COLORS = {
+      bg: 0x2d1b4e,
+      bgLight: 0x4a2c7a,
+      paddle: 0x00d4aa,
+      paddleDark: 0x00a080,
+      ball: 0x4da6ff,
+      ballHighlight: 0x8ec8ff,
+      blockNormal: 0xfff5e6,
+      blockNormalBorder: 0xffb347,
+      blockGray: 0x9ca3af,
+      blockGrayBorder: 0x4b5563,
+      blockPower: 0x6b7280,
+      blockPowerBorder: 0x374151,
+      blockPowerGlow: 0xffe66d,
+      spike: 0xff3366,
+      enemy: 0xff6bcb,
+      enemyDark: 0xc94d9a,
+      text: '#ffffff',
+      accent: '#ffe66d',
+      danger: '#ff3366',
+    };
 
-/** Fallback debris tint if texture sampling fails. */
-const CLAY_DEBRIS_TINT_FALLBACK = {
-  normal: 0xe8dcc8,
-  gray: 0xb8b0a8,
-  power: 0xc9c4b0,
-  spike: 0xd4a8a8,
+    /** Fallback debris tint if texture sampling fails. */
+    const CLAY_DEBRIS_TINT_FALLBACK = {
+      normal: 0xe8dcc8,
+      gray: 0xb8b0a8,
+      power: 0xc9c4b0,
+      spike: 0xd4a8a8,
   indestructible: 0x9aa8b0,
+  score: 0xb8a8d8,
 };
 
-const PHYSICS = {
-  ballSpeed: 380,
-  ballMaxSpeed: 520,
-  powerBallMaxSpeed: 760,
-  launchSpeed: 420,
-  powerBounceSpeed: 680,
-  powerAngleAmp: 1.38,
-  paddleBounceFactor: 1.05,
-  /** Rolling spin: rotation rate ≈ speed / radius (rad/s). */
-  ballSpin: 0.15,
-};
-
-/** Level-placed pickups bob in place (classic Kirby-style float). */
-const ITEM_FLOAT = {
-  amplitudeFrac: 0.09,
-  durationBase: 820,
-  durationStep: 100,
-  delayStep: 85,
-};
-
-const BALL_TRAIL = {
-  /** Must match speed_line texture size in generateTextures(). */
-  texWidth: 24,
-  texHeight: 6,
-  frequency: 20,
-  frequencyPower: 14,
-  lifespan: 140,
-  lifespanPower: 170,
-  tint: 0xc8eed4,
-  tintPower: 0xfff0b0,
-  /** Thickness vs ball diameter (1 = full ball width; original ≈ 0.1). */
-  widthMul: 0.5,
-  widthMulPower: 0.58,
-  /** Streak length vs ball diameter. */
-  lengthMul: 1.1,
-  lengthMulPower: 1.28,
-};
-
-/** Aim while ball on paddle: left 45° → straight up → right 45° (screen coords, y down). */
-const LAUNCH_AIM_TICK_MS = 650;
-const LAUNCH_AIM_DIRS = [
-  { vx: -1 / Math.SQRT2, vy: -1 / Math.SQRT2 },
-  { vx: 0, vy: -1 },
-  { vx: 1 / Math.SQRT2, vy: -1 / Math.SQRT2 },
-];
-
-const SCORE = {
-  powerMultiplier: 1.5,
-};
-
-/** Neutral hit on power blocks — “needs Power Bounce” feedback (not indestructible). */
-const POWER_BLOCK_RESIST = {
-  squashScaleX: 1.07,
-  squashScaleY: 0.86,
-  squashInMs: 42,
-  ballSpeedMul: 0.9,
-  cameraShakeMs: 48,
-  cameraShakeIntensity: 0.0022,
-  godRayAngleDeg: -36,
-  godRaySweepMs: 360,
-  godRayCoreScale: 0.3,
-  godRayHaloScale: 0.62,
-  godRayCoreAlpha: 0.9,
-  godRayHaloAlpha: 0.38,
-};
-
-const POWER_BOUNCE = {
-  /** Release arms power; paddle hit must occur within this window (ms) */
-  queueWindowMs: 1100,
-  /** Ball falling — used for charge visuals */
-  minFallSpeed: 18,
-  /** How far above/below paddle center release can arm power */
-  armAbovePaddle: 240,
-  armBelowPaddle: 48,
-  /** Charge ring / shake while ball is in this zone above paddle */
-  chargeAbovePaddle: 200,
-  chargeBelowPaddle: 40,
-  /** Brief slow-mo emphasis on perfect Power Bounce (real-time ms) */
-  slowMoRealMs: 130,
-  slowMoTimeScale: 0.32,
-};
-
-const POWER_BALL = {
-  durationMs: 2800,
-  cooldownMs: 500,
-  scale: 1.24,
-};
-
-/** Ball sprite sheets in assets/ball/ */
-const BALL_TEXTURE = {
-  neutral: 'ball',
-  determined: 'ball_determined',
-};
-
-/** Matches legacy procedural paddle texture size (see generateTextures). */
-const PADDLE_PAD = 2;
-
-function getPaddleDisplaySize(cellW, cellH, colSpan = 2) {
-  return {
-    width: Math.max(1, Math.round(colSpan * cellW - PADDLE_PAD)),
-    height: Math.max(1, Math.round(cellH * 0.5)),
-  };
-}
-
-/** Scale preloaded paddle PNG to exact playfield paddle dimensions (1:1 in game). */
-function bakePaddleTexture(scene, cellW, cellH, colSpan) {
-  const { width: w, height: h } = getPaddleDisplaySize(cellW, cellH, colSpan);
-  const sourceKey = 'paddle';
-  const bakedKey = 'paddle_baked';
-
-  if (!scene.textures.exists(sourceKey)) {
-    return { key: sourceKey, width: w, height: h };
-  }
-
-  if (scene.textures.exists(bakedKey)) {
-    scene.textures.remove(bakedKey);
-  }
-
-  const canvasTex = scene.textures.createCanvas(bakedKey, w, h);
-  const ctx = canvasTex.getContext();
-  const src = scene.textures.get(sourceKey).getSourceImage();
-  if (src) {
-    ctx.drawImage(src, 0, 0, w, h);
-  }
-  canvasTex.refresh();
-  return { key: bakedKey, width: w, height: h };
-}
-
-/** Soft band for power-block god-ray sweep (canvas; ADD blend in scene). */
-function ensurePowerGodRayTexture(scene) {
-  if (scene.textures.exists('power_godray')) return;
-
-  const w = 64;
-  const h = 168;
-  const tex = scene.textures.createCanvas('power_godray', w, h);
-  const ctx = tex.getContext();
-
-  const hGrad = ctx.createLinearGradient(0, 0, w, 0);
-  hGrad.addColorStop(0, 'rgba(255,255,255,0)');
-  hGrad.addColorStop(0.4, 'rgba(255,255,255,0)');
-  hGrad.addColorStop(0.5, 'rgba(255,255,255,1)');
-  hGrad.addColorStop(0.6, 'rgba(255,255,255,0)');
-  hGrad.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = hGrad;
-  ctx.fillRect(0, 0, w, h);
-
-  const vGrad = ctx.createLinearGradient(0, 0, 0, h);
-  vGrad.addColorStop(0, 'rgba(0,0,0,0)');
-  vGrad.addColorStop(0.1, 'rgba(255,255,255,1)');
-  vGrad.addColorStop(0.9, 'rgba(255,255,255,1)');
-  vGrad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.globalCompositeOperation = 'destination-in';
-  ctx.fillStyle = vGrad;
-  ctx.fillRect(0, 0, w, h);
-  ctx.globalCompositeOperation = 'source-over';
-
-  tex.refresh();
-}
-
-// =============================================================================
-// TEXTURE GENERATION (generic shapes — no franchise assets)
-// =============================================================================
-
-function generateTextures(scene, cellW, cellH) {
-  ensurePowerGodRayTexture(scene);
-  const g = scene.make.graphics({ x: 0, y: 0, add: false });
-  const pad = 2;
-  const innerW = cellW - pad * 2;
-  const innerH = cellH - pad * 2;
-  const paddleColSpan = (ACTIVE_LEVEL?.paddle?.colSpan) ?? 2;
-  if (scene.textures.exists('paddle')) {
-    bakePaddleTexture(scene, cellW, cellH, paddleColSpan);
-  } else {
-    const paddleW = paddleColSpan * cellW - pad;
-    const paddleTexH = cellH * 0.5;
-    const paddleInnerH = paddleTexH - pad - 2;
-    g.clear();
-    g.fillStyle(COLORS.paddleDark, 1);
-    g.fillRoundedRect(0, 2, paddleW, paddleInnerH, 6);
-    g.fillStyle(COLORS.paddle, 1);
-    g.fillRoundedRect(0, 0, paddleW, paddleInnerH, 6);
-    g.generateTexture('paddle', paddleW, paddleTexH);
-  }
-
-  function drawBlockTexture(key, fill, border, extra) {
-    g.clear();
-    g.fillStyle(border, 1);
-    g.fillRoundedRect(0, 0, innerW, innerH, 4);
-    g.fillStyle(fill, 1);
-    g.fillRoundedRect(2, 2, innerW - 4, innerH - 4, 3);
-    if (extra) extra(g, innerW, innerH);
-    g.generateTexture(key, cellW, cellH);
-  }
-
-  // Normal / gray — assets/blocks/*.png (preload); procedural fallback if missing
-  if (!scene.textures.exists('block_normal')) {
-    drawBlockTexture('block_normal', COLORS.blockNormal, COLORS.blockNormalBorder);
-  }
-  if (!scene.textures.exists('block_gray')) {
-    drawBlockTexture('block_gray', COLORS.blockGray, COLORS.blockGrayBorder, (gfx, w, h) => {
-      gfx.lineStyle(1, 0x6b7280, 0.8);
-      gfx.strokeRect(w * 0.2, h * 0.35, w * 0.6, h * 0.3);
-    });
-  }
-  if (!scene.textures.exists('block_power')) {
-    drawBlockTexture('block_power', COLORS.blockPower, COLORS.blockPowerBorder, (gfx, w, h) => {
-      gfx.lineStyle(2, COLORS.blockPowerGlow, 0.85);
-      gfx.strokeRoundedRect(4, 4, w - 8, h - 8, 3);
-      gfx.fillStyle(COLORS.blockPowerGlow, 0.35);
-      gfx.fillRect(6, 6, w - 12, Math.max(4, h * 0.2));
-    });
-  }
-  bakePowerBlockTextures(scene, cellW, cellH);
-
-  // Spike hazard — assets/blocks/spike.png (preload); procedural fallback if missing
-  if (!scene.textures.exists('block_spike')) {
-    g.clear();
-    g.fillStyle(0x4a1028, 1);
-    g.fillRoundedRect(0, 0, innerW, innerH, 3);
-    g.fillStyle(COLORS.spike, 1);
-    const spikeW = innerW / 3;
-    for (let i = 0; i < 3; i++) {
-      const cx = spikeW * i + spikeW * 0.5;
-      const half = spikeW * 0.38;
-      g.fillTriangle(cx - half, innerH, cx, innerH * 0.12, cx + half, innerH);
-    }
-    g.lineStyle(2, 0xcc1144, 0.7);
-    g.strokeRect(1, innerH - 2, innerW - 2, 2);
-    g.generateTexture('block_spike', cellW, cellH);
-  }
-
-  // Indestructible (steel + X; never breaks)
-  drawBlockTexture('block_indestructible', 0x6b7c8c, 0x3d4d5d, (gfx, w, h) => {
-    gfx.lineStyle(Math.max(2, Math.floor(Math.min(w, h) * 0.08)), 0x1e2832, 0.95);
-    gfx.lineBetween(4, 4, w - 4, h - 4);
-    gfx.lineBetween(w - 4, 4, 4, h - 4);
-  });
-
-  // Life icon (mini ball; main ball uses assets/ball/neutral.png + determined.png)
-  g.clear();
-  g.fillStyle(COLORS.ball, 1);
-  g.fillCircle(8, 8, 8);
-  g.generateTexture('life_icon', 16, 16);
-
-  generateHudAvatarTextures(scene, 48);
-
-  // Enemy (one cell)
-  g.clear();
-  g.fillStyle(COLORS.enemyDark, 1);
-  g.fillEllipse(cellW / 2, cellH * 0.65, innerW * 0.85, innerH * 0.7);
-  g.fillStyle(COLORS.enemy, 1);
-  g.fillEllipse(cellW / 2, cellH * 0.58, innerW * 0.8, innerH * 0.65);
-  g.fillStyle(0xffffff, 1);
-  g.fillCircle(cellW * 0.35, cellH * 0.42, Math.max(3, cellW * 0.1));
-  g.fillCircle(cellW * 0.65, cellH * 0.42, Math.max(3, cellW * 0.1));
-  g.fillStyle(0x1e3a5f, 1);
-  g.fillCircle(cellW * 0.35, cellH * 0.42, Math.max(2, cellW * 0.05));
-  g.fillCircle(cellW * 0.65, cellH * 0.42, Math.max(2, cellW * 0.05));
-  g.fillStyle(0x1e3a5f, 0.8);
-  g.fillEllipse(cellW / 2, cellH * 0.72, cellW * 0.15, cellH * 0.1);
-  g.generateTexture('enemy', cellW, cellH);
-
-  generateItemTextures(scene, cellW, cellH, g);
-
-  // Particle spark (ball lose, enemies)
-  g.clear();
-  g.fillStyle(0xffffff, 1);
-  g.fillCircle(4, 4, 4);
-  g.generateTexture('particle', 8, 8);
-
-  const clayAtlasH = 12;
-  const clayFrames = [
-    { name: 'chunk_a', x: 0, w: 12, h: 10 },
-    { name: 'chunk_b', x: 14, w: 10, h: 12 },
-    { name: 'chunk_c', x: 26, w: 14, h: 9 },
-    { name: 'chunk_d', x: 42, w: 7, h: 7 },
-  ];
-  const clayAtlasW = 50;
-
-  function drawClayChunkAt(ox, oy, w, h) {
-    g.fillStyle(0xf0e6d8, 1);
-    const cx = ox + w / 2;
-    const cy = oy + h / 2;
-    g.fillCircle(cx, cy, Math.min(w, h) * 0.44);
-    g.fillCircle(cx - w * 0.22, cy + h * 0.12, Math.min(w, h) * 0.3);
-    g.fillCircle(cx + w * 0.2, cy - h * 0.1, Math.min(w, h) * 0.28);
-    g.fillCircle(cx + w * 0.08, cy + h * 0.22, Math.min(w, h) * 0.22);
-    g.fillStyle(0x000000, 0.12);
-    g.fillCircle(cx - 1, cy + 1, Math.max(1, Math.min(w, h) * 0.08));
-    g.fillStyle(0xffffff, 0.15);
-    g.fillCircle(cx + 1, cy - 2, Math.max(1, Math.min(w, h) * 0.06));
-  }
-
-  g.clear();
-  for (const f of clayFrames) {
-    const oy = Math.floor((clayAtlasH - f.h) / 2);
-    drawClayChunkAt(f.x, oy, f.w, f.h);
-  }
-  g.generateTexture('clay_debris', clayAtlasW, clayAtlasH);
-  const clayTex = scene.textures.get('clay_debris');
-  for (const f of clayFrames) {
-    const oy = Math.floor((clayAtlasH - f.h) / 2);
-    clayTex.add(f.name, 0, f.x, oy, f.w, f.h);
-  }
-
-  // Speed line (horizontal streak; rotated per velocity in updateBallTrail)
-  const lineW = BALL_TRAIL.texWidth;
-  const lineH = BALL_TRAIL.texHeight;
-  g.clear();
-  for (let i = 0; i < lineW; i++) {
-    const t = i / (lineW - 1);
-    const a = Math.min(1, t * 3, (1 - t) * 3) * 0.95;
-    g.fillStyle(0xffffff, a);
-    g.fillRect(i, 0, 1, lineH);
-  }
-  g.generateTexture('speed_line', lineW, lineH);
-
-  g.destroy();
-}
-
-const ITEM_CATEGORY_COLORS = {
-  [ITEM_CATEGORY.food]: { fill: 0xc45c5c, border: 0x8b3a3a },
-  [ITEM_CATEGORY.powerUp]: { fill: 0x3d9a6a, border: 0x2a6b4a },
-  [ITEM_CATEGORY.copyAbility]: { fill: 0x6b8cce, border: 0x4a6299 },
-  [ITEM_CATEGORY.life]: { fill: 0x9b7ede, border: 0x6b5a9e },
-};
-
-function uniqueLevelItemIds() {
-  const spawns = ACTIVE_LEVEL?.items || [];
-  return [...new Set(spawns.map((s) => s.type).filter(Boolean))];
-}
-
-/** Procedural item icons for types without PNG art in preload. */
-function generateItemTextures(scene, cellW, cellH, g) {
-  const ids = uniqueLevelItemIds();
-  if (!ids.length) return;
-
-  const size = Math.max(8, Math.min(cellW, cellH) - 4);
-
-  for (const id of ids) {
-    const key = getItemTextureKey(id);
-    if (scene.textures.exists(key)) continue;
-
-    const def = getItemDef(id);
-    const colors = ITEM_CATEGORY_COLORS[def?.category] || { fill: 0x888888, border: 0x555555 };
-
-    g.clear();
-    g.fillStyle(colors.border, 1);
-    g.fillRoundedRect(0, 0, size, size, 4);
-    g.fillStyle(colors.fill, 1);
-    g.fillRoundedRect(2, 2, size - 4, size - 4, 3);
-    g.fillStyle(0xffffff, 0.35);
-    g.fillCircle(size * 0.72, size * 0.28, Math.max(2, size * 0.1));
-    g.generateTexture(key, size, size);
-  }
-}
-
-// =============================================================================
-// MAIN SCENE
-// =============================================================================
-
-class GameScene extends Phaser.Scene {
-  constructor() {
-    super({ key: 'GameScene' });
-  }
-
-  preload() {
-    const v = '13';
-    this.load.image(BALL_TEXTURE.neutral, `assets/ball/neutral.png?v=${v}`);
-    this.load.image(BALL_TEXTURE.determined, `assets/ball/determined.png?v=${v}`);
-    this.load.image('paddle', `assets/paddle/paddle.png?v=${v}`);
-    this.load.image('block_normal', `assets/blocks/normal.png?v=${v}`);
-    this.load.image('block_gray', `assets/blocks/gray.png?v=${v}`);
-    this.load.image('block_spike', `assets/blocks/spike.png?v=${v}`);
-    this.load.image('block_power', `assets/blocks/power.png?v=${v}`);
-
-    const itemV = typeof ITEM_ART_VERSION !== 'undefined' ? ITEM_ART_VERSION : '1';
-    for (const id of uniqueLevelItemIds()) {
-      const path = getItemImagePath(id);
-      const key = getItemTextureKey(id);
-      if (path) {
-        this.load.image(key, `${path}?v=${itemV}`);
-      }
-    }
-  }
-
-  /** Match inscribed cell ball size (setTexture resets to native image dimensions). */
-  syncBallDisplaySize(worldRadius) {
-    if (!this.ball || this.ballRadius == null) return;
-    const diameter = this.ballRadius * 2;
-    this.ball.setDisplaySize(diameter, diameter);
-    // setDisplaySize adjusts scaleX/Y (~0.07 for 420px art); store for power tweens.
-    this.ballBaseScale = this.ball.scaleX;
-    this.syncBallPhysicsBody(worldRadius);
-  }
-
-  /** Arcade circle is scaled with the sprite — divide by scaleX so world radius matches art. */
-  syncBallPhysicsBody(worldRadius) {
-    if (!this.ball?.body || this.ballRadius == null) return;
-    const worldR = worldRadius ?? this.ballRadius;
-    const s = Math.abs(this.ball.scaleX);
-    if (!s) return;
-    this.ball.body.setCircle(worldR / s);
-  }
-
-  ballPowerScale() {
-    return this.ballBaseScale * POWER_BALL.scale;
-  }
-
-  updateBallSpin(delta) {
-    if (!this.ball?.active || this.ballOnPaddle || !this.ball.body?.moves) return;
-
-    const vx = this.ball.body.velocity.x;
-    const vy = this.ball.body.velocity.y;
-    const speed = Math.hypot(vx, vy);
-    if (speed < 8) return;
-
-    const r = this.ball.displayWidth * 0.5;
-    if (r <= 0) return;
-
-    const omega = (speed / r) * PHYSICS.ballSpin;
-    const spinSign = vx === 0 ? (vy > 0 ? 1 : -1) : Math.sign(vx);
-    this.ball.rotation += spinSign * omega * (delta / 1000);
-  }
-
-  /** Neutral face by default; determined face while power mode is active. */
-  applyBallTexture() {
-    if (!this.ball?.active) return;
-    const key = this.ballPowerMode ? BALL_TEXTURE.determined : BALL_TEXTURE.neutral;
-    if (this.textures.exists(key)) {
-      this.ball.setTexture(key);
-    }
-    this.syncBallDisplaySize();
-    this.ball.clearTint();
-  }
-
-  clearPaddleTweenRefs() {
-    this.paddleChargeScaleTween = null;
-    this.paddleChargeShakeTween = null;
-  }
-
-  killPaddleTweens() {
-    if (this.paddle) this.tweens.killTweensOf(this.paddle);
-    this.clearPaddleTweenRefs();
-  }
-
-  finishPaddleSpring() {
-    this.paddleSpringing = false;
-    this.killPaddleTweens();
-    this.resetPaddleVisual();
-  }
-
-  preparePaddleForCharge() {
-    if (this.paddleSpringing) {
-      this.finishPaddleSpring();
-    } else {
-      this.killPaddleTweens();
-      this.resetPaddleVisual();
-    }
-  }
-
-  isSceneActive() {
-    return Boolean(this.sys?.isActive());
-  }
-
-  safeStopTween(tween) {
-    if (!tween) return;
-    try {
-      if (typeof tween.isPlaying === 'function' && tween.isPlaying()) {
-        tween.stop();
-      }
-    } catch (err) {
-      bbError('safeStopTween', err);
-    }
-  }
-
-  create() {
-    bbLog('create() start');
-    this.gameState = 'playing'; // playing | levelClear | gameOver
-    this.score = 0;
-    this.ballLaunched = false;
-    this.ballOnPaddle = true;
-    this.powerBounceQueued = false;
-    this.powerBounceQueuedAt = 0;
-    this.powerBounceActive = false;
-    this.powerBounceMultiplier = false;
-    this.ballPowerMode = false;
-    this.ballPowerCooling = false;
-    this.powerBallTimer = null;
-    this.blocksRemaining = 0;
-    this.dragging = false;
-    this.pointerWasDragging = false;
-    this.isLosingBall = false;
-    this.paddleCharging = false;
-    this.paddleSpringing = false;
-    this.paddleChargeScaleTween = null;
-    this.paddleChargeShakeTween = null;
-    this.bottomHalfTouchThisStroke = false;
-    this.pendingPowerSpring = false;
-
-    this.launchAimIndex = 0;
-    this.launchAimDirection = 1;
-    this.launchAimTickEvent = null;
-    this.aimArrowGfx = null;
-    this.blockDebrisTintCache = new Map();
-
-    const { width, height } = this.scale;
-    this.level = ACTIVE_LEVEL;
-    this.levelGrid = createLevelGrid(this.level, height, width);
-    this.lives = this.level.meta?.lives ?? 3;
-
-    // Background gradient bands
-    this.add.rectangle(width / 2, height / 2, width, height, COLORS.bg);
-    this.add.rectangle(width / 2, height * 0.35, width, height * 0.5, COLORS.bgLight, 0.35);
-
-    // Arcade frame lines
-    const frame = this.add.graphics();
-    frame.lineStyle(3, 0xffe66d, 0.5);
-    frame.strokeRect(8, 8, width - 16, height - 16);
-
-    generateTextures(this, this.levelGrid.config.cellWidth, this.levelGrid.config.cellHeight);
-    this.ballRadius = ballRadiusForCell(this.levelGrid);
-    this.gridCellH = this.levelGrid.config.cellHeight;
-
-    // Physics world — only the playfield (below HUD), not the full frame
-    const playBounds = this.levelGrid.getPlayBounds();
-    this.physics.world.setBounds(playBounds.x, playBounds.y, playBounds.width, playBounds.height);
-    this.physics.world.setBoundsCollision(true, true, true, false);
-
-    this.createBlocks();
-    this.createEnemies();
-    this.createItems();
-    this.createPaddle();
-    this.createBall();
-    this.setupCollisions();
-    this.createUI();
-    this.setupInput();
-
-    if (SHOW_LEVEL_GRID) {
-      drawLevelGridDebug(this, this.levelGrid, this.level);
-    }
-
-    if (DEV_BORDERS) {
-      drawDevViewBorders(this, this.levelGrid, width, height);
-    }
-
-    this.updateUI();
-    bbLog('create() complete', { blocks: this.blocksRemaining, lives: this.lives });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Level geometry
-  // ---------------------------------------------------------------------------
-
-  createBlocks() {
-    const cells = ensurePlayBlockCells(this.level, this.levelGrid);
-
-    this.blocks = this.physics.add.staticGroup();
-    this.blocksRemaining = 0;
-
-    const spawnBlock = (gridCol, gridRow, cell) => {
-      if (isBlockExtensionCell(cell)) return;
-      const typeId = getBlockTypeFromCell(cell);
-      if (!typeId) return;
-      const def = getBlockDef(typeId);
-      const { colSpan, rowSpan } = getBlockFootprint(typeId);
-      const isLong = colSpan > 1 || rowSpan > 1;
-      const { x, y } = isLong
-        ? this.levelGrid.cellSpanCenter(gridCol, gridRow, colSpan, rowSpan)
-        : this.levelGrid.cellCenter(gridCol, gridRow);
-
-      const block = this.blocks.create(x, y, def.texture);
-      const isPower = isPowerBlockType(typeId);
-      const containSprite = typeId === 'spike' || typeId === 'normal' || typeId === 'gray';
-      if (isLong || isPower) {
-        fitEntityToCellSpan(block, this.levelGrid, colSpan, rowSpan);
-      } else {
-        fitEntityToCell(block, this.levelGrid, containSprite ? { contain: true } : {});
-      }
-      block.refreshBody();
-      block.setDepth(def.isHazard ? 8 : 5);
-      block.setData('typeId', typeId);
-      block.setData('points', def.points);
-      block.setData('isPower', def.powerOnly);
-      block.setData('isHazard', Boolean(def.isHazard));
-      block.setData('gridCol', gridCol);
-      block.setData('gridRow', gridRow);
-      block.setData('colSpan', colSpan);
-      block.setData('rowSpan', rowSpan);
-      if (def.countsTowardClear !== false) this.blocksRemaining++;
+    const PHYSICS = {
+      ballSpeed: 380,
+      ballMaxSpeed: 520,
+      powerBallMaxSpeed: 760,
+      launchSpeed: 420,
+      powerBounceSpeed: 680,
+      powerAngleAmp: 1.38,
+      paddleBounceFactor: 1.05,
+      /** Rolling spin: rotation rate ≈ speed / radius (rad/s). */
+      ballSpin: 0.15,
     };
 
-    for (let row = 0; row < cells.length; row++) {
-      for (let col = 0; col < cells[row].length; col++) {
-        const cell = cells[row][col];
-        if (cell === 0) continue;
-        spawnBlock(col, row, cell);
-      }
-    }
-  }
-
-  createEnemies() {
-    const spawns = this.level.enemies || [];
-
-    this.enemies = this.physics.add.group();
-    spawns.forEach((spawn, i) => {
-      const { x, y } = this.levelGrid.cellCenter(spawn.col, spawn.row);
-      this.spawnEnemy(spawn.type, x, y, i);
-    });
-  }
-
-  applyItemFloatTween(item, baseY, spawn, index) {
-    const amp = Math.max(2, this.levelGrid.config.cellHeight * ITEM_FLOAT.amplitudeFrac);
-    this.tweens.add({
-      targets: item,
-      y: baseY - amp,
-      duration: ITEM_FLOAT.durationBase + (index % 4) * ITEM_FLOAT.durationStep,
-      ease: 'Sine.easeInOut',
-      yoyo: true,
-      repeat: -1,
-      delay: ((spawn.col * 3 + spawn.row) % 6) * ITEM_FLOAT.delayStep,
-    });
-  }
-
-  createItems() {
-    const spawns = this.level.items || [];
-    this.levelItems = this.add.group();
-
-    spawns.forEach((spawn, index) => {
-      const key = getItemTextureKey(spawn.type);
-      if (!this.textures.exists(key)) {
-        bbLog('createItems: missing texture', spawn.type);
-        return;
-      }
-      const foot = getItemFootprint(spawn.type);
-      const { x, y } = this.levelGrid.cellSpanCenter(
-        spawn.col,
-        spawn.row,
-        foot.colSpan,
-        foot.rowSpan
-      );
-      const item = this.add.image(x, y, key);
-      this.physics.add.existing(item);
-      item.body.setImmovable(true);
-      item.body.allowGravity = false;
-      if (foot.colSpan > 1 || foot.rowSpan > 1) {
-        fitEntityToCellSpan(item, this.levelGrid, foot.colSpan, foot.rowSpan, { contain: true });
-      } else {
-        fitEntityToCell(item, this.levelGrid, { contain: true });
-      }
-      item.setDepth(6);
-      item.setData('typeId', spawn.type);
-      item.setData('gridCol', spawn.col);
-      item.setData('gridRow', spawn.row);
-      item.setData('colSpan', foot.colSpan);
-      item.setData('rowSpan', foot.rowSpan);
-      item.setData('baseY', y);
-      this.levelItems.add(item);
-      this.applyItemFloatTween(item, y, spawn, index);
-    });
-
-    bbLog('createItems', { count: this.levelItems.getLength() });
-  }
-
-  spawnEnemy(typeId, x, y, index) {
-    const def = getEnemyDef(typeId);
-    const enemy = this.enemies.create(x, y, def.texture);
-    fitEntityToCell(enemy, this.levelGrid, { circle: true });
-    enemy.setBounce(1);
-    enemy.setCollideWorldBounds(true);
-    enemy.setImmovable(true);
-    enemy.body.allowGravity = false;
-    enemy.setDepth(7);
-    enemy.setData('typeId', typeId);
-    enemy.setData('hp', def.hp);
-    enemy.setData('maxHp', def.maxHp);
-    enemy.setData('points', def.points);
-    enemy.setData('drop', def.drop);
-
-    this.applyEnemyMovement(enemy, def, index, x, y);
-    return enemy;
-  }
-
-  applyEnemyMovement(enemy, def, index, startX, startY) {
-    switch (def.movement) {
-      case 'erratic_float':
-      default:
-        this.tweens.add({
-          targets: enemy,
-          x: startX + (index % 2 === 0 ? this.levelGrid.config.cellWidth : -this.levelGrid.config.cellWidth),
-          duration: 2200 + index * 400,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut',
-        });
-        break;
-    }
-    enemy.setData('baseX', startX);
-  }
-
-  createPaddle() {
-    const paddleDef = this.level.paddle || { col: 4, colSpan: 2, rowFromBottom: 2 };
-    const colSpan = paddleDef.colSpan ?? 2;
-    const paddleRow = resolveGridRow(this.levelGrid, paddleDef);
-    const { x: paddleX, y: paddleY } = this.levelGrid.cellSpanCenter(
-      paddleDef.col,
-      paddleRow,
-      colSpan,
-      1
-    );
-    const { cellWidth, cellHeight } = this.levelGrid.config;
-    const paddleSize = getPaddleDisplaySize(cellWidth, cellHeight, colSpan);
-    const paddleKey = this.textures.exists('paddle_baked') ? 'paddle_baked' : 'paddle';
-
-    this.paddle = this.physics.add.image(paddleX, paddleY, paddleKey);
-    this.paddle.setDisplaySize(paddleSize.width, paddleSize.height);
-    this.paddleBaseW = paddleSize.width;
-    this.paddleBaseH = paddleSize.height;
-    if (this.paddle.body) {
-      this.paddle.body.setSize(paddleSize.width, paddleSize.height);
-    }
-    this.paddle.setImmovable(true);
-    this.paddle.body.allowGravity = false;
-    this.paddle.setCollideWorldBounds(true);
-    this.paddle.setDepth(10);
-    this.paddle.setOrigin(0.5, 0.5);
-  }
-
-  createBall() {
-    this.ball = this.physics.add.image(this.paddle.x, this.paddle.y, BALL_TEXTURE.neutral);
-    this.applyBallTexture();
-    this.ball.setBounce(1);
-    this.ball.setCollideWorldBounds(true);
-    this.ball.body.onWorldBounds = true;
-    this.ball.setDepth(11);
-    this.ball.setOrigin(0.5, 0.5);
-    this.ball.body.allowGravity = false;
-    this.physics.world.gravity.y = 0;
-
-    this.createBallTrail();
-    this.attachBallToPaddle(false);
-  }
-
-  createBallTrail() {
-    this.ballTrail = this.add.particles(0, 0, 'speed_line', {
-      ...this.ballTrailBaseConfig(false),
-      emitting: false,
-    });
-    this.ballTrail.setDepth(10);
-    this.ballTrail.startFollow(this.ball);
-    this._ballTrailPowered = false;
-  }
-
-  /** Streak angle: opposite travel direction (degrees, Phaser rotation). */
-  ballTrailRotateDeg() {
-    const vx = this.ball.body.velocity.x;
-    const vy = this.ball.body.velocity.y;
-    return Phaser.Math.RadToDeg(Math.atan2(vy, vx)) + 180;
-  }
-
-  syncBallTrailRotate() {
-    if (!this.ballTrail) return;
-    const deg = this.ballTrailRotateDeg();
-    const rot = { min: deg, max: deg };
-    if (this.ballTrail.setParticleRotate) {
-      this.ballTrail.setParticleRotate(rot);
-    } else if (this.ballTrail.ops?.rotate) {
-      this.ballTrail.ops.rotate.loadConfig({ rotate: rot });
-    }
-  }
-
-  ballTrailBaseConfig(powered) {
-    const diam = this.ball?.active ? this.ball.displayWidth : this.ballRadius * 2;
-    const lengthMul = powered ? BALL_TRAIL.lengthMulPower : BALL_TRAIL.lengthMul;
-    const widthMul = powered ? BALL_TRAIL.widthMulPower : BALL_TRAIL.widthMul;
-    const scaleY = (diam / BALL_TRAIL.texHeight) * widthMul;
-    const scaleX = (diam * lengthMul) / BALL_TRAIL.texWidth;
-    return {
-      lifespan: powered ? BALL_TRAIL.lifespanPower : BALL_TRAIL.lifespan,
-      scaleX: { start: scaleX, end: scaleX * 0.2 },
-      scaleY: { start: scaleY, end: scaleY * 0.35 },
-      alpha: { start: 0.7, end: 0 },
-      speed: 0,
-      rotate: { min: 0, max: 0 },
-      tint: powered ? BALL_TRAIL.tintPower : BALL_TRAIL.tint,
-      blendMode: 'ADD',
-      frequency: powered ? BALL_TRAIL.frequencyPower : BALL_TRAIL.frequency,
-      quantity: 1,
+    /** Level-placed pickups bob in place (classic Kirby-style float). */
+    const ITEM_FLOAT = {
+      amplitudeFrac: 0.09,
+      durationBase: 820,
+      durationStep: 100,
+      delayStep: 85,
     };
-  }
 
-  /** Reconfigure trail for normal vs power (not every frame — loadConfig each frame broke emission). */
-  syncBallTrailStyle() {
-    if (!this.ballTrail) return;
-    const powered = !!this.ballPowerMode;
-    if (this._ballTrailPowered !== powered) {
-      this._ballTrailPowered = powered;
-      const wasEmitting = this.ballTrail.emitting;
-      this.ballTrail.setConfig(this.ballTrailBaseConfig(powered));
-      this.ballTrail.startFollow(this.ball);
-      if (wasEmitting) this.ballTrail.start();
+    const BALL_TRAIL = {
+      /** Must match speed_line texture size in generateTextures(). */
+      texWidth: 24,
+      texHeight: 6,
+      frequency: 20,
+      frequencyPower: 14,
+      lifespan: 140,
+      lifespanPower: 170,
+      tint: 0xc8eed4,
+      tintPower: 0xfff0b0,
+      /** Thickness vs ball diameter (1 = full ball width; original ≈ 0.1). */
+      widthMul: 0.5,
+      widthMulPower: 0.58,
+      /** Streak length vs ball diameter. */
+      lengthMul: 1.1,
+      lengthMulPower: 1.28,
+    };
+
+    /** Aim while ball on paddle: left 45° → straight up → right 45° (screen coords, y down). */
+    const LAUNCH_AIM_TICK_MS = 650;
+    const LAUNCH_AIM_DIRS = [
+      { vx: -1 / Math.SQRT2, vy: -1 / Math.SQRT2 },
+      { vx: 0, vy: -1 },
+      { vx: 1 / Math.SQRT2, vy: -1 / Math.SQRT2 },
+    ];
+
+    const SCORE = {
+      powerMultiplier: 1.5,
+    };
+
+    const BONUS_CHANCE = {
+      durationMs: 30000,
+    };
+
+    /** Neutral hit on power blocks — “needs Power Bounce” feedback (not indestructible). */
+    const POWER_BLOCK_RESIST = {
+      squashScaleX: 1.07,
+      squashScaleY: 0.86,
+      squashInMs: 42,
+      ballSpeedMul: 0.9,
+      cameraShakeMs: 48,
+      cameraShakeIntensity: 0.0022,
+      godRayAngleDeg: -36,
+      godRaySweepMs: 360,
+      godRayCoreScale: 0.3,
+      godRayHaloScale: 0.62,
+      godRayCoreAlpha: 0.9,
+      godRayHaloAlpha: 0.38,
+    };
+
+    const POWER_BOUNCE = {
+      /** Release arms power; paddle hit must occur within this window (ms) */
+      queueWindowMs: 1100,
+      /** Ball falling — used for charge visuals */
+      minFallSpeed: 18,
+      /** How far above/below paddle center release can arm power */
+      armAbovePaddle: 240,
+      armBelowPaddle: 48,
+      /** Charge ring / shake while ball is in this zone above paddle */
+      chargeAbovePaddle: 200,
+      chargeBelowPaddle: 40,
+      /** Brief slow-mo emphasis on perfect Power Bounce (real-time ms) */
+      slowMoRealMs: 130,
+      slowMoTimeScale: 0.32,
+    };
+
+    const POWER_BALL = {
+      durationMs: 2800,
+      cooldownMs: 500,
+      scale: 1.24,
+    };
+
+    /** Procedural ball textures (generateTextures). */
+    const BALL_TEXTURE = {
+      neutral: 'ball',
+      determined: 'ball_determined',
+    };
+
+    /** Matches procedural paddle texture size (see generateTextures). */
+    const PADDLE_PAD = 2;
+
+    function getPaddleDisplaySize(cellW, cellH, colSpan = 2) {
+      return {
+        width: Math.max(1, Math.round(colSpan * cellW - PADDLE_PAD)),
+        height: Math.max(1, Math.round(cellH * 0.5)),
+      };
     }
-    this.syncBallTrailRotate();
-  }
 
-  startBallTrail() {
-    if (!this.ballTrail || !this.ball?.active) return;
-    this.syncBallTrailStyle();
-    if (!this.ballTrail.emitting) this.ballTrail.start();
-  }
+    /** Soft band for power-block god-ray sweep (canvas; ADD blend in scene). */
+    function ensurePowerGodRayTexture(scene) {
+      if (scene.textures.exists('power_godray')) return;
 
-  stopBallTrail() {
-    if (this.ballTrail?.emitting) this.ballTrail.stop();
-  }
+      const w = 64;
+      const h = 168;
+      const tex = scene.textures.createCanvas('power_godray', w, h);
+      const ctx = tex.getContext();
 
-  updateBallTrail() {
-    if (!this.ballTrail || !this.ball?.active || this.ballOnPaddle) return;
-    const speed = Math.hypot(this.ball.body.velocity.x, this.ball.body.velocity.y);
-    if (speed < 50) {
-      this.stopBallTrail();
-      return;
+      const hGrad = ctx.createLinearGradient(0, 0, w, 0);
+      hGrad.addColorStop(0, 'rgba(255,255,255,0)');
+      hGrad.addColorStop(0.4, 'rgba(255,255,255,0)');
+      hGrad.addColorStop(0.5, 'rgba(255,255,255,1)');
+      hGrad.addColorStop(0.6, 'rgba(255,255,255,0)');
+      hGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = hGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      const vGrad = ctx.createLinearGradient(0, 0, 0, h);
+      vGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      vGrad.addColorStop(0.1, 'rgba(255,255,255,1)');
+      vGrad.addColorStop(0.9, 'rgba(255,255,255,1)');
+      vGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.fillStyle = vGrad;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
+
+      tex.refresh();
     }
-    this.syncBallTrailStyle();
-    if (!this.ballTrail.emitting) this.ballTrail.start();
-  }
 
-  attachBallToPaddle(deferAim = false) {
-    this.ballOnPaddle = true;
-    this.ballLaunched = false;
-    this.pendingPowerSpring = false;
-    this.ball.body.setVelocity(0, 0);
-    this.ball.body.moves = false;
-    this.clearBallPowerState();
-    this.stopBallTrail();
-    this.finishPaddleSpring();
-    this.ball.rotation = 0;
-    this.syncBallToPaddle();
-    this.launchAimIndex = 0;
-    this.launchAimDirection = 1;
-    if (deferAim) {
-      this.stopLaunchAimCycle();
-    } else {
-      this.startLaunchAimCycle();
-    }
-  }
+    // =============================================================================
+    // TEXTURE GENERATION (generic shapes — no franchise assets)
+    // =============================================================================
 
-  startLaunchAimCycle() {
-    this.stopLaunchAimCycle();
-    if (!this.aimArrowGfx) {
-      this.aimArrowGfx = this.add.graphics().setDepth(12).setScrollFactor(0);
-    }
-    this.launchAimTickEvent = this.time.addEvent({
-      delay: LAUNCH_AIM_TICK_MS,
-      loop: true,
-      callback: () => {
-        if (!this.ballOnPaddle || this.gameState !== 'playing' || this.isLosingBall) return;
-        let next = this.launchAimIndex + this.launchAimDirection;
-        if (next < 0 || next >= LAUNCH_AIM_DIRS.length) {
-          this.launchAimDirection *= -1;
-          next = this.launchAimIndex + this.launchAimDirection;
-        }
-        this.launchAimIndex = next;
-        this.redrawAimArrow();
-      },
-    });
-    this.redrawAimArrow();
-  }
+    function generateTextures(scene, cellW, cellH) {
+      ensurePowerGodRayTexture(scene);
+      const g = scene.make.graphics({ x: 0, y: 0, add: false });
+      const pad = 2;
+      const innerW = cellW - pad * 2;
+      const innerH = cellH - pad * 2;
+      const paddleColSpan = (ACTIVE_LEVEL?.paddle?.colSpan) ?? 2;
+      const paddleW = paddleColSpan * cellW - pad;
+      const paddleTexH = cellH * 0.5;
+      const paddleInnerH = paddleTexH - pad - 2;
+      g.clear();
+      g.fillStyle(COLORS.paddleDark, 1);
+      g.fillRoundedRect(0, 2, paddleW, paddleInnerH, 6);
+      g.fillStyle(COLORS.paddle, 1);
+      g.fillRoundedRect(0, 0, paddleW, paddleInnerH, 6);
+      g.generateTexture('paddle', paddleW, paddleTexH);
 
-  stopLaunchAimCycle() {
-    if (this.launchAimTickEvent) {
-      this.launchAimTickEvent.destroy();
-      this.launchAimTickEvent = null;
-    }
-    if (this.aimArrowGfx) {
-      this.aimArrowGfx.clear();
-    }
-  }
-
-  redrawAimArrow() {
-    if (!this.aimArrowGfx || !this.ballOnPaddle || !this.ball?.active || this.isLosingBall) {
-      if (this.aimArrowGfx) this.aimArrowGfx.clear();
-      return;
-    }
-    const d = LAUNCH_AIM_DIRS[this.launchAimIndex];
-    const bx = this.ball.x;
-    const by = this.ball.y;
-    const shaftLen = this.ballRadius + 36;
-    const tipX = bx + d.vx * shaftLen;
-    const tipY = by + d.vy * shaftLen;
-    const px = -d.vy;
-    const py = d.vx;
-    const hw = 7;
-
-    this.aimArrowGfx.clear();
-    this.aimArrowGfx.lineStyle(4, 0xffe66d, 0.95);
-    this.aimArrowGfx.beginPath();
-    this.aimArrowGfx.moveTo(bx + d.vx * (this.ballRadius + 4), by + d.vy * (this.ballRadius + 4));
-    this.aimArrowGfx.lineTo(tipX, tipY);
-    this.aimArrowGfx.strokePath();
-
-    this.aimArrowGfx.fillStyle(0xffe66d, 0.95);
-    this.aimArrowGfx.fillTriangle(
-      tipX,
-      tipY,
-      tipX - d.vx * 14 + px * hw,
-      tipY - d.vy * 14 + py * hw,
-      tipX - d.vx * 14 - px * hw,
-      tipY - d.vy * 14 - py * hw
-    );
-  }
-
-  syncBallToPaddle() {
-    if (this.ballOnPaddle && this.paddle) {
-      this.ball.x = this.paddle.x;
-      const above = this.paddle.displayHeight * 0.5 + this.ballRadius + 2;
-      this.ball.y = this.paddle.y - above;
-    }
-    if (this.ballOnPaddle && !this.isLosingBall) this.redrawAimArrow();
-  }
-
-  launchBall() {
-    if (!this.ballOnPaddle || this.gameState !== 'playing' || this.isLosingBall) return;
-    this.stopLaunchAimCycle();
-    const d = LAUNCH_AIM_DIRS[this.launchAimIndex];
-    this.ballOnPaddle = false;
-    this.ballLaunched = true;
-    this.ball.body.moves = true;
-    this.ball.setVelocity(d.vx * PHYSICS.launchSpeed, d.vy * PHYSICS.launchSpeed);
-    this.startBallTrail();
-  }
-
-  // ---------------------------------------------------------------------------
-  // Collisions
-  // ---------------------------------------------------------------------------
-
-  setupCollisions() {
-    this.physics.add.collider(this.ball, this.blocks, this.onBallBlock, null, this);
-    this.physics.add.collider(this.ball, this.paddle, this.onBallPaddle, null, this);
-    this.physics.add.collider(this.ball, this.enemies, this.onBallEnemy, null, this);
-    this.physics.add.overlap(this.ball, this.levelItems, this.onBallItem, null, this);
-    this.physics.add.collider(this.enemies, this.blocks);
-    this.physics.world.on('worldbounds', (body) => {
-      if (body.gameObject === this.ball && body.blocked.down === false) {
-        // Top/side bounces handled by physics; bottom = lose ball
+      function drawBlockTexture(key, fill, border, extra) {
+        g.clear();
+        g.fillStyle(border, 1);
+        g.fillRoundedRect(0, 0, innerW, innerH, 4);
+        g.fillStyle(fill, 1);
+        g.fillRoundedRect(2, 2, innerW - 4, innerH - 4, 3);
+        if (extra) extra(g, innerW, innerH);
+        g.generateTexture(key, cellW, cellH);
       }
-    });
-  }
 
-  onBallBlock(ball, block) {
-    if (!block.active) return;
-
-    const typeId = block.getData('typeId') || 'normal';
-    const result = resolveBlockHit(typeId, this.powerBounceActive || this.ballPowerMode);
-
-    if (result.action === 'immune') {
-      const def = getBlockDef(typeId);
-      if (def.powerOnly) {
-        this.onPowerBlockResist(ball, block);
-      } else {
-        this.flashBlock(block, 0xaaaaaa);
-      }
-      return;
-    }
-
-    if (result.action === 'hazard' || result.action === 'hazard_bounce') {
-      this.onBallSpike(ball, block, result.action === 'hazard_bounce');
-      return;
-    }
-
-    if (result.action === 'downgrade') {
-      this.downgradeBlock(block, result.toType);
-      this.clampBallSpeed();
-      return;
-    }
-
-    if (result.action === 'destroy') {
-      let points = result.points;
-      if (this.powerBounceMultiplier) {
-        points = Math.floor(points * SCORE.powerMultiplier);
-      }
-      this.awardDestroyPoints(points, block.x, block.y);
-      this.destroyBlock(block);
-      this.clampBallSpeed();
-    }
-  }
-
-  downgradeBlock(block, toTypeId) {
-    const def = getBlockDef(toTypeId);
-    const col = block.getData('gridCol');
-    const row = block.getData('gridRow');
-    const { colSpan, rowSpan } = getBlockFootprint(toTypeId);
-    block.setTexture(def.texture);
-    block.setData('typeId', toTypeId);
-    block.setData('points', def.points);
-    block.setData('isPower', def.powerOnly);
-    block.setData('colSpan', colSpan);
-    block.setData('rowSpan', rowSpan);
-    const isLong = colSpan > 1 || rowSpan > 1;
-    const isPower = isPowerBlockType(toTypeId);
-    const contain = toTypeId === 'normal' || toTypeId === 'gray';
-    if (isLong || isPower) {
-      const { x, y } = isLong
-        ? this.levelGrid.cellSpanCenter(col, row, colSpan, rowSpan)
-        : this.levelGrid.cellCenter(col, row);
-      block.setPosition(x, y);
-      fitEntityToCellSpan(block, this.levelGrid, colSpan, rowSpan);
-    } else {
-      const { x, y } = this.levelGrid.cellCenter(col, row);
-      block.setPosition(x, y);
-      fitEntityToCell(block, this.levelGrid, contain ? { contain: true } : {});
-    }
-    block.refreshBody();
-    this.flashBlock(block, 0xdddddd);
-    bbLog('block downgraded', { to: toTypeId });
-  }
-
-  onBallPaddle(ball, paddle) {
-    if (this.ballOnPaddle) return;
-
-    const diff = ball.x - paddle.x;
-    const normalized = Phaser.Math.Clamp(diff / (paddle.displayWidth * 0.5), -1, 1);
-    const now = this.time.now;
-    const queueElapsed = now - this.powerBounceQueuedAt;
-    const queuedPower =
-      this.powerBounceQueued && queueElapsed <= POWER_BOUNCE.queueWindowMs;
-
-    let vx = normalized * PHYSICS.ballSpeed * 0.85;
-    let vy;
-
-    const fingerStillDown = this.dragging;
-
-    if (queuedPower) {
-      bbLog('Power Bounce hit — trampoline spring + power ball');
-      this.paddle.clearTint();
-      // Amplified angle: center ≈ vertical, edges = sharper (spec)
-      if (Math.abs(normalized) < 0.22) {
-        vx = normalized * PHYSICS.ballSpeed * 0.4;
-        vy = -PHYSICS.powerBounceSpeed * 1.1;
-      } else {
-        vx = normalized * PHYSICS.ballSpeed * PHYSICS.powerAngleAmp;
-        vy = -PHYSICS.powerBounceSpeed;
-      }
-      this.powerBounceQueued = false;
-      this.enterBallPowerMode();
-      if (fingerStillDown) {
-        // Spring plays on release so charge can continue until then
-        this.pendingPowerSpring = true;
-      } else {
-        this.doPaddleSpringBounce();
-      }
-      this.flashBallPowerSuccess();
-      this.triggerPerfectTimingFeedback();
-    } else {
-      if (this.powerBounceQueued) {
-        bbLog('power bounce not applied', {
-          queueElapsed,
-          windowMs: POWER_BOUNCE.queueWindowMs,
-          vy: ball.body.velocity.y,
-        });
-      }
-      this.powerBounceQueued = false;
-      vy = -Math.abs(ball.body.velocity.y) * PHYSICS.paddleBounceFactor;
-      if (vy > -280) vy = -280;
-      if (!fingerStillDown) {
-        this.doPaddleNormalTap();
-      }
-    }
-
-    ball.setVelocity(vx, vy);
-    this.clampBallSpeed();
-
-    if (fingerStillDown) {
-      this.maintainPaddleChargeWhileDragging();
-    }
-  }
-
-  onBallItem(ball, item) {
-    if (!item?.active || this.gameState !== 'playing') return;
-
-    const typeId = item.getData('typeId');
-    let points = getItemPoints(typeId);
-    if (this.powerBounceMultiplier) {
-      points = Math.floor(points * SCORE.powerMultiplier);
-    }
-
-    const { x, y } = item;
-    this.tweens.killTweensOf(item);
-    this.awardDestroyPoints(points, x, y, { color: '#ff9de2' });
-    if (points > 0) {
-      this.spawnDestroyParticles(x, y, 0xff9de2);
-    }
-    item.destroy();
-    this.clampBallSpeed();
-    bbLog('item collected', { typeId, points });
-  }
-
-  onBallEnemy(ball, enemy) {
-    if (!enemy.active) return;
-
-    const typeId = enemy.getData('typeId') || 'drifter';
-    const { damage, pointsOnKill } = resolveEnemyHit(typeId, this.powerBounceActive);
-    let hp = (enemy.getData('hp') || 1) - damage;
-    enemy.setData('hp', hp);
-
-    if (hp > 0) {
-      this.flashEnemyHit(enemy);
-      this.clampBallSpeed();
-      bbLog('enemy damaged', { typeId, hp, damage });
-      return;
-    }
-
-    let points = pointsOnKill;
-    if (this.powerBounceMultiplier) {
-      points = Math.floor(points * SCORE.powerMultiplier);
-    }
-    const { x, y } = enemy;
-    this.awardDestroyPoints(points, x, y);
-    this.spawnDestroyParticles(x, y, COLORS.enemy);
-    enemy.destroy();
-    this.clampBallSpeed();
-    bbLog('enemy defeated', { typeId, points });
-  }
-
-  flashEnemyHit(enemy) {
-    enemy.setTint(0xffffff);
-    this.tweens.add({
-      targets: enemy,
-      alpha: 0.65,
-      duration: 50,
-      yoyo: true,
-      onComplete: () => {
-        if (enemy.active) {
-          enemy.clearTint();
-          enemy.setAlpha(1);
-        }
-      },
-    });
-  }
-
-  onBallSpike(ball, block, poweredBounce) {
-    if (this.ballOnPaddle || this.gameState !== 'playing') return;
-
-    if (poweredBounce || this.ballPowerMode) {
-      const pushX = ball.body.velocity.x * 1.05 || (ball.x < this.scale.width / 2 ? -140 : 140);
-      ball.setVelocity(pushX, -Math.max(380, Math.abs(ball.body.velocity.y) * 1.2));
-      this.spawnDestroyParticles(ball.x, ball.y, 0xffe66d);
-      if (block?.active) this.flashBlock(block, 0xffe66d);
-      this.clampBallSpeed();
-      return;
-    }
-
-    this.loseBall();
-  }
-
-  /** Average opaque color from block texture (cached per texture frame). */
-  getBlockDebrisTint(block) {
-    const typeId = block.getData('typeId') || 'normal';
-    const fallback = CLAY_DEBRIS_TINT_FALLBACK[typeId] ?? CLAY_DEBRIS_TINT_FALLBACK.normal;
-    const texKey = block.texture?.key;
-    if (!texKey || !this.textures.exists(texKey)) return fallback;
-
-    const frame = block.frame;
-    const cacheKey = `${texKey}:${frame?.name ?? '__BASE'}`;
-    if (this.blockDebrisTintCache.has(cacheKey)) {
-      return this.blockDebrisTintCache.get(cacheKey);
-    }
-
-    const source = this.textures.get(texKey).getSourceImage();
-    if (!source) {
-      this.blockDebrisTintCache.set(cacheKey, fallback);
-      return fallback;
-    }
-
-    const fw = frame?.cutWidth ?? source.width;
-    const fh = frame?.cutHeight ?? source.height;
-    const fx = frame?.cutX ?? 0;
-    const fy = frame?.cutY ?? 0;
-    const sw = Math.max(8, Math.floor(fw * 0.55));
-    const sh = Math.max(8, Math.floor(fh * 0.55));
-    const canvas = document.createElement('canvas');
-    canvas.width = sw;
-    canvas.height = sh;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(source, fx + (fw - sw) / 2, fy + (fh - sh) / 2, sw, sh, 0, 0, sw, sh);
-
-    const data = ctx.getImageData(0, 0, sw, sh).data;
-    let r = 0;
-    let g = 0;
-    let b = 0;
-    let weight = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      const a = data[i + 3];
-      if (a < 40) continue;
-      const w = a / 255;
-      r += data[i] * w;
-      g += data[i + 1] * w;
-      b += data[i + 2] * w;
-      weight += w;
-    }
-
-    const tint =
-      weight > 0
-        ? ((Math.round(r / weight) << 16) | (Math.round(g / weight) << 8) | Math.round(b / weight))
-        : fallback;
-    this.blockDebrisTintCache.set(cacheKey, tint);
-    return tint;
-  }
-
-  destroyBlock(block) {
-    const tint = this.getBlockDebrisTint(block);
-    this.spawnBlockClayDebris(block.x, block.y, tint);
-    block.destroy();
-    this.blocksRemaining--;
-    if (this.blocksRemaining <= 0) {
-      this.time.delayedCall(300, () => this.showLevelClear());
-    }
-  }
-
-  flashBlock(block, color) {
-    this.tweens.add({
-      targets: block,
-      alpha: 0.5,
-      duration: 60,
-      yoyo: true,
-    });
-  }
-
-  onPowerBlockResist(ball, block) {
-    if (!block?.active) return;
-
-    this.playPowerBlockResistFx(block);
-
-    const body = ball?.body;
-    if (body) {
-      body.velocity.x *= POWER_BLOCK_RESIST.ballSpeedMul;
-      body.velocity.y *= POWER_BLOCK_RESIST.ballSpeedMul;
-    }
-
-    this.cameras.main.shake(
-      POWER_BLOCK_RESIST.cameraShakeMs,
-      POWER_BLOCK_RESIST.cameraShakeIntensity
-    );
-  }
-
-  playPowerBlockResistFx(block) {
-    this.tweens.killTweensOf(block);
-    this.playPowerBlockGodRay(block);
-
-    const baseX = block.scaleX;
-    const baseY = block.scaleY;
-
-    this.tweens.add({
-      targets: block,
-      scaleX: baseX * POWER_BLOCK_RESIST.squashScaleX,
-      scaleY: baseY * POWER_BLOCK_RESIST.squashScaleY,
-      duration: POWER_BLOCK_RESIST.squashInMs,
-      ease: 'Quad.easeOut',
-      yoyo: true,
-      onComplete: () => {
-        if (!block.active) return;
-        block.setScale(baseX, baseY);
-      },
-    });
-  }
-
-  /** Diagonal white god-ray sweep clipped to the block silhouette. */
-  playPowerBlockGodRay(block) {
-    if (!block?.active || !this.textures.exists('power_godray')) return;
-
-    const bw = block.displayWidth;
-    const bh = block.displayHeight;
-    const span = Math.hypot(bw, bh);
-
-    const root = this.add.container(block.x, block.y);
-    root.setDepth(block.depth + 2);
-    root.setAngle(POWER_BLOCK_RESIST.godRayAngleDeg);
-
-    const mover = this.add.container(0, 0);
-    root.add(mover);
-
-    const rayH = span * 1.4;
-    const halo = this.add.image(0, 0, 'power_godray');
-    halo.setBlendMode(Phaser.BlendModes.ADD);
-    halo.setDisplaySize(span * POWER_BLOCK_RESIST.godRayHaloScale, rayH);
-    halo.setAlpha(POWER_BLOCK_RESIST.godRayHaloAlpha);
-
-    const core = this.add.image(0, 0, 'power_godray');
-    core.setBlendMode(Phaser.BlendModes.ADD);
-    core.setDisplaySize(span * POWER_BLOCK_RESIST.godRayCoreScale, rayH * 0.92);
-    core.setAlpha(POWER_BLOCK_RESIST.godRayCoreAlpha);
-
-    mover.add([halo, core]);
-
-    if (typeof block.createBitmapMask === 'function') {
-      root.setMask(block.createBitmapMask());
-    }
-
-    const travel = span * 1.4;
-    mover.x = -travel;
-    this.tweens.add({
-      targets: mover,
-      x: travel,
-      duration: POWER_BLOCK_RESIST.godRaySweepMs,
-      ease: 'Sine.easeInOut',
-      onComplete: () => {
-        if (root.active) root.destroy();
-      },
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Ball lifecycle
-  // ---------------------------------------------------------------------------
-
-  loseBall() {
-    if (this.gameState !== 'playing' || this.isLosingBall) return;
-    bbLog('loseBall', { livesBefore: this.lives });
-    this.isLosingBall = true;
-    this.lives--;
-    this.updateUI();
-    this.stopBallTrail();
-    this.spawnDestroyParticles(this.ball.x, this.ball.y, COLORS.ball);
-
-    if (this.lives <= 0) {
-      this.stopLaunchAimCycle();
-      this.ball.setActive(false).setVisible(false);
-      this.stopBallTrail();
-      this.showGameOver();
-      return;
-    }
-
-    this.attachBallToPaddle(true);
-    this.powerBounceQueued = false;
-    this.time.delayedCall(400, () => {
-      this.isLosingBall = false;
-      this.startLaunchAimCycle();
-    });
-  }
-
-  clampBallSpeed() {
-    const v = this.ball.body.velocity;
-    const speed = Math.sqrt(v.x * v.x + v.y * v.y);
-    const cap = this.ballPowerMode ? PHYSICS.powerBallMaxSpeed : PHYSICS.ballMaxSpeed;
-    if (speed > cap) {
-      const scale = cap / speed;
-      this.ball.setVelocity(v.x * scale, v.y * scale);
-    }
-    if (speed < 200 && this.ballLaunched && !this.ballOnPaddle) {
-      const scale = 220 / speed;
-      this.ball.setVelocity(v.x * scale, v.y * scale);
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Input — drag paddle on bottom half; RELEASE in timing window arms Power Bounce
-  // ---------------------------------------------------------------------------
-
-  isBallNearPaddleForCharge() {
-    if (!this.ball?.body || !this.paddle) return false;
-    const dy = this.ball.y - this.paddle.y;
-    return (
-      dy > -POWER_BOUNCE.chargeAbovePaddle &&
-      dy < POWER_BOUNCE.chargeBelowPaddle &&
-      this.ball.body.velocity.y > POWER_BOUNCE.minFallSpeed
-    );
-  }
-
-  canArmPowerOnRelease() {
-    if (!this.ball?.body || !this.paddle) return false;
-    if (!this.ballLaunched || this.ballOnPaddle) return false;
-    const dy = this.ball.y - this.paddle.y;
-    const inZone = dy > -POWER_BOUNCE.armAbovePaddle && dy < POWER_BOUNCE.armBelowPaddle;
-    const falling = this.ball.body.velocity.y > POWER_BOUNCE.minFallSpeed;
-    return inZone && falling;
-  }
-
-  queuePowerBounceOnRelease(wasPaddleTouch) {
-    if (this.gameState !== 'playing') return false;
-    if (!wasPaddleTouch) {
-      bbLog('power bounce not queued — no bottom-half touch');
-      return false;
-    }
-    if (!this.canArmPowerOnRelease()) {
-      bbLog('power bounce not queued — outside arm window', {
-        dy: this.ball.y - this.paddle.y,
-        vy: this.ball.body.velocity.y,
+      drawBlockTexture('block_normal', COLORS.blockNormal, COLORS.blockNormalBorder);
+      drawBlockTexture('block_gray', COLORS.blockGray, COLORS.blockGrayBorder, (gfx, w, h) => {
+        gfx.lineStyle(1, 0x6b7280, 0.8);
+        gfx.strokeRect(w * 0.2, h * 0.35, w * 0.6, h * 0.3);
       });
-      return false;
+      bakePowerBlockTextures(scene, cellW, cellH, g);
+
+      g.clear();
+      g.fillStyle(0x4a1028, 1);
+      g.fillRoundedRect(0, 0, innerW, innerH, 3);
+      g.fillStyle(COLORS.spike, 1);
+      const spikeW = innerW / 3;
+      for (let i = 0; i < 3; i++) {
+        const cx = spikeW * i + spikeW * 0.5;
+        const half = spikeW * 0.38;
+        g.fillTriangle(cx - half, innerH, cx, innerH * 0.12, cx + half, innerH);
+      }
+      g.lineStyle(2, 0xcc1144, 0.7);
+      g.strokeRect(1, innerH - 2, innerW - 2, 2);
+      g.generateTexture('block_spike', cellW, cellH);
+
+      // Indestructible (steel + X; never breaks)
+      drawBlockTexture('block_indestructible', 0x6b7c8c, 0x3d4d5d, (gfx, w, h) => {
+        gfx.lineStyle(Math.max(2, Math.floor(Math.min(w, h) * 0.08)), 0x1e2832, 0.95);
+        gfx.lineBetween(4, 4, w - 4, h - 4);
+        gfx.lineBetween(w - 4, 4, 4, h - 4);
+      });
+
+      // Score block — 2×2 footprint
+      {
+        const scoreW = 2 * cellW - pad;
+        const scoreH = 2 * cellH - pad;
+        const scoreInnerW = scoreW - pad * 2;
+        const scoreInnerH = scoreH - pad * 2;
+        g.clear();
+        g.fillStyle(0x6b5a9e, 1);
+        g.fillRoundedRect(0, 0, scoreInnerW, scoreInnerH, 4);
+        g.fillStyle(0x9b7ede, 1);
+        g.fillRoundedRect(2, 2, scoreInnerW - 4, scoreInnerH - 4, 3);
+        g.lineStyle(2, 0xffffff, 0.85);
+        g.strokeRect(scoreInnerW * 0.22, scoreInnerH * 0.22, scoreInnerW * 0.56, scoreInnerH * 0.56);
+        g.fillStyle(0xffffff, 0.75);
+        g.fillCircle(scoreInnerW / 2, scoreInnerH / 2, Math.min(scoreInnerW, scoreInnerH) * 0.12);
+        g.generateTexture('block_score', scoreW, scoreH);
+      }
+
+      drawBlockTexture('block_bonus', 0xffd54f, 0xffb300, (gfx, w, h) => {
+        gfx.fillStyle(0xffffff, 0.9);
+        gfx.fillCircle(w / 2, h * 0.44, Math.min(w, h) * 0.14);
+        gfx.fillStyle(0xffffff, 0.75);
+        gfx.lineStyle(1, 0xffffff, 0.5);
+        gfx.strokeRect(w * 0.28, h * 0.62, w * 0.44, h * 0.18);
+      });
+
+      // Life icon + ball (procedural)
+      g.clear();
+      g.fillStyle(COLORS.ball, 1);
+      g.fillCircle(8, 8, 8);
+      g.generateTexture('life_icon', 16, 16);
+
+      const ballSize = 64;
+      g.clear();
+      g.fillStyle(COLORS.ball, 1);
+      g.fillCircle(ballSize / 2, ballSize / 2, ballSize / 2 - 2);
+      g.fillStyle(COLORS.ballHighlight, 0.55);
+      g.fillCircle(ballSize * 0.35, ballSize * 0.35, ballSize * 0.12);
+      g.generateTexture(BALL_TEXTURE.neutral, ballSize, ballSize);
+
+      g.clear();
+      g.fillStyle(0xffaa00, 1);
+      g.fillCircle(ballSize / 2, ballSize / 2, ballSize / 2 - 2);
+      g.fillStyle(COLORS.accent, 0.65);
+      g.fillCircle(ballSize * 0.35, ballSize * 0.35, ballSize * 0.12);
+      g.lineStyle(2, 0x1a1028, 0.45);
+      g.strokeCircle(ballSize / 2, ballSize / 2, ballSize / 2 - 3);
+      g.generateTexture(BALL_TEXTURE.determined, ballSize, ballSize);
+
+      generateHudAvatarTextures(scene, 48);
+
+      // Enemy (one cell)
+      g.clear();
+      g.fillStyle(COLORS.enemyDark, 1);
+      g.fillEllipse(cellW / 2, cellH * 0.65, innerW * 0.85, innerH * 0.7);
+      g.fillStyle(COLORS.enemy, 1);
+      g.fillEllipse(cellW / 2, cellH * 0.58, innerW * 0.8, innerH * 0.65);
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(cellW * 0.35, cellH * 0.42, Math.max(3, cellW * 0.1));
+      g.fillCircle(cellW * 0.65, cellH * 0.42, Math.max(3, cellW * 0.1));
+      g.fillStyle(0x1e3a5f, 1);
+      g.fillCircle(cellW * 0.35, cellH * 0.42, Math.max(2, cellW * 0.05));
+      g.fillCircle(cellW * 0.65, cellH * 0.42, Math.max(2, cellW * 0.05));
+      g.fillStyle(0x1e3a5f, 0.8);
+      g.fillEllipse(cellW / 2, cellH * 0.72, cellW * 0.15, cellH * 0.1);
+      g.generateTexture('enemy', cellW, cellH);
+
+      generateItemTextures(scene, cellW, cellH, g);
+
+      // Particle spark (ball lose, enemies)
+      g.clear();
+      g.fillStyle(0xffffff, 1);
+      g.fillCircle(4, 4, 4);
+      g.generateTexture('particle', 8, 8);
+
+      const clayAtlasH = 12;
+      const clayFrames = [
+        { name: 'chunk_a', x: 0, w: 12, h: 10 },
+        { name: 'chunk_b', x: 14, w: 10, h: 12 },
+        { name: 'chunk_c', x: 26, w: 14, h: 9 },
+        { name: 'chunk_d', x: 42, w: 7, h: 7 },
+      ];
+      const clayAtlasW = 50;
+
+      function drawClayChunkAt(ox, oy, w, h) {
+        g.fillStyle(0xf0e6d8, 1);
+        const cx = ox + w / 2;
+        const cy = oy + h / 2;
+        g.fillCircle(cx, cy, Math.min(w, h) * 0.44);
+        g.fillCircle(cx - w * 0.22, cy + h * 0.12, Math.min(w, h) * 0.3);
+        g.fillCircle(cx + w * 0.2, cy - h * 0.1, Math.min(w, h) * 0.28);
+        g.fillCircle(cx + w * 0.08, cy + h * 0.22, Math.min(w, h) * 0.22);
+        g.fillStyle(0x000000, 0.12);
+        g.fillCircle(cx - 1, cy + 1, Math.max(1, Math.min(w, h) * 0.08));
+        g.fillStyle(0xffffff, 0.15);
+        g.fillCircle(cx + 1, cy - 2, Math.max(1, Math.min(w, h) * 0.06));
+      }
+
+      g.clear();
+      for (const f of clayFrames) {
+        const oy = Math.floor((clayAtlasH - f.h) / 2);
+        drawClayChunkAt(f.x, oy, f.w, f.h);
+      }
+      g.generateTexture('clay_debris', clayAtlasW, clayAtlasH);
+      const clayTex = scene.textures.get('clay_debris');
+      for (const f of clayFrames) {
+        const oy = Math.floor((clayAtlasH - f.h) / 2);
+        clayTex.add(f.name, 0, f.x, oy, f.w, f.h);
+      }
+
+      // Speed line (horizontal streak; rotated per velocity in updateBallTrail)
+      const lineW = BALL_TRAIL.texWidth;
+      const lineH = BALL_TRAIL.texHeight;
+      g.clear();
+      for (let i = 0; i < lineW; i++) {
+        const t = i / (lineW - 1);
+        const a = Math.min(1, t * 3, (1 - t) * 3) * 0.95;
+        g.fillStyle(0xffffff, a);
+        g.fillRect(i, 0, 1, lineH);
+      }
+      g.generateTexture('speed_line', lineW, lineH);
+
+      g.destroy();
     }
 
-    this.powerBounceQueued = true;
-    this.powerBounceQueuedAt = this.time.now;
-    bbLog('power bounce queued', {
-      at: this.powerBounceQueuedAt,
-      dy: this.ball.y - this.paddle.y,
-      vy: this.ball.body.velocity.y,
-    });
-    return true;
-  }
+    const ITEM_CATEGORY_COLORS = {
+      [ITEM_CATEGORY.food]: { fill: 0xc45c5c, border: 0x8b3a3a },
+      [ITEM_CATEGORY.powerUp]: { fill: 0x3d9a6a, border: 0x2a6b4a },
+      [ITEM_CATEGORY.copyAbility]: { fill: 0x6b8cce, border: 0x4a6299 },
+      [ITEM_CATEGORY.life]: { fill: 0x9b7ede, border: 0x6b5a9e },
+    };
 
-  setupInput() {
-    this.input.on('pointerdown', (pointer) => {
-      if (this.gameState !== 'playing') return;
+    function uniqueLevelItemIds() {
+      const spawns = ACTIVE_LEVEL?.items || [];
+      return [...new Set(spawns.map((s) => s.type).filter(Boolean))];
+    }
 
-      const { height } = this.scale;
-      const bottomHalf = pointer.y > height * 0.5;
-      this.pointerWasDragging = false;
-      this.bottomHalfTouchThisStroke = bottomHalf;
-
-      if (this.ballOnPaddle) {
-        if (this.isLosingBall) return;
-        if (bottomHalf) {
-          this.dragging = true;
-          this.movePaddleToPointer(pointer);
-        }
-        return;
+    /** Procedural item icons for types without PNG art in preload. */
+    function fillStar(g, cx, cy, outerR, innerR, points) {
+      g.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const r = i % 2 === 0 ? outerR : innerR;
+        const angle = -Math.PI / 2 + (i * Math.PI) / points;
+        const x = cx + r * Math.cos(angle);
+        const y = cy + r * Math.sin(angle);
+        if (i === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
       }
+      g.closePath();
+      g.fillPath();
+    }
 
-      if (bottomHalf) {
-        this.dragging = true;
-        this.movePaddleToPointer(pointer);
-      }
-    });
+    function generateItemTextures(scene, cellW, cellH, g) {
+      const ids = uniqueLevelItemIds();
+      if (!ids.length) return;
 
-    this.input.on('pointermove', (pointer) => {
-      if (this.gameState !== 'playing' || !this.dragging) return;
-      if (pointer.y > this.scale.height * 0.5) {
-        this.pointerWasDragging = true;
-        this.movePaddleToPointer(pointer);
-      }
-    });
+      const pad = 2;
 
-    this.input.on('pointerup', () => {
-      const wasPaddleTouch =
-        this.bottomHalfTouchThisStroke || this.dragging || this.pointerWasDragging;
-      const ballOnPaddleAtStart = this.ballOnPaddle;
+      for (const id of ids) {
+        const key = getItemTextureKey(id);
+        if (scene.textures.exists(key)) continue;
 
-      if (this.gameState === 'playing' && ballOnPaddleAtStart && !this.isLosingBall) {
-        this.launchBall();
-      }
+        const def = getItemDef(id);
+        const foot = getItemFootprint(id);
+        const colors = ITEM_CATEGORY_COLORS[def?.category] || { fill: 0x888888, border: 0x555555 };
+        const texW = foot.colSpan * cellW - pad;
+        const texH = foot.rowSpan * cellH - pad;
 
-      if (this.gameState === 'playing' && wasPaddleTouch && !ballOnPaddleAtStart && !this.ballOnPaddle) {
-        const queued = this.queuePowerBounceOnRelease(wasPaddleTouch);
-        if (this.pendingPowerSpring) {
-          this.pendingPowerSpring = false;
-          this.doPaddleSpringBounce();
+        g.clear();
+        if (id === 'item_bonus_chance') {
+          const cx = texW * 0.5;
+          const cy = texH * 0.5;
+          const circleR = Math.min(texW, texH) * 0.42;
+          g.fillStyle(0x3d9a6a, 1);
+          g.fillCircle(cx, cy, circleR);
+          g.fillStyle(0xffe66d, 1);
+          fillStar(g, cx, cy, circleR * 0.55, circleR * 0.55 * 0.42, 5);
         } else {
-          this.paddleReleaseAnimation(queued);
+          const size = Math.max(8, Math.min(texW, texH) - 4);
+          g.fillStyle(colors.border, 1);
+          g.fillRoundedRect(0, 0, size, size, 4);
+          g.fillStyle(colors.fill, 1);
+          g.fillRoundedRect(2, 2, size - 4, size - 4, 3);
+          g.fillStyle(0xffffff, 0.35);
+          g.fillCircle(size * 0.72, size * 0.28, Math.max(2, size * 0.1));
         }
-      } else if (!this.paddleSpringing) {
-        this.stopPaddleCharge(true);
-      }
-
-      this.dragging = false;
-      this.pointerWasDragging = false;
-      this.bottomHalfTouchThisStroke = false;
-    });
-  }
-
-  movePaddleToPointer(pointer) {
-    const margin = 58;
-    const { width } = this.scale;
-    this.paddle.x = Phaser.Math.Clamp(pointer.x, margin, width - margin);
-    if (this.ballOnPaddle) this.syncBallToPaddle();
-  }
-
-  // ---------------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------------
-
-  createUI() {
-    const hud = this.levelGrid.hud;
-    const maxLives = this.level.meta?.lives ?? 3;
-    const textStyle = {
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      fontSize: '18px',
-      color: COLORS.text,
-    };
-
-    if (!hud) {
-      bbError('createUI', 'level.hud is required for HUD container');
-      return;
-    }
-
-    const { x, y, width, height } = hud.bounds;
-    this.hudContainer = this.add.container(x, y).setDepth(200).setScrollFactor(0);
-
-    const hudBg = this.add.rectangle(width / 2, height / 2, width, height, 0x16082a, 0.94);
-    this.hudContainer.add(hudBg);
-
-    const hudFrame = this.add.graphics();
-    hudFrame.lineStyle(2, 0xffe66d, 0.4);
-    hudFrame.strokeRect(0, 0, width, height);
-    this.hudContainer.add(hudFrame);
-
-    const pos = resolveHudLayout(this.level, { width, height }, { maxLives });
-    const hudLayout = { ...DEFAULT_HUD_LAYOUT, ...(this.level.hudLayout || {}) };
-
-    this.scoreText = this.add.text(pos.score.x, pos.score.y, 'Score: 0', textStyle).setOrigin(0, 0.5);
-    this.hudContainer.add(this.scoreText);
-
-    const lifeStep = 20;
-    this.livesContainer = this.add.container(pos.livesContainer.x, pos.livesContainer.y);
-    this.lifeIcons = [];
-    for (let i = 0; i < maxLives; i++) {
-      const icon = this.add.image(-i * lifeStep - 8, 0, 'life_icon').setScale(0.85);
-      this.lifeIcons.push(icon);
-      this.livesContainer.add(icon);
-    }
-    this.hudContainer.add(this.livesContainer);
-
-    this.hudAvatarState = 'default';
-    this.hudAvatarConfig = { ...(this.level.hudLayout?.avatar || {}) };
-
-    this.hudAvatar = null;
-    if (hudLayout.right && hudLayout.right.includes('avatar')) {
-      const avSize = pos.avatar.size;
-      const startKey = getHudAvatarTextureKey('default', this.hudAvatarConfig, this);
-      this.hudAvatar = this.add
-        .image(pos.avatar.x, pos.avatar.y, startKey)
-        .setDisplaySize(avSize, avSize)
-        .setOrigin(0.5, 0.5)
-        .setData('hudAvatarSize', avSize);
-      this.hudContainer.add(this.hudAvatar);
-      this.updateHudAvatar();
-    }
-
-    this.playAreaDivider = this.add.graphics().setDepth(199).setScrollFactor(0);
-    this.playAreaDivider.lineStyle(2, 0xffe66d, 0.35);
-    this.playAreaDivider.lineBetween(x, y + height, x + width, y + height);
-  }
-
-  /** Updates portrait from gameplay state (power, charging, lives, etc.). */
-  updateHudAvatar() {
-    if (!this.hudAvatar) return;
-    const stateId = resolveHudAvatarState({
-      gameState: this.gameState,
-      ballPowerMode: this.ballPowerMode,
-      ballPowerCooling: this.ballPowerCooling,
-      paddleCharging: this.paddleCharging,
-      powerBounceQueued: this.powerBounceQueued,
-      lives: this.lives,
-    });
-    this.hudAvatarState = applyHudAvatarState(this.hudAvatar, stateId, this.hudAvatarConfig);
-  }
-
-  /**
-   * Force a portrait state (e.g. after loading custom textures).
-   * Gameplay will override on the next updateHudAvatar() unless you set a lock later.
-   */
-  setHudAvatarState(stateId) {
-    if (!this.hudAvatar) return;
-    this.hudAvatarState = applyHudAvatarState(this.hudAvatar, stateId, this.hudAvatarConfig);
-  }
-
-  updateUI() {
-    this.scoreText.setText(`Score: ${this.score}`);
-    this.lifeIcons.forEach((icon, i) => {
-      icon.setAlpha(i < this.lives ? 1 : 0.25);
-      icon.setTint(i < this.lives ? 0xffffff : 0x666666);
-    });
-    this.updateHudAvatar();
-  }
-
-  /** HUD score + arcade float at world position (blocks, enemies, items). */
-  awardDestroyPoints(pts, worldX, worldY, popupOptions) {
-    awardPointsAt(this, pts, worldX, worldY, popupOptions);
-  }
-
-  addScore(pts) {
-    this.score += pts;
-    this.scoreText.setText(`Score: ${this.score}`);
-    this.tweens.add({
-      targets: this.scoreText,
-      scaleX: 1.15,
-      scaleY: 1.15,
-      duration: 80,
-      yoyo: true,
-    });
-  }
-
-  resetPaddleVisual() {
-    if (!this.paddle) return;
-    this.paddle.setScale(1);
-    this.paddle.angle = 0;
-    this.paddle.clearTint();
-    if (this.paddleBaseW != null) {
-      this.paddle.setDisplaySize(this.paddleBaseW, this.paddleBaseH);
-      if (this.paddle.body) {
-        this.paddle.body.setSize(this.paddleBaseW, this.paddleBaseH);
+        g.generateTexture(key, texW, texH);
       }
     }
-  }
 
-  startPaddleCharge() {
-    if (this.paddleCharging) return;
-    this.preparePaddleForCharge();
-    bbLog('paddle charge start');
-    this.paddleCharging = true;
-    this.paddle.setTint(0xb8ffec);
+    // =============================================================================
+    // MAIN SCENE
+    // =============================================================================
 
-    this.paddleChargeScaleTween = this.tweens.add({
-      targets: this.paddle,
-      scaleX: 1.16,
-      scaleY: 0.86,
-      duration: 220,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
-    this.paddleChargeShakeTween = this.tweens.add({
-      targets: this.paddle,
-      angle: 3,
-      duration: 42,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-  }
-
-  stopPaddleCharge(resetVisual) {
-    this.paddleCharging = false;
-    this.safeStopTween(this.paddleChargeScaleTween);
-    this.safeStopTween(this.paddleChargeShakeTween);
-    this.clearPaddleTweenRefs();
-    if (resetVisual && !this.paddleSpringing) {
-      this.resetPaddleVisual();
-    }
-  }
-
-  maintainPaddleChargeWhileDragging() {
-    if (!this.dragging || this.ballOnPaddle || !this.ballLaunched) return;
-    if (!this.paddleCharging) {
-      this.startPaddleCharge();
-    }
-  }
-
-  updatePaddleCharge() {
-    if (this.gameState !== 'playing' || this.ballOnPaddle || !this.ballLaunched) {
-      if (this.paddleCharging) this.stopPaddleCharge(true);
-      return;
-    }
-
-    // Recover if spring flag stuck after a killed/completed tween chain
-    if (this.paddleSpringing && this.paddle && this.tweens.getTweensOf(this.paddle).length === 0) {
-      bbLog('paddle spring flag stuck — resetting');
-      this.finishPaddleSpring();
-    }
-
-    // Finger down: keep shake for whole drag (even after power spring / powered ball)
-    if (this.dragging) {
-      const canStartCharge = this.isBallNearPaddleForCharge() || this.paddleCharging;
-      if (canStartCharge && !this.paddleCharging) {
-        this.startPaddleCharge();
+    class GameScene extends Phaser.Scene {
+      constructor() {
+        super({ key: 'GameScene' });
       }
-      return;
-    }
 
-    // Finger up: only charge when ball is falling near paddle
-    const ready = this.isBallNearPaddleForCharge();
-    if (ready && !this.paddleCharging) {
-      this.startPaddleCharge();
-    } else if (!ready && this.paddleCharging) {
-      this.stopPaddleCharge(true);
-    }
-  }
+      /** All art is procedural — generated in create() via generateTextures(). */
 
-  clearBallPowerState() {
-    if (this.powerBallTimer) {
-      this.powerBallTimer.remove(false);
-      this.powerBallTimer = null;
-    }
-    this.tweens.killTweensOf(this.ball);
-    this.ballPowerMode = false;
-    this.ballPowerCooling = false;
-    this.powerBounceActive = false;
-    this.powerBounceMultiplier = false;
-    this.applyBallTexture();
-  }
-
-  refreshPowerBallTimer() {
-    if (this.powerBallTimer) this.powerBallTimer.remove(false);
-    this.powerBallTimer = this.time.delayedCall(POWER_BALL.durationMs, () => {
-      this.startBallPowerCooldown();
-    });
-  }
-
-  enterBallPowerMode() {
-    const chaining = this.ballPowerMode;
-
-    if (this.powerBallTimer) this.powerBallTimer.remove(false);
-    if (!chaining) this.tweens.killTweensOf(this.ball);
-
-    this.ballPowerMode = true;
-    this.ballPowerCooling = false;
-    this.powerBounceActive = true;
-    this.powerBounceMultiplier = true;
-
-    this.applyBallTexture();
-    const powerScale = this.ballPowerScale();
-    const powerWorldR = this.ballRadius * POWER_BALL.scale;
-    const syncPowerBody = () => this.syncBallPhysicsBody(powerWorldR);
-    if (!chaining) {
-      this.tweens.add({
-        targets: this.ball,
-        scale: powerScale,
-        duration: 120,
-        ease: 'Back.easeOut',
-        onUpdate: syncPowerBody,
-        onComplete: syncPowerBody,
-      });
-    } else {
-      this.ball.setScale(powerScale);
-      syncPowerBody();
-    }
-    this.refreshPowerBallTimer();
-  }
-
-  startBallPowerCooldown() {
-    if (!this.ball.active || this.ballOnPaddle) return;
-
-    this.ballPowerMode = false;
-    this.ballPowerCooling = true;
-    this.powerBounceActive = false;
-    this.powerBounceMultiplier = false;
-    this.applyBallTexture();
-
-    this.tweens.killTweensOf(this.ball);
-    const normalScale = this.ballBaseScale;
-    const syncNormalBody = () => this.syncBallPhysicsBody(this.ballRadius);
-    this.tweens.add({
-      targets: this.ball,
-      scale: normalScale,
-      duration: POWER_BALL.cooldownMs,
-      ease: 'Sine.easeInOut',
-      onUpdate: syncNormalBody,
-      onComplete: () => {
-        syncNormalBody();
-        this.ballPowerCooling = false;
-      },
-    });
-
-    this.powerBallTimer = this.time.delayedCall(POWER_BALL.cooldownMs, () => {
-      this.powerBallTimer = null;
-      if (!this.ballPowerMode) {
-        this.ballPowerCooling = false;
+      /** Match inscribed cell ball size (setTexture resets to native image dimensions). */
+      syncBallDisplaySize(worldRadius) {
+        if (!this.ball || this.ballRadius == null) return;
+        const diameter = this.ballRadius * 2;
+        this.ball.setDisplaySize(diameter, diameter);
+        // setDisplaySize adjusts scaleX/Y (~0.07 for 420px art); store for power tweens.
+        this.ballBaseScale = this.ball.scaleX;
+        this.syncBallPhysicsBody(worldRadius);
       }
-    });
-  }
 
-  // ---------------------------------------------------------------------------
-  // Effects
-  // ---------------------------------------------------------------------------
+      /** Arcade circle is scaled with the sprite — divide by scaleX so world radius matches art. */
+      syncBallPhysicsBody(worldRadius) {
+        if (!this.ball?.body || this.ballRadius == null) return;
+        const worldR = worldRadius ?? this.ballRadius;
+        const s = Math.abs(this.ball.scaleX);
+        if (!s) return;
+        this.ball.body.setCircle(worldR / s);
+      }
 
-  /**
-   * Always plays on bottom-half release while ball is in play.
-   * @param {boolean} armed — power queued; holds coil until ball hits or window expires
-   */
-  paddleReleaseAnimation(armed) {
-    bbLog('paddle release animation', { armed });
-    this.stopPaddleCharge(false);
-    this.killPaddleTweens();
-    this.paddleSpringing = true;
+      ballPowerScale() {
+        return this.ballBaseScale * POWER_BALL.scale;
+      }
 
-    const coilScaleX = armed ? 1.34 : 1.2;
-    const coilScaleY = armed ? 0.5 : 0.64;
+      updateBallSpin(delta) {
+        if (!this.ball?.active || this.ballOnPaddle || !this.ball.body?.moves) return;
 
-    if (armed) {
-      this.paddle.setTint(0xd4fff0);
-    } else {
-      this.paddle.clearTint();
-    }
+        const vx = this.ball.body.velocity.x;
+        const vy = this.ball.body.velocity.y;
+        const speed = Math.hypot(vx, vy);
+        if (speed < 8) return;
 
-    this.tweens.add({
-      targets: this.paddle,
-      scaleX: coilScaleX,
-      scaleY: coilScaleY,
-      angle: 0,
-      duration: armed ? 75 : 60,
-      ease: 'Quad.easeIn',
-      onComplete: () => {
-        if (!this.isSceneActive()) return;
+        const r = this.ball.displayWidth * 0.5;
+        if (r <= 0) return;
 
-        if (armed) {
-          // Stay coiled — full trampoline spring runs on successful power hit
-          this.paddleSpringing = false;
-          return;
+        const omega = (speed / r) * PHYSICS.ballSpin;
+        const spinSign = vx === 0 ? (vy > 0 ? 1 : -1) : Math.sign(vx);
+        this.ball.rotation += spinSign * omega * (delta / 1000);
+      }
+
+      /** Neutral face by default; determined face while power mode is active. */
+      applyBallTexture() {
+        if (!this.ball?.active) return;
+        const key = this.ballPowerMode ? BALL_TEXTURE.determined : BALL_TEXTURE.neutral;
+        if (this.textures.exists(key)) {
+          this.ball.setTexture(key);
         }
-
-        // Miss / early release: small rebound, then rest
-        this.tweens.add({
-          targets: this.paddle,
-          scaleX: 1.08,
-          scaleY: 1.06,
-          duration: 85,
-          ease: 'Back.easeOut',
-          onComplete: () => {
-            if (!this.isSceneActive()) return;
-            this.tweens.add({
-              targets: this.paddle,
-              scaleX: 1,
-              scaleY: 1,
-              duration: 110,
-              ease: 'Quad.easeOut',
-              onComplete: () => {
-                if (!this.isSceneActive()) return;
-                this.finishPaddleSpring();
-              },
-            });
-          },
-        });
-      },
-    });
-  }
-
-  /** Trampoline spring on successful Power Bounce contact */
-  doPaddleSpringBounce() {
-    bbLog('paddle spring bounce');
-    this.stopPaddleCharge(false);
-    this.killPaddleTweens();
-    this.paddleSpringing = true;
-    this.paddle.clearTint();
-
-    this.tweens.add({
-      targets: this.paddle,
-      scaleX: 1.58,
-      scaleY: 0.4,
-      angle: 0,
-      duration: 45,
-      ease: 'Quad.easeIn',
-      onComplete: () => {
-        if (!this.isSceneActive()) return;
-        this.tweens.add({
-          targets: this.paddle,
-          scaleX: 1.22,
-          scaleY: 1.42,
-          duration: 95,
-          ease: 'Back.easeOut',
-          onComplete: () => {
-            if (!this.isSceneActive()) return;
-            this.tweens.add({
-              targets: this.paddle,
-              scaleX: 1,
-              scaleY: 1,
-              duration: 280,
-              ease: 'Bounce.easeOut',
-              onComplete: () => {
-                if (!this.isSceneActive()) return;
-                this.finishPaddleSpring();
-              },
-            });
-          },
-        });
-      },
-    });
-  }
-
-  /** Subtle trampoline tap on a normal bounce */
-  doPaddleNormalTap() {
-    if (this.paddleCharging) return;
-    this.paddleSpringing = true;
-    this.killPaddleTweens();
-    this.tweens.add({
-      targets: this.paddle,
-      scaleX: 1.1,
-      scaleY: 0.72,
-      duration: 50,
-      yoyo: true,
-      ease: 'Quad.easeOut',
-      onComplete: () => {
-        if (!this.isSceneActive()) return;
-        this.finishPaddleSpring();
-      },
-    });
-  }
-
-  flashBallPowerSuccess() {
-    this.ball.setTint(0xffffff);
-    this.time.delayedCall(90, () => {
-      if (this.ball.active && this.ballPowerMode) {
+        this.syncBallDisplaySize();
         this.ball.clearTint();
       }
-    });
-  }
 
-  triggerPerfectTimingFeedback() {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(12);
-    }
-
-    const overlay = this.add.rectangle(
-      this.scale.width / 2,
-      this.scale.height / 2,
-      this.scale.width,
-      this.scale.height,
-      0xffffff,
-      0.12
-    ).setDepth(150);
-
-    this.tweens.add({
-      targets: overlay,
-      alpha: 0,
-      duration: POWER_BOUNCE.slowMoRealMs,
-      onComplete: () => overlay.destroy(),
-    });
-
-    const prevScale = this.time.timeScale;
-    this.time.timeScale = POWER_BOUNCE.slowMoTimeScale;
-    window.setTimeout(() => {
-      if (!this.isSceneActive()) return;
-      if (this.time) this.time.timeScale = prevScale === 0 ? 1 : prevScale;
-    }, POWER_BOUNCE.slowMoRealMs);
-  }
-
-  spawnDestroyParticles(x, y, tint) {
-    const emitter = this.add.particles(x, y, 'particle', {
-      speed: { min: 60, max: 180 },
-      angle: { min: 0, max: 360 },
-      scale: { start: 1.2, end: 0 },
-      lifespan: 350,
-      tint,
-      blendMode: 'ADD',
-      emitting: false,
-    });
-    emitter.explode(10);
-    this.time.delayedCall(400, () => emitter.destroy());
-  }
-
-  /** Chunky clay crumbs when a block is destroyed. */
-  spawnBlockClayDebris(x, y, tint) {
-    const emitter = this.add.particles(x, y, 'clay_debris', {
-      frame: ['chunk_a', 'chunk_b', 'chunk_c', 'chunk_d'],
-      speed: { min: 45, max: 130 },
-      angle: { min: 0, max: 360 },
-      gravityY: 420,
-      scale: { start: 1, end: 0.2, random: true },
-      alpha: { start: 1, end: 0 },
-      rotate: { min: 0, max: 360 },
-      lifespan: { min: 500, max: 800 },
-      tint,
-      blendMode: 'NORMAL',
-      emitting: false,
-    });
-    emitter.setDepth(12);
-    emitter.explode(14);
-    this.time.delayedCall(900, () => emitter.destroy());
-  }
-
-  // ---------------------------------------------------------------------------
-  // End screens
-  // ---------------------------------------------------------------------------
-
-  showOverlay(title, subtitle, buttonLabel, onRestart) {
-    const { width, height } = this.scale;
-    const overlay = this.add.container(0, 0).setDepth(250);
-
-    const dim = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75);
-    const panel = this.add.rectangle(width / 2, height / 2, width - 48, 220, 0x1a1a2e, 0.95);
-    panel.setStrokeStyle(3, 0xffe66d);
-
-    const titleText = this.add
-      .text(width / 2, height / 2 - 50, title, {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '28px',
-        color: COLORS.accent,
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-
-    const subText = this.add
-      .text(width / 2, height / 2, subtitle, {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '18px',
-        color: COLORS.text,
-      })
-      .setOrigin(0.5);
-
-    const btnBg = this.add.rectangle(width / 2, height / 2 + 60, 180, 44, COLORS.paddle).setInteractive({ useHandCursor: true });
-    const btnLabel = this.add
-      .text(width / 2, height / 2 + 60, buttonLabel, {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '18px',
-        color: '#1a1a2e',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5);
-
-    btnBg.on('pointerdown', () => {
-      overlay.destroy();
-      onRestart();
-    });
-
-    overlay.add([dim, panel, titleText, subText, btnBg, btnLabel]);
-    return overlay;
-  }
-
-  showLevelClear() {
-    if (this.gameState !== 'playing') return;
-    this.gameState = 'levelClear';
-    this.stopLaunchAimCycle();
-    this.ball.body.setVelocity(0, 0);
-    this.ball.body.moves = false;
-    this.showOverlay('Level Clear!', `Final Score: ${this.score}`, 'Play Again', () => this.scene.restart());
-  }
-
-  showGameOver() {
-    this.gameState = 'gameOver';
-    this.stopLaunchAimCycle();
-    this.showOverlay('Game Over', `Score: ${this.score}`, 'Try Again', () => this.scene.restart());
-  }
-
-  // ---------------------------------------------------------------------------
-  // Update loop
-  // ---------------------------------------------------------------------------
-
-  update(time, delta) {
-    if (this.gameState !== 'playing') return;
-
-    try {
-      if (this.ballOnPaddle) {
-        this.syncBallToPaddle();
-      } else if (this.ball?.active) {
-        if (this.ball.y > this.scale.height - 28) {
-          this.loseBall();
-        }
-        this.clampBallSpeed();
-        this.updateBallSpin(delta);
-        this.updateBallTrail();
+      clearPaddleTweenRefs() {
+        this.paddleChargeScaleTween = null;
+        this.paddleChargeShakeTween = null;
       }
 
-      this.updatePaddleCharge();
-      this.updateHudAvatar();
+      killPaddleTweens() {
+        if (this.paddle) this.tweens.killTweensOf(this.paddle);
+        this.clearPaddleTweenRefs();
+      }
 
-      // Expire stale power bounce queue
-      if (this.powerBounceQueued && time - this.powerBounceQueuedAt > POWER_BOUNCE.queueWindowMs) {
-        this.powerBounceQueued = false;
-        if (!this.paddleSpringing && !this.paddleCharging) {
+      finishPaddleSpring() {
+        this.paddleSpringing = false;
+        this.killPaddleTweens();
+        this.resetPaddleVisual();
+      }
+
+      preparePaddleForCharge() {
+        if (this.paddleSpringing) {
+          this.finishPaddleSpring();
+        } else {
           this.killPaddleTweens();
           this.resetPaddleVisual();
         }
       }
 
-      // Keep enemy hitboxes aligned with tweened positions
-      this.enemies?.getChildren().forEach((enemy) => {
-        if (enemy.active && enemy.body) {
-          enemy.body.reset(enemy.x, enemy.y);
+      isSceneActive() {
+        return Boolean(this.sys?.isActive());
+      }
+
+      safeStopTween(tween) {
+        if (!tween) return;
+        try {
+          if (typeof tween.isPlaying === 'function' && tween.isPlaying()) {
+            tween.stop();
+          }
+        } catch (err) {
+          bbError('safeStopTween', err);
         }
+      }
+
+      create() {
+        bbLog('create() start');
+        this.gameState = 'playing'; // playing | levelClear | gameOver
+        this.score = 0;
+        this.ballLaunched = false;
+        this.ballOnPaddle = true;
+        this.powerBounceQueued = false;
+        this.powerBounceQueuedAt = 0;
+        this.powerBounceActive = false;
+        this.powerBounceMultiplier = false;
+        this.ballPowerMode = false;
+        this.ballPowerCooling = false;
+        this.powerBallTimer = null;
+        this.blocksRemaining = 0;
+        this.dragging = false;
+        this.pointerWasDragging = false;
+        this.isLosingBall = false;
+        this.paddleCharging = false;
+        this.paddleSpringing = false;
+        this.paddleChargeScaleTween = null;
+        this.paddleChargeShakeTween = null;
+        this.bottomHalfTouchThisStroke = false;
+        this.pendingPowerSpring = false;
+        this.bonusChanceActive = false;
+        this.bonusChanceEndsAt = 0;
+
+        this.launchAimIndex = 0;
+        this.launchAimDirection = 1;
+        this.launchAimTickEvent = null;
+        this.aimArrowGfx = null;
+        this.blockDebrisTintCache = new Map();
+
+        const { width, height } = this.scale;
+        this.level = ACTIVE_LEVEL;
+        this.levelGrid = createLevelGrid(this.level, height, width);
+        this.lives = this.level.meta?.lives ?? 3;
+
+        // Background gradient bands
+        this.add.rectangle(width / 2, height / 2, width, height, COLORS.bg);
+        this.add.rectangle(width / 2, height * 0.35, width, height * 0.5, COLORS.bgLight, 0.35);
+
+        // Arcade frame lines
+        const frame = this.add.graphics();
+        frame.lineStyle(3, 0xffe66d, 0.5);
+        frame.strokeRect(8, 8, width - 16, height - 16);
+
+        generateTextures(this, this.levelGrid.config.cellWidth, this.levelGrid.config.cellHeight);
+        this.ballRadius = ballRadiusForCell(this.levelGrid);
+        this.gridCellH = this.levelGrid.config.cellHeight;
+
+        // Physics world — only the playfield (below HUD), not the full frame
+        const playBounds = this.levelGrid.getPlayBounds();
+        this.physics.world.setBounds(playBounds.x, playBounds.y, playBounds.width, playBounds.height);
+        this.physics.world.setBoundsCollision(true, true, true, false);
+
+        this.createBlocks();
+        this.createEnemies();
+        this.createItems();
+        this.createPaddle();
+        this.createBall();
+        this.setupCollisions();
+        this.createUI();
+        this.setupInput();
+
+        if (SHOW_LEVEL_GRID) {
+          drawLevelGridDebug(this, this.levelGrid, this.level);
+        }
+
+        if (DEV_BORDERS) {
+          drawDevViewBorders(this, this.levelGrid, width, height);
+        }
+
+        this.updateUI();
+        bbLog('create() complete', { blocks: this.blocksRemaining, lives: this.lives });
+      }
+
+      // ---------------------------------------------------------------------------
+      // Level geometry
+      // ---------------------------------------------------------------------------
+
+      createBlocks() {
+        const cells = ensurePlayBlockCells(this.level, this.levelGrid);
+
+        this.blocks = this.physics.add.staticGroup();
+        this.blocksRemaining = 0;
+
+        const spawnBlock = (gridCol, gridRow, cell) => {
+          if (isBlockExtensionCell(cell)) return;
+          const typeId = getBlockTypeFromCell(cell);
+          if (!typeId) return;
+          const def = getBlockDef(typeId);
+          const { colSpan, rowSpan } = getBlockFootprint(typeId);
+          const isLong = colSpan > 1 || rowSpan > 1;
+          const { x, y } = isLong
+            ? this.levelGrid.cellSpanCenter(gridCol, gridRow, colSpan, rowSpan)
+            : this.levelGrid.cellCenter(gridCol, gridRow);
+
+          const block = this.blocks.create(x, y, def.texture);
+          const isPower = isPowerBlockType(typeId);
+          if (isLong || isPower) {
+            fitEntityToCellSpan(block, this.levelGrid, colSpan, rowSpan);
+          } else {
+            fitEntityToCell(block, this.levelGrid);
+          }
+          block.refreshBody();
+          block.setDepth(def.isHazard ? 8 : 5);
+          block.setData('typeId', typeId);
+          block.setData('points', def.points);
+          block.setData('isPower', def.powerOnly);
+          block.setData('isHazard', Boolean(def.isHazard));
+          block.setData('gridCol', gridCol);
+          block.setData('gridRow', gridRow);
+          block.setData('colSpan', colSpan);
+          block.setData('rowSpan', rowSpan);
+          block.setData('countsTowardClear', def.countsTowardClear !== false);
+          if (typeId === 'score') block.setData('scoreHits', 0);
+          if (def.countsTowardClear !== false) this.blocksRemaining++;
+        };
+
+        for (let row = 0; row < cells.length; row++) {
+          for (let col = 0; col < cells[row].length; col++) {
+            const cell = cells[row][col];
+            if (cell === 0) continue;
+            spawnBlock(col, row, cell);
+          }
+        }
+      }
+
+      createEnemies() {
+        const spawns = this.level.enemies || [];
+
+        this.enemies = this.physics.add.group();
+        spawns.forEach((spawn, i) => {
+          const { x, y } = this.levelGrid.cellCenter(spawn.col, spawn.row);
+          this.spawnEnemy(spawn.type, x, y, i);
+        });
+      }
+
+      applyItemFloatTween(item, baseY, spawn, index) {
+        const amp = Math.max(2, this.levelGrid.config.cellHeight * ITEM_FLOAT.amplitudeFrac);
+        this.tweens.add({
+          targets: item,
+          y: baseY - amp,
+          duration: ITEM_FLOAT.durationBase + (index % 4) * ITEM_FLOAT.durationStep,
+          ease: 'Sine.easeInOut',
+          yoyo: true,
+          repeat: -1,
+          delay: ((spawn.col * 3 + spawn.row) % 6) * ITEM_FLOAT.delayStep,
+        });
+      }
+
+      createItems() {
+        const spawns = this.level.items || [];
+        this.levelItems = this.add.group();
+
+        spawns.forEach((spawn, index) => {
+          const key = getItemTextureKey(spawn.type);
+          if (!this.textures.exists(key)) {
+            bbLog('createItems: missing texture', spawn.type);
+            return;
+          }
+          const foot = getItemFootprint(spawn.type);
+          const { x, y } = this.levelGrid.cellSpanCenter(
+            spawn.col,
+            spawn.row,
+            foot.colSpan,
+            foot.rowSpan
+          );
+          const item = this.add.image(x, y, key);
+          this.physics.add.existing(item);
+          item.body.setImmovable(true);
+          item.body.allowGravity = false;
+          if (foot.colSpan > 1 || foot.rowSpan > 1) {
+            fitEntityToCellSpan(item, this.levelGrid, foot.colSpan, foot.rowSpan);
+          } else {
+            fitEntityToCell(item, this.levelGrid, { contain: true });
+          }
+          item.setDepth(6);
+          item.setData('typeId', spawn.type);
+          item.setData('gridCol', spawn.col);
+          item.setData('gridRow', spawn.row);
+          item.setData('colSpan', foot.colSpan);
+          item.setData('rowSpan', foot.rowSpan);
+          item.setData('baseY', y);
+          this.levelItems.add(item);
+          this.applyItemFloatTween(item, y, spawn, index);
+        });
+
+        bbLog('createItems', { count: this.levelItems.getLength() });
+      }
+
+      spawnEnemy(typeId, x, y, index) {
+        const def = getEnemyDef(typeId);
+        const enemy = this.enemies.create(x, y, def.texture);
+        fitEntityToCell(enemy, this.levelGrid, { circle: true });
+        enemy.setBounce(1);
+        enemy.setCollideWorldBounds(true);
+        enemy.setImmovable(true);
+        enemy.body.allowGravity = false;
+        enemy.setDepth(7);
+        enemy.setData('typeId', typeId);
+        enemy.setData('hp', def.hp);
+        enemy.setData('maxHp', def.maxHp);
+        enemy.setData('points', def.points);
+        enemy.setData('drop', def.drop);
+
+        this.applyEnemyMovement(enemy, def, index, x, y);
+        return enemy;
+      }
+
+      applyEnemyMovement(enemy, def, index, startX, startY) {
+        switch (def.movement) {
+          case 'erratic_float':
+          default:
+            this.tweens.add({
+              targets: enemy,
+              x: startX + (index % 2 === 0 ? this.levelGrid.config.cellWidth : -this.levelGrid.config.cellWidth),
+              duration: 2200 + index * 400,
+              yoyo: true,
+              repeat: -1,
+              ease: 'Sine.easeInOut',
+            });
+            break;
+        }
+        enemy.setData('baseX', startX);
+      }
+
+      createPaddle() {
+        const paddleDef = this.level.paddle || { col: 4, colSpan: 2, rowFromBottom: 2 };
+        const colSpan = paddleDef.colSpan ?? 2;
+        const paddleRow = resolveGridRow(this.levelGrid, paddleDef);
+        const { x: paddleX, y: paddleY } = this.levelGrid.cellSpanCenter(
+          paddleDef.col,
+          paddleRow,
+          colSpan,
+          1
+        );
+        const { cellWidth, cellHeight } = this.levelGrid.config;
+        const paddleSize = getPaddleDisplaySize(cellWidth, cellHeight, colSpan);
+        const paddleKey = 'paddle';
+
+        this.paddle = this.physics.add.image(paddleX, paddleY, paddleKey);
+        this.paddle.setDisplaySize(paddleSize.width, paddleSize.height);
+        this.paddleBaseW = paddleSize.width;
+        this.paddleBaseH = paddleSize.height;
+        if (this.paddle.body) {
+          this.paddle.body.setSize(paddleSize.width, paddleSize.height);
+        }
+        this.paddle.setImmovable(true);
+        this.paddle.body.allowGravity = false;
+        this.paddle.setCollideWorldBounds(true);
+        this.paddle.setDepth(10);
+        this.paddle.setOrigin(0.5, 0.5);
+      }
+
+      createBall() {
+        this.ball = this.physics.add.image(this.paddle.x, this.paddle.y, BALL_TEXTURE.neutral);
+        this.applyBallTexture();
+        this.ball.setBounce(1);
+        this.ball.setCollideWorldBounds(true);
+        this.ball.body.onWorldBounds = true;
+        this.ball.setDepth(11);
+        this.ball.setOrigin(0.5, 0.5);
+        this.ball.body.allowGravity = false;
+        this.physics.world.gravity.y = 0;
+
+        this.createBallTrail();
+        this.attachBallToPaddle(false);
+      }
+
+      createBallTrail() {
+        this.ballTrail = this.add.particles(0, 0, 'speed_line', {
+          ...this.ballTrailBaseConfig(false),
+          emitting: false,
+        });
+        this.ballTrail.setDepth(10);
+        this.ballTrail.startFollow(this.ball);
+        this._ballTrailPowered = false;
+      }
+
+      /** Streak angle: opposite travel direction (degrees, Phaser rotation). */
+      ballTrailRotateDeg() {
+        const vx = this.ball.body.velocity.x;
+        const vy = this.ball.body.velocity.y;
+        return Phaser.Math.RadToDeg(Math.atan2(vy, vx)) + 180;
+      }
+
+      syncBallTrailRotate() {
+        if (!this.ballTrail) return;
+        const deg = this.ballTrailRotateDeg();
+        const rot = { min: deg, max: deg };
+        if (this.ballTrail.setParticleRotate) {
+          this.ballTrail.setParticleRotate(rot);
+        } else if (this.ballTrail.ops?.rotate) {
+          this.ballTrail.ops.rotate.loadConfig({ rotate: rot });
+        }
+      }
+
+      ballTrailBaseConfig(powered) {
+        const diam = this.ball?.active ? this.ball.displayWidth : this.ballRadius * 2;
+        const lengthMul = powered ? BALL_TRAIL.lengthMulPower : BALL_TRAIL.lengthMul;
+        const widthMul = powered ? BALL_TRAIL.widthMulPower : BALL_TRAIL.widthMul;
+        const scaleY = (diam / BALL_TRAIL.texHeight) * widthMul;
+        const scaleX = (diam * lengthMul) / BALL_TRAIL.texWidth;
+        return {
+          lifespan: powered ? BALL_TRAIL.lifespanPower : BALL_TRAIL.lifespan,
+          scaleX: { start: scaleX, end: scaleX * 0.2 },
+          scaleY: { start: scaleY, end: scaleY * 0.35 },
+          alpha: { start: 0.7, end: 0 },
+          speed: 0,
+          rotate: { min: 0, max: 0 },
+          tint: powered ? BALL_TRAIL.tintPower : BALL_TRAIL.tint,
+          blendMode: 'ADD',
+          frequency: powered ? BALL_TRAIL.frequencyPower : BALL_TRAIL.frequency,
+          quantity: 1,
+        };
+      }
+
+      /** Reconfigure trail for normal vs power (not every frame — loadConfig each frame broke emission). */
+      syncBallTrailStyle() {
+        if (!this.ballTrail) return;
+        const powered = !!this.ballPowerMode;
+        if (this._ballTrailPowered !== powered) {
+          this._ballTrailPowered = powered;
+          const wasEmitting = this.ballTrail.emitting;
+          this.ballTrail.setConfig(this.ballTrailBaseConfig(powered));
+          this.ballTrail.startFollow(this.ball);
+          if (wasEmitting) this.ballTrail.start();
+        }
+        this.syncBallTrailRotate();
+      }
+
+      startBallTrail() {
+        if (!this.ballTrail || !this.ball?.active) return;
+        this.syncBallTrailStyle();
+        if (!this.ballTrail.emitting) this.ballTrail.start();
+      }
+
+      stopBallTrail() {
+        if (this.ballTrail?.emitting) this.ballTrail.stop();
+      }
+
+      updateBallTrail() {
+        if (!this.ballTrail || !this.ball?.active || this.ballOnPaddle) return;
+        const speed = Math.hypot(this.ball.body.velocity.x, this.ball.body.velocity.y);
+        if (speed < 50) {
+          this.stopBallTrail();
+          return;
+        }
+        this.syncBallTrailStyle();
+        if (!this.ballTrail.emitting) this.ballTrail.start();
+      }
+
+      attachBallToPaddle(deferAim = false) {
+        this.ballOnPaddle = true;
+        this.ballLaunched = false;
+        this.pendingPowerSpring = false;
+        this.ball.body.setVelocity(0, 0);
+        this.ball.body.moves = false;
+        this.clearBallPowerState();
+        this.stopBallTrail();
+        this.finishPaddleSpring();
+        this.ball.rotation = 0;
+        this.syncBallToPaddle();
+        this.launchAimIndex = 0;
+        this.launchAimDirection = 1;
+        if (deferAim) {
+          this.stopLaunchAimCycle();
+        } else {
+          this.startLaunchAimCycle();
+        }
+      }
+
+      startLaunchAimCycle() {
+        this.stopLaunchAimCycle();
+        if (!this.aimArrowGfx) {
+          this.aimArrowGfx = this.add.graphics().setDepth(12).setScrollFactor(0);
+        }
+        this.launchAimTickEvent = this.time.addEvent({
+          delay: LAUNCH_AIM_TICK_MS,
+          loop: true,
+          callback: () => {
+            if (!this.ballOnPaddle || this.gameState !== 'playing' || this.isLosingBall) return;
+            let next = this.launchAimIndex + this.launchAimDirection;
+            if (next < 0 || next >= LAUNCH_AIM_DIRS.length) {
+              this.launchAimDirection *= -1;
+              next = this.launchAimIndex + this.launchAimDirection;
+            }
+            this.launchAimIndex = next;
+            this.redrawAimArrow();
+          },
+        });
+        this.redrawAimArrow();
+      }
+
+      stopLaunchAimCycle() {
+        if (this.launchAimTickEvent) {
+          this.launchAimTickEvent.destroy();
+          this.launchAimTickEvent = null;
+        }
+        if (this.aimArrowGfx) {
+          this.aimArrowGfx.clear();
+        }
+      }
+
+      redrawAimArrow() {
+        if (!this.aimArrowGfx || !this.ballOnPaddle || !this.ball?.active || this.isLosingBall) {
+          if (this.aimArrowGfx) this.aimArrowGfx.clear();
+          return;
+        }
+        const d = LAUNCH_AIM_DIRS[this.launchAimIndex];
+        const bx = this.ball.x;
+        const by = this.ball.y;
+        const shaftLen = this.ballRadius + 36;
+        const tipX = bx + d.vx * shaftLen;
+        const tipY = by + d.vy * shaftLen;
+        const px = -d.vy;
+        const py = d.vx;
+        const hw = 7;
+
+        this.aimArrowGfx.clear();
+        this.aimArrowGfx.lineStyle(4, 0xffe66d, 0.95);
+        this.aimArrowGfx.beginPath();
+        this.aimArrowGfx.moveTo(bx + d.vx * (this.ballRadius + 4), by + d.vy * (this.ballRadius + 4));
+        this.aimArrowGfx.lineTo(tipX, tipY);
+        this.aimArrowGfx.strokePath();
+
+        this.aimArrowGfx.fillStyle(0xffe66d, 0.95);
+        this.aimArrowGfx.fillTriangle(
+          tipX,
+          tipY,
+          tipX - d.vx * 14 + px * hw,
+          tipY - d.vy * 14 + py * hw,
+          tipX - d.vx * 14 - px * hw,
+          tipY - d.vy * 14 - py * hw
+        );
+      }
+
+      syncBallToPaddle() {
+        if (this.ballOnPaddle && this.paddle) {
+          this.ball.x = this.paddle.x;
+          const above = this.paddle.displayHeight * 0.5 + this.ballRadius + 2;
+          this.ball.y = this.paddle.y - above;
+        }
+        if (this.ballOnPaddle && !this.isLosingBall) this.redrawAimArrow();
+      }
+
+      launchBall() {
+        if (!this.ballOnPaddle || this.gameState !== 'playing' || this.isLosingBall) return;
+        this.stopLaunchAimCycle();
+        const d = LAUNCH_AIM_DIRS[this.launchAimIndex];
+        this.ballOnPaddle = false;
+        this.ballLaunched = true;
+        this.ball.body.moves = true;
+        this.ball.setVelocity(d.vx * PHYSICS.launchSpeed, d.vy * PHYSICS.launchSpeed);
+        this.startBallTrail();
+      }
+
+      // ---------------------------------------------------------------------------
+      // Collisions
+      // ---------------------------------------------------------------------------
+
+      setupCollisions() {
+        this.physics.add.collider(this.ball, this.blocks, this.onBallBlock, null, this);
+        this.physics.add.collider(this.ball, this.paddle, this.onBallPaddle, null, this);
+        this.physics.add.collider(this.ball, this.enemies, this.onBallEnemy, null, this);
+        this.physics.add.overlap(this.ball, this.levelItems, this.onBallItem, null, this);
+        this.physics.add.collider(this.enemies, this.blocks);
+        this.physics.world.on('worldbounds', (body) => {
+          if (body.gameObject === this.ball && body.blocked.down === false) {
+            // Top/side bounces handled by physics; bottom = lose ball
+          }
+        });
+      }
+
+      onBallBlock(ball, block) {
+        if (!block.active) return;
+
+        if (block.getData('isBonusCollectible')) {
+          this.collectBonusBlock(ball, block);
+          return;
+        }
+
+        const typeId = block.getData('typeId') || 'normal';
+        const result = resolveBlockHit(typeId, this.powerBounceActive || this.ballPowerMode);
+
+        if (result.action === 'immune') {
+          const def = getBlockDef(typeId);
+          if (def.powerOnly) {
+            this.onPowerBlockResist(ball, block);
+          } else {
+            this.flashBlock(block, 0xaaaaaa);
+          }
+          return;
+        }
+
+        if (result.action === 'hazard' || result.action === 'hazard_bounce') {
+          this.onBallSpike(ball, block, result.action === 'hazard_bounce');
+          return;
+        }
+
+        if (result.action === 'downgrade') {
+          this.downgradeBlock(block, result.toType);
+          this.clampBallSpeed();
+          return;
+        }
+
+        if (result.action === 'score_hit') {
+          this.onScoreBlockHit(ball, block, result.powered);
+          return;
+        }
+
+        if (result.action === 'destroy') {
+          let points = result.points;
+          if (this.powerBounceMultiplier) {
+            points = Math.floor(points * SCORE.powerMultiplier);
+          }
+          this.awardDestroyPoints(points, block.x, block.y);
+          this.destroyBlock(block);
+          this.clampBallSpeed();
+        }
+      }
+
+      onScoreBlockHit(ball, block, powered) {
+        const typeId = block.getData('typeId') || 'score';
+        const def = getBlockDef(typeId);
+        const tiers = def.scoreTiers || [50, 100, 200, 400, 800, 1600, 3200];
+        const hits = (block.getData('scoreHits') || 0) + 1;
+        const idx = Math.min(hits - 1, tiers.length - 1);
+        let points = tiers[idx];
+        if (powered && this.powerBounceMultiplier) {
+          points = Math.floor(points * SCORE.powerMultiplier);
+        }
+        this.awardDestroyPoints(points, block.x, block.y);
+        block.setData('scoreHits', hits);
+        this.flashBlock(block, 0xffe66d);
+        this.clampBallSpeed();
+        if (hits >= (def.maxHits ?? tiers.length)) {
+          this.destroyBlock(block);
+        }
+      }
+
+      downgradeBlock(block, toTypeId) {
+        const def = getBlockDef(toTypeId);
+        const col = block.getData('gridCol');
+        const row = block.getData('gridRow');
+        const { colSpan, rowSpan } = getBlockFootprint(toTypeId);
+        block.setTexture(def.texture);
+        block.setData('typeId', toTypeId);
+        block.setData('points', def.points);
+        block.setData('isPower', def.powerOnly);
+        block.setData('colSpan', colSpan);
+        block.setData('rowSpan', rowSpan);
+        const isLong = colSpan > 1 || rowSpan > 1;
+        const isPower = isPowerBlockType(toTypeId);
+        if (isLong || isPower) {
+          const { x, y } = isLong
+            ? this.levelGrid.cellSpanCenter(col, row, colSpan, rowSpan)
+            : this.levelGrid.cellCenter(col, row);
+          block.setPosition(x, y);
+          fitEntityToCellSpan(block, this.levelGrid, colSpan, rowSpan);
+        } else {
+          const { x, y } = this.levelGrid.cellCenter(col, row);
+          block.setPosition(x, y);
+          fitEntityToCell(block, this.levelGrid);
+        }
+        block.refreshBody();
+        this.flashBlock(block, 0xdddddd);
+        bbLog('block downgraded', { to: toTypeId });
+      }
+
+      onBallPaddle(ball, paddle) {
+        if (this.ballOnPaddle) return;
+
+        const diff = ball.x - paddle.x;
+        const normalized = Phaser.Math.Clamp(diff / (paddle.displayWidth * 0.5), -1, 1);
+        const now = this.time.now;
+        const queueElapsed = now - this.powerBounceQueuedAt;
+        const queuedPower =
+          this.powerBounceQueued && queueElapsed <= POWER_BOUNCE.queueWindowMs;
+
+        let vx = normalized * PHYSICS.ballSpeed * 0.85;
+        let vy;
+
+        const fingerStillDown = this.dragging;
+
+        if (queuedPower) {
+          bbLog('Power Bounce hit — trampoline spring + power ball');
+          this.paddle.clearTint();
+          // Amplified angle: center ≈ vertical, edges = sharper (spec)
+          if (Math.abs(normalized) < 0.22) {
+            vx = normalized * PHYSICS.ballSpeed * 0.4;
+            vy = -PHYSICS.powerBounceSpeed * 1.1;
+          } else {
+            vx = normalized * PHYSICS.ballSpeed * PHYSICS.powerAngleAmp;
+            vy = -PHYSICS.powerBounceSpeed;
+          }
+          this.powerBounceQueued = false;
+          this.enterBallPowerMode();
+          if (fingerStillDown) {
+            // Spring plays on release so charge can continue until then
+            this.pendingPowerSpring = true;
+          } else {
+            this.doPaddleSpringBounce();
+          }
+          this.flashBallPowerSuccess();
+          this.triggerPerfectTimingFeedback();
+        } else {
+          if (this.powerBounceQueued) {
+            bbLog('power bounce not applied', {
+              queueElapsed,
+              windowMs: POWER_BOUNCE.queueWindowMs,
+              vy: ball.body.velocity.y,
+            });
+          }
+          this.powerBounceQueued = false;
+          vy = -Math.abs(ball.body.velocity.y) * PHYSICS.paddleBounceFactor;
+          if (vy > -280) vy = -280;
+          if (!fingerStillDown) {
+            this.doPaddleNormalTap();
+          }
+        }
+
+        ball.setVelocity(vx, vy);
+        this.clampBallSpeed();
+
+        if (fingerStillDown) {
+          this.maintainPaddleChargeWhileDragging();
+        }
+      }
+
+      onBallItem(ball, item) {
+        if (!item?.active || this.gameState !== 'playing') return;
+
+        const typeId = item.getData('typeId');
+        const def = getItemDef(typeId);
+        let points = getItemPoints(typeId);
+        if (this.powerBounceMultiplier) {
+          points = Math.floor(points * SCORE.powerMultiplier);
+        }
+
+        const { x, y } = item;
+        this.tweens.killTweensOf(item);
+        this.awardDestroyPoints(points, x, y, { color: '#ff9de2' });
+        if (points > 0) {
+          this.spawnDestroyParticles(x, y, 0xff9de2);
+        }
+        item.destroy();
+
+        if (def?.effect === 'bonus_chance') {
+          this.activateBonusChance();
+        }
+
+        this.clampBallSpeed();
+        bbLog('item collected', { typeId, points, effect: def?.effect });
+      }
+
+      activateBonusChance() {
+        let converted = 0;
+        for (const block of this.blocks.getChildren()) {
+          if (!block?.active || block.getData('isBonusCollectible')) continue;
+
+          const typeId = block.getData('typeId');
+          if (!canBlockBecomeBonus(typeId)) continue;
+
+          const bonusPoints = getBonusCollectPoints(typeId, {
+            scoreHits: block.getData('scoreHits') || 0,
+          });
+
+          this.applyBonusCollectibleBlock(block, bonusPoints, {
+            originalTypeId: typeId,
+            convertVisual: true,
+          });
+          converted++;
+        }
+
+        if (converted === 0) return;
+
+        this.bonusChanceActive = true;
+        this.bonusChanceEndsAt = performance.now() + BONUS_CHANCE.durationMs;
+        this.showBonusChanceTimer(BONUS_CHANCE.durationMs);
+
+        const g = this.levelGrid.config;
+        const cx = g.originX + (g.cols * g.cellWidth) / 2;
+        const cy = g.originY + (g.rows * g.cellHeight) * 0.38;
+        spawnFloatingHint(this, cx, cy, 'BONUS CHANCE!', {
+          fontSize: 22,
+          color: '#ffd54f',
+          rise: 28,
+          duration: 1200,
+        });
+        bbLog('bonus chance activated', { converted, durationMs: BONUS_CHANCE.durationMs });
+      }
+
+      showBonusChanceTimer(msLeft) {
+        const sec = Math.ceil(msLeft / 1000);
+        if (!this.bonusChanceTimerText) {
+          const g = this.levelGrid.config;
+          this.bonusChanceTimerText = this.add
+            .text(g.originX + (g.cols * g.cellWidth) / 2, g.originY + 6, `Bonus ${sec}`, {
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontSize: '20px',
+              fontStyle: 'bold',
+              color: '#ffd54f',
+              stroke: '#1a1028',
+              strokeThickness: 4,
+            })
+            .setOrigin(0.5, 0)
+            .setDepth(150)
+            .setScrollFactor(0);
+        }
+        this.bonusChanceTimerText.setText(`Bonus ${sec}`).setVisible(true);
+      }
+
+      hideBonusChanceTimer() {
+        this.bonusChanceTimerText?.setVisible(false);
+      }
+
+      countBonusCollectibleBlocks() {
+        return this.blocks.getChildren().filter((b) => b?.active && b.getData('isBonusCollectible')).length;
+      }
+
+      checkBonusChanceProgress() {
+        if (!this.bonusChanceActive) return;
+        if (this.countBonusCollectibleBlocks() > 0) return;
+        this.completeBonusChance();
+      }
+
+      completeBonusChance() {
+        if (!this.bonusChanceActive) return;
+        this.bonusChanceActive = false;
+        this.bonusChanceEndsAt = 0;
+        this.hideBonusChanceTimer();
+
+        const g = this.levelGrid.config;
+        const cx = g.originX + (g.cols * g.cellWidth) / 2;
+        const cy = g.originY + (g.rows * g.cellHeight) * 0.38;
+        spawnFloatingHint(this, cx, cy, 'BONUS CLEAR!', {
+          fontSize: 22,
+          color: '#ffe66d',
+          rise: 28,
+          duration: 1200,
+        });
+        bbLog('bonus chance cleared');
+      }
+
+      /** End Bonus Chance — optionally revert uncollected blocks and show a hint. */
+      endBonusChanceActive(options = {}) {
+        if (!this.bonusChanceActive) return;
+
+        const { revertUncollected = true, hint = null } = options;
+        let reverted = 0;
+
+        if (revertUncollected) {
+          for (const block of this.blocks.getChildren()) {
+            if (!block?.active || !block.getData('isBonusCollectible')) continue;
+            this.revertBonusBlock(block);
+            reverted++;
+          }
+        }
+
+        this.bonusChanceActive = false;
+        this.bonusChanceEndsAt = 0;
+        this.hideBonusChanceTimer();
+
+        if (hint && reverted > 0) {
+          const g = this.levelGrid.config;
+          const cx = g.originX + (g.cols * g.cellWidth) / 2;
+          const cy = g.originY + (g.rows * g.cellHeight) * 0.38;
+          spawnFloatingHint(this, cx, cy, hint, {
+            fontSize: 22,
+            color: '#ff9de2',
+            rise: 28,
+            duration: 1200,
+          });
+        }
+        bbLog('bonus chance ended', { reverted, hint });
+      }
+
+      expireBonusChance() {
+        this.endBonusChanceActive({ hint: 'TIME UP!' });
+      }
+
+      revertBonusBlock(block) {
+        const revert = block.getData('bonusRevert');
+        const typeId = revert?.typeId ?? block.getData('originalTypeId') ?? 'normal';
+        const def = getBlockDef(typeId);
+
+        block.setData('typeId', typeId);
+        block.setData('isBonusCollectible', false);
+        block.setData('bonusPoints', null);
+        block.setData('bonusCollecting', false);
+        block.setData('originalTypeId', null);
+        block.setData('bonusRevert', null);
+        block.clearTint();
+        block.setAlpha(revert?.alpha ?? 1);
+
+        const textureKey = revert?.textureKey ?? def.texture;
+        if (textureKey && this.textures.exists(textureKey)) {
+          block.setTexture(textureKey);
+        }
+
+        if (typeId === 'score') {
+          block.setData('scoreHits', revert?.scoreHits ?? 0);
+        }
+        block.setData('points', revert?.points ?? def.points);
+        block.setData('isPower', def.powerOnly);
+        block.setData('isHazard', Boolean(def.isHazard));
+
+        if (block.body) {
+          block.body.checkCollision.none = false;
+          block.refreshBody();
+        }
+      }
+
+      /** Bonus Chance block — collides to collect; ball keeps moving (no ricochet). */
+      applyBonusCollectibleBlock(block, bonusPoints, options = {}) {
+        if (!block.getData('bonusRevert')) {
+          block.setData('bonusRevert', {
+            typeId: block.getData('typeId'),
+            textureKey: block.texture?.key,
+            alpha: block.alpha,
+            scoreHits: block.getData('scoreHits') || 0,
+            points: block.getData('points'),
+          });
+        }
+
+        const originalTypeId = options.originalTypeId ?? block.getData('typeId');
+        block.setData('originalTypeId', originalTypeId);
+        block.setData('bonusPoints', bonusPoints);
+        block.setData('isBonusCollectible', true);
+        block.setData('typeId', 'bonus');
+        block.clearTint();
+        if (options.convertVisual) {
+          block.setAlpha(0.52);
+        } else {
+          block.setAlpha(0.88);
+        }
+      }
+
+      collectBonusBlock(ball, block) {
+        if (!block?.active || !block.getData('isBonusCollectible')) return;
+        if (block.getData('bonusCollecting')) return;
+        if (this.gameState !== 'playing') return;
+
+        const pre = this.ballPreImpactVel;
+        block.setData('bonusCollecting', true);
+
+        let points = block.getData('bonusPoints') ?? 0;
+        if (this.powerBounceMultiplier) {
+          points = Math.floor(points * SCORE.powerMultiplier);
+        }
+
+        this.awardDestroyPoints(points, block.x, block.y, { color: '#ffe66d' });
+        this.destroyBlock(block);
+        this.checkBonusChanceProgress();
+
+        if (pre && ball?.body) {
+          ball.setVelocity(pre.x, pre.y);
+        }
+        this.clampBallSpeed();
+      }
+
+      onBallEnemy(ball, enemy) {
+        if (!enemy.active) return;
+
+        const typeId = enemy.getData('typeId') || 'drifter';
+        const { damage, pointsOnKill } = resolveEnemyHit(typeId, this.powerBounceActive);
+        let hp = (enemy.getData('hp') || 1) - damage;
+        enemy.setData('hp', hp);
+
+        if (hp > 0) {
+          this.flashEnemyHit(enemy);
+          this.clampBallSpeed();
+          bbLog('enemy damaged', { typeId, hp, damage });
+          return;
+        }
+
+        let points = pointsOnKill;
+        if (this.powerBounceMultiplier) {
+          points = Math.floor(points * SCORE.powerMultiplier);
+        }
+        const { x, y } = enemy;
+        this.awardDestroyPoints(points, x, y);
+        this.spawnDestroyParticles(x, y, COLORS.enemy);
+        enemy.destroy();
+        this.clampBallSpeed();
+        bbLog('enemy defeated', { typeId, points });
+      }
+
+      flashEnemyHit(enemy) {
+        enemy.setTint(0xffffff);
+        this.tweens.add({
+          targets: enemy,
+          alpha: 0.65,
+          duration: 50,
+          yoyo: true,
+          onComplete: () => {
+            if (enemy.active) {
+              enemy.clearTint();
+              enemy.setAlpha(1);
+            }
+          },
+        });
+      }
+
+      onBallSpike(ball, block, poweredBounce) {
+        if (this.ballOnPaddle || this.gameState !== 'playing') return;
+
+        if (poweredBounce || this.ballPowerMode) {
+          const pushX = ball.body.velocity.x * 1.05 || (ball.x < this.scale.width / 2 ? -140 : 140);
+          ball.setVelocity(pushX, -Math.max(380, Math.abs(ball.body.velocity.y) * 1.2));
+          this.spawnDestroyParticles(ball.x, ball.y, 0xffe66d);
+          if (block?.active) this.flashBlock(block, 0xffe66d);
+          this.clampBallSpeed();
+          return;
+        }
+
+        this.loseBall();
+      }
+
+      /** Average opaque color from block texture (cached per texture frame). */
+      getBlockDebrisTint(block) {
+        const typeId = block.getData('typeId') || 'normal';
+        const fallback = CLAY_DEBRIS_TINT_FALLBACK[typeId] ?? CLAY_DEBRIS_TINT_FALLBACK.normal;
+        const texKey = block.texture?.key;
+        if (!texKey || !this.textures.exists(texKey)) return fallback;
+
+        const frame = block.frame;
+        const cacheKey = `${texKey}:${frame?.name ?? '__BASE'}`;
+        if (this.blockDebrisTintCache.has(cacheKey)) {
+          return this.blockDebrisTintCache.get(cacheKey);
+        }
+
+        const source = this.textures.get(texKey).getSourceImage();
+        if (!source) {
+          this.blockDebrisTintCache.set(cacheKey, fallback);
+          return fallback;
+        }
+
+        const fw = frame?.cutWidth ?? source.width;
+        const fh = frame?.cutHeight ?? source.height;
+        const fx = frame?.cutX ?? 0;
+        const fy = frame?.cutY ?? 0;
+        const sw = Math.max(8, Math.floor(fw * 0.55));
+        const sh = Math.max(8, Math.floor(fh * 0.55));
+        const canvas = document.createElement('canvas');
+        canvas.width = sw;
+        canvas.height = sh;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(source, fx + (fw - sw) / 2, fy + (fh - sh) / 2, sw, sh, 0, 0, sw, sh);
+
+        const data = ctx.getImageData(0, 0, sw, sh).data;
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let weight = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          const a = data[i + 3];
+          if (a < 40) continue;
+          const w = a / 255;
+          r += data[i] * w;
+          g += data[i + 1] * w;
+          b += data[i + 2] * w;
+          weight += w;
+        }
+
+        const tint =
+          weight > 0
+            ? ((Math.round(r / weight) << 16) | (Math.round(g / weight) << 8) | Math.round(b / weight))
+            : fallback;
+        this.blockDebrisTintCache.set(cacheKey, tint);
+        return tint;
+      }
+
+      destroyBlock(block) {
+        const tint = this.getBlockDebrisTint(block);
+        this.spawnBlockClayDebris(block.x, block.y, tint);
+        const counted = block.getData('countsTowardClear') !== false;
+        block.destroy();
+        if (counted) {
+          this.blocksRemaining--;
+          if (this.blocksRemaining <= 0) {
+            this.time.delayedCall(300, () => this.showLevelClear());
+          }
+        }
+      }
+
+      flashBlock(block, color) {
+        this.tweens.add({
+          targets: block,
+          alpha: 0.5,
+          duration: 60,
+          yoyo: true,
+        });
+      }
+
+      onPowerBlockResist(ball, block) {
+        if (!block?.active) return;
+
+        this.playPowerBlockResistFx(block);
+
+        const body = ball?.body;
+        if (body) {
+          body.velocity.x *= POWER_BLOCK_RESIST.ballSpeedMul;
+          body.velocity.y *= POWER_BLOCK_RESIST.ballSpeedMul;
+        }
+
+        this.cameras.main.shake(
+          POWER_BLOCK_RESIST.cameraShakeMs,
+          POWER_BLOCK_RESIST.cameraShakeIntensity
+        );
+      }
+
+      playPowerBlockResistFx(block) {
+        this.tweens.killTweensOf(block);
+        this.playPowerBlockGodRay(block);
+
+        const baseX = block.scaleX;
+        const baseY = block.scaleY;
+
+        this.tweens.add({
+          targets: block,
+          scaleX: baseX * POWER_BLOCK_RESIST.squashScaleX,
+          scaleY: baseY * POWER_BLOCK_RESIST.squashScaleY,
+          duration: POWER_BLOCK_RESIST.squashInMs,
+          ease: 'Quad.easeOut',
+          yoyo: true,
+          onComplete: () => {
+            if (!block.active) return;
+            block.setScale(baseX, baseY);
+          },
+        });
+      }
+
+      /** Diagonal white god-ray sweep clipped to the block silhouette. */
+      playPowerBlockGodRay(block) {
+        if (!block?.active || !this.textures.exists('power_godray')) return;
+
+        const bw = block.displayWidth;
+        const bh = block.displayHeight;
+        const span = Math.hypot(bw, bh);
+
+        const root = this.add.container(block.x, block.y);
+        root.setDepth(block.depth + 2);
+        root.setAngle(POWER_BLOCK_RESIST.godRayAngleDeg);
+
+        const mover = this.add.container(0, 0);
+        root.add(mover);
+
+        const rayH = span * 1.4;
+        const halo = this.add.image(0, 0, 'power_godray');
+        halo.setBlendMode(Phaser.BlendModes.ADD);
+        halo.setDisplaySize(span * POWER_BLOCK_RESIST.godRayHaloScale, rayH);
+        halo.setAlpha(POWER_BLOCK_RESIST.godRayHaloAlpha);
+
+        const core = this.add.image(0, 0, 'power_godray');
+        core.setBlendMode(Phaser.BlendModes.ADD);
+        core.setDisplaySize(span * POWER_BLOCK_RESIST.godRayCoreScale, rayH * 0.92);
+        core.setAlpha(POWER_BLOCK_RESIST.godRayCoreAlpha);
+
+        mover.add([halo, core]);
+
+        if (typeof block.createBitmapMask === 'function') {
+          root.setMask(block.createBitmapMask());
+        }
+
+        const travel = span * 1.4;
+        mover.x = -travel;
+        this.tweens.add({
+          targets: mover,
+          x: travel,
+          duration: POWER_BLOCK_RESIST.godRaySweepMs,
+          ease: 'Sine.easeInOut',
+          onComplete: () => {
+            if (root.active) root.destroy();
+          },
+        });
+      }
+
+      // ---------------------------------------------------------------------------
+      // Ball lifecycle
+      // ---------------------------------------------------------------------------
+
+      loseBall() {
+        if (this.gameState !== 'playing' || this.isLosingBall) return;
+        bbLog('loseBall', { livesBefore: this.lives });
+        this.endBonusChanceActive();
+        this.isLosingBall = true;
+        this.lives--;
+        this.updateUI();
+        this.stopBallTrail();
+        this.spawnDestroyParticles(this.ball.x, this.ball.y, COLORS.ball);
+
+        if (this.lives <= 0) {
+          this.stopLaunchAimCycle();
+          this.ball.setActive(false).setVisible(false);
+          this.stopBallTrail();
+          this.showGameOver();
+          return;
+        }
+
+        this.attachBallToPaddle(true);
+        this.powerBounceQueued = false;
+        this.time.delayedCall(400, () => {
+          this.isLosingBall = false;
+          this.startLaunchAimCycle();
+        });
+      }
+
+      clampBallSpeed() {
+        const v = this.ball.body.velocity;
+        const speed = Math.sqrt(v.x * v.x + v.y * v.y);
+        const cap = this.ballPowerMode ? PHYSICS.powerBallMaxSpeed : PHYSICS.ballMaxSpeed;
+        if (speed > cap) {
+          const scale = cap / speed;
+          this.ball.setVelocity(v.x * scale, v.y * scale);
+        }
+        if (speed < 200 && this.ballLaunched && !this.ballOnPaddle) {
+          const scale = 220 / speed;
+          this.ball.setVelocity(v.x * scale, v.y * scale);
+        }
+      }
+
+      // ---------------------------------------------------------------------------
+      // Input — drag paddle on bottom half; RELEASE in timing window arms Power Bounce
+      // ---------------------------------------------------------------------------
+
+      isBallNearPaddleForCharge() {
+        if (!this.ball?.body || !this.paddle) return false;
+        const dy = this.ball.y - this.paddle.y;
+        return (
+          dy > -POWER_BOUNCE.chargeAbovePaddle &&
+          dy < POWER_BOUNCE.chargeBelowPaddle &&
+          this.ball.body.velocity.y > POWER_BOUNCE.minFallSpeed
+        );
+      }
+
+      canArmPowerOnRelease() {
+        if (!this.ball?.body || !this.paddle) return false;
+        if (!this.ballLaunched || this.ballOnPaddle) return false;
+        const dy = this.ball.y - this.paddle.y;
+        const inZone = dy > -POWER_BOUNCE.armAbovePaddle && dy < POWER_BOUNCE.armBelowPaddle;
+        const falling = this.ball.body.velocity.y > POWER_BOUNCE.minFallSpeed;
+        return inZone && falling;
+      }
+
+      queuePowerBounceOnRelease(wasPaddleTouch) {
+        if (this.gameState !== 'playing') return false;
+        if (!wasPaddleTouch) {
+          bbLog('power bounce not queued — no bottom-half touch');
+          return false;
+        }
+        if (!this.canArmPowerOnRelease()) {
+          bbLog('power bounce not queued — outside arm window', {
+            dy: this.ball.y - this.paddle.y,
+            vy: this.ball.body.velocity.y,
+          });
+          return false;
+        }
+
+        this.powerBounceQueued = true;
+        this.powerBounceQueuedAt = this.time.now;
+        bbLog('power bounce queued', {
+          at: this.powerBounceQueuedAt,
+          dy: this.ball.y - this.paddle.y,
+          vy: this.ball.body.velocity.y,
+        });
+        return true;
+      }
+
+      setupInput() {
+        this.input.on('pointerdown', (pointer) => {
+          if (this.gameState !== 'playing') return;
+
+          const { height } = this.scale;
+          const bottomHalf = pointer.y > height * 0.5;
+          this.pointerWasDragging = false;
+          this.bottomHalfTouchThisStroke = bottomHalf;
+
+          if (this.ballOnPaddle) {
+            if (this.isLosingBall) return;
+            if (bottomHalf) {
+              this.dragging = true;
+              this.movePaddleToPointer(pointer);
+            }
+            return;
+          }
+
+          if (bottomHalf) {
+            this.dragging = true;
+            this.movePaddleToPointer(pointer);
+          }
+        });
+
+        this.input.on('pointermove', (pointer) => {
+          if (this.gameState !== 'playing' || !this.dragging) return;
+          if (pointer.y > this.scale.height * 0.5) {
+            this.pointerWasDragging = true;
+            this.movePaddleToPointer(pointer);
+          }
+        });
+
+        this.input.on('pointerup', () => {
+          const wasPaddleTouch =
+            this.bottomHalfTouchThisStroke || this.dragging || this.pointerWasDragging;
+          const ballOnPaddleAtStart = this.ballOnPaddle;
+
+          if (this.gameState === 'playing' && ballOnPaddleAtStart && !this.isLosingBall) {
+            this.launchBall();
+          }
+
+          if (this.gameState === 'playing' && wasPaddleTouch && !ballOnPaddleAtStart && !this.ballOnPaddle) {
+            const queued = this.queuePowerBounceOnRelease(wasPaddleTouch);
+            if (this.pendingPowerSpring) {
+              this.pendingPowerSpring = false;
+              this.doPaddleSpringBounce();
+            } else {
+              this.paddleReleaseAnimation(queued);
+            }
+          } else if (!this.paddleSpringing) {
+            this.stopPaddleCharge(true);
+          }
+
+          this.dragging = false;
+          this.pointerWasDragging = false;
+          this.bottomHalfTouchThisStroke = false;
+        });
+      }
+
+      movePaddleToPointer(pointer) {
+        const margin = 58;
+        const { width } = this.scale;
+        this.paddle.x = Phaser.Math.Clamp(pointer.x, margin, width - margin);
+        if (this.ballOnPaddle) this.syncBallToPaddle();
+      }
+
+      // ---------------------------------------------------------------------------
+      // UI
+      // ---------------------------------------------------------------------------
+
+      createUI() {
+        const hud = this.levelGrid.hud;
+        const maxLives = this.level.meta?.lives ?? 3;
+        const textStyle = {
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          fontSize: '18px',
+          color: COLORS.text,
+        };
+
+        if (!hud) {
+          bbError('createUI', 'level.hud is required for HUD container');
+          return;
+        }
+
+        const { x, y, width, height } = hud.bounds;
+        this.hudContainer = this.add.container(x, y).setDepth(200).setScrollFactor(0);
+
+        const hudBg = this.add.rectangle(width / 2, height / 2, width, height, 0x16082a, 0.94);
+        this.hudContainer.add(hudBg);
+
+        const hudFrame = this.add.graphics();
+        hudFrame.lineStyle(2, 0xffe66d, 0.4);
+        hudFrame.strokeRect(0, 0, width, height);
+        this.hudContainer.add(hudFrame);
+
+        const pos = resolveHudLayout(this.level, { width, height }, { maxLives });
+        const hudLayout = { ...DEFAULT_HUD_LAYOUT, ...(this.level.hudLayout || {}) };
+
+        this.scoreText = this.add.text(pos.score.x, pos.score.y, 'Score: 0', textStyle).setOrigin(0, 0.5);
+        this.hudContainer.add(this.scoreText);
+
+        const lifeStep = 20;
+        this.livesContainer = this.add.container(pos.livesContainer.x, pos.livesContainer.y);
+        this.lifeIcons = [];
+        for (let i = 0; i < maxLives; i++) {
+          const icon = this.add.image(-i * lifeStep - 8, 0, 'life_icon').setScale(0.85);
+          this.lifeIcons.push(icon);
+          this.livesContainer.add(icon);
+        }
+        this.hudContainer.add(this.livesContainer);
+
+        this.hudAvatarState = 'default';
+        this.hudAvatarConfig = { ...(this.level.hudLayout?.avatar || {}) };
+
+        this.hudAvatar = null;
+        if (hudLayout.right && hudLayout.right.includes('avatar')) {
+          const avSize = pos.avatar.size;
+          const startKey = getHudAvatarTextureKey('default', this.hudAvatarConfig, this);
+          this.hudAvatar = this.add
+            .image(pos.avatar.x, pos.avatar.y, startKey)
+            .setDisplaySize(avSize, avSize)
+            .setOrigin(0.5, 0.5)
+            .setData('hudAvatarSize', avSize);
+          this.hudContainer.add(this.hudAvatar);
+          this.updateHudAvatar();
+        }
+
+        this.playAreaDivider = this.add.graphics().setDepth(199).setScrollFactor(0);
+        this.playAreaDivider.lineStyle(2, 0xffe66d, 0.35);
+        this.playAreaDivider.lineBetween(x, y + height, x + width, y + height);
+
+        this.bonusChanceTimerText = null;
+      }
+
+      /** Updates portrait from gameplay state (power, charging, lives, etc.). */
+      updateHudAvatar() {
+        if (!this.hudAvatar) return;
+        const stateId = resolveHudAvatarState({
+          gameState: this.gameState,
+          ballPowerMode: this.ballPowerMode,
+          ballPowerCooling: this.ballPowerCooling,
+          paddleCharging: this.paddleCharging,
+          powerBounceQueued: this.powerBounceQueued,
+          lives: this.lives,
+        });
+        this.hudAvatarState = applyHudAvatarState(this.hudAvatar, stateId, this.hudAvatarConfig);
+      }
+
+      /**
+       * Force a portrait state (e.g. after loading custom textures).
+       * Gameplay will override on the next updateHudAvatar() unless you set a lock later.
+       */
+      setHudAvatarState(stateId) {
+        if (!this.hudAvatar) return;
+        this.hudAvatarState = applyHudAvatarState(this.hudAvatar, stateId, this.hudAvatarConfig);
+      }
+
+      updateUI() {
+        this.scoreText.setText(`Score: ${this.score}`);
+        this.lifeIcons.forEach((icon, i) => {
+          icon.setAlpha(i < this.lives ? 1 : 0.25);
+          icon.setTint(i < this.lives ? 0xffffff : 0x666666);
+        });
+        this.updateHudAvatar();
+      }
+
+      /** HUD score + arcade float at world position (blocks, enemies, items). */
+      awardDestroyPoints(pts, worldX, worldY, popupOptions) {
+        awardPointsAt(this, pts, worldX, worldY, popupOptions);
+      }
+
+      addScore(pts) {
+        this.score += pts;
+        this.scoreText.setText(`Score: ${this.score}`);
+        this.tweens.add({
+          targets: this.scoreText,
+          scaleX: 1.15,
+          scaleY: 1.15,
+          duration: 80,
+          yoyo: true,
+        });
+      }
+
+      resetPaddleVisual() {
+        if (!this.paddle) return;
+        this.paddle.setScale(1);
+        this.paddle.angle = 0;
+        this.paddle.clearTint();
+        if (this.paddleBaseW != null) {
+          this.paddle.setDisplaySize(this.paddleBaseW, this.paddleBaseH);
+          if (this.paddle.body) {
+            this.paddle.body.setSize(this.paddleBaseW, this.paddleBaseH);
+          }
+        }
+      }
+
+      startPaddleCharge() {
+        if (this.paddleCharging) return;
+        this.preparePaddleForCharge();
+        bbLog('paddle charge start');
+        this.paddleCharging = true;
+        this.paddle.setTint(0xb8ffec);
+
+        this.paddleChargeScaleTween = this.tweens.add({
+          targets: this.paddle,
+          scaleX: 1.16,
+          scaleY: 0.86,
+          duration: 220,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+
+        this.paddleChargeShakeTween = this.tweens.add({
+          targets: this.paddle,
+          angle: 3,
+          duration: 42,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      }
+
+      stopPaddleCharge(resetVisual) {
+        this.paddleCharging = false;
+        this.safeStopTween(this.paddleChargeScaleTween);
+        this.safeStopTween(this.paddleChargeShakeTween);
+        this.clearPaddleTweenRefs();
+        if (resetVisual && !this.paddleSpringing) {
+          this.resetPaddleVisual();
+        }
+      }
+
+      maintainPaddleChargeWhileDragging() {
+        if (!this.dragging || this.ballOnPaddle || !this.ballLaunched) return;
+        if (!this.paddleCharging) {
+          this.startPaddleCharge();
+        }
+      }
+
+      updatePaddleCharge() {
+        if (this.gameState !== 'playing' || this.ballOnPaddle || !this.ballLaunched) {
+          if (this.paddleCharging) this.stopPaddleCharge(true);
+          return;
+        }
+
+        // Recover if spring flag stuck after a killed/completed tween chain
+        if (this.paddleSpringing && this.paddle && this.tweens.getTweensOf(this.paddle).length === 0) {
+          bbLog('paddle spring flag stuck — resetting');
+          this.finishPaddleSpring();
+        }
+
+        // Finger down: keep shake for whole drag (even after power spring / powered ball)
+        if (this.dragging) {
+          const canStartCharge = this.isBallNearPaddleForCharge() || this.paddleCharging;
+          if (canStartCharge && !this.paddleCharging) {
+            this.startPaddleCharge();
+          }
+          return;
+        }
+
+        // Finger up: only charge when ball is falling near paddle
+        const ready = this.isBallNearPaddleForCharge();
+        if (ready && !this.paddleCharging) {
+          this.startPaddleCharge();
+        } else if (!ready && this.paddleCharging) {
+          this.stopPaddleCharge(true);
+        }
+      }
+
+      clearBallPowerState() {
+        if (this.powerBallTimer) {
+          this.powerBallTimer.remove(false);
+          this.powerBallTimer = null;
+        }
+        this.tweens.killTweensOf(this.ball);
+        this.ballPowerMode = false;
+        this.ballPowerCooling = false;
+        this.powerBounceActive = false;
+        this.powerBounceMultiplier = false;
+        this.applyBallTexture();
+      }
+
+      refreshPowerBallTimer() {
+        if (this.powerBallTimer) this.powerBallTimer.remove(false);
+        this.powerBallTimer = this.time.delayedCall(POWER_BALL.durationMs, () => {
+          this.startBallPowerCooldown();
+        });
+      }
+
+      enterBallPowerMode() {
+        const chaining = this.ballPowerMode;
+
+        if (this.powerBallTimer) this.powerBallTimer.remove(false);
+        if (!chaining) this.tweens.killTweensOf(this.ball);
+
+        this.ballPowerMode = true;
+        this.ballPowerCooling = false;
+        this.powerBounceActive = true;
+        this.powerBounceMultiplier = true;
+
+        this.applyBallTexture();
+        const powerScale = this.ballPowerScale();
+        const powerWorldR = this.ballRadius * POWER_BALL.scale;
+        const syncPowerBody = () => this.syncBallPhysicsBody(powerWorldR);
+        if (!chaining) {
+          this.tweens.add({
+            targets: this.ball,
+            scale: powerScale,
+            duration: 120,
+            ease: 'Back.easeOut',
+            onUpdate: syncPowerBody,
+            onComplete: syncPowerBody,
+          });
+        } else {
+          this.ball.setScale(powerScale);
+          syncPowerBody();
+        }
+        this.refreshPowerBallTimer();
+      }
+
+      startBallPowerCooldown() {
+        if (!this.ball.active || this.ballOnPaddle) return;
+
+        this.ballPowerMode = false;
+        this.ballPowerCooling = true;
+        this.powerBounceActive = false;
+        this.powerBounceMultiplier = false;
+        this.applyBallTexture();
+
+        this.tweens.killTweensOf(this.ball);
+        const normalScale = this.ballBaseScale;
+        const syncNormalBody = () => this.syncBallPhysicsBody(this.ballRadius);
+        this.tweens.add({
+          targets: this.ball,
+          scale: normalScale,
+          duration: POWER_BALL.cooldownMs,
+          ease: 'Sine.easeInOut',
+          onUpdate: syncNormalBody,
+          onComplete: () => {
+            syncNormalBody();
+            this.ballPowerCooling = false;
+          },
+        });
+
+        this.powerBallTimer = this.time.delayedCall(POWER_BALL.cooldownMs, () => {
+          this.powerBallTimer = null;
+          if (!this.ballPowerMode) {
+            this.ballPowerCooling = false;
+          }
+        });
+      }
+
+      // ---------------------------------------------------------------------------
+      // Effects
+      // ---------------------------------------------------------------------------
+
+      /**
+       * Always plays on bottom-half release while ball is in play.
+       * @param {boolean} armed — power queued; holds coil until ball hits or window expires
+       */
+      paddleReleaseAnimation(armed) {
+        bbLog('paddle release animation', { armed });
+        this.stopPaddleCharge(false);
+        this.killPaddleTweens();
+        this.paddleSpringing = true;
+
+        const coilScaleX = armed ? 1.34 : 1.2;
+        const coilScaleY = armed ? 0.5 : 0.64;
+
+        if (armed) {
+          this.paddle.setTint(0xd4fff0);
+        } else {
+          this.paddle.clearTint();
+        }
+
+        this.tweens.add({
+          targets: this.paddle,
+          scaleX: coilScaleX,
+          scaleY: coilScaleY,
+          angle: 0,
+          duration: armed ? 75 : 60,
+          ease: 'Quad.easeIn',
+          onComplete: () => {
+            if (!this.isSceneActive()) return;
+
+            if (armed) {
+              // Stay coiled — full trampoline spring runs on successful power hit
+              this.paddleSpringing = false;
+              return;
+            }
+
+            // Miss / early release: small rebound, then rest
+            this.tweens.add({
+              targets: this.paddle,
+              scaleX: 1.08,
+              scaleY: 1.06,
+              duration: 85,
+              ease: 'Back.easeOut',
+              onComplete: () => {
+                if (!this.isSceneActive()) return;
+                this.tweens.add({
+                  targets: this.paddle,
+                  scaleX: 1,
+                  scaleY: 1,
+                  duration: 110,
+                  ease: 'Quad.easeOut',
+                  onComplete: () => {
+                    if (!this.isSceneActive()) return;
+                    this.finishPaddleSpring();
+                  },
+                });
+              },
+            });
+          },
+        });
+      }
+
+      /** Trampoline spring on successful Power Bounce contact */
+      doPaddleSpringBounce() {
+        bbLog('paddle spring bounce');
+        this.stopPaddleCharge(false);
+        this.killPaddleTweens();
+        this.paddleSpringing = true;
+        this.paddle.clearTint();
+
+        this.tweens.add({
+          targets: this.paddle,
+          scaleX: 1.58,
+          scaleY: 0.4,
+          angle: 0,
+          duration: 45,
+          ease: 'Quad.easeIn',
+          onComplete: () => {
+            if (!this.isSceneActive()) return;
+            this.tweens.add({
+              targets: this.paddle,
+              scaleX: 1.22,
+              scaleY: 1.42,
+              duration: 95,
+              ease: 'Back.easeOut',
+              onComplete: () => {
+                if (!this.isSceneActive()) return;
+                this.tweens.add({
+                  targets: this.paddle,
+                  scaleX: 1,
+                  scaleY: 1,
+                  duration: 280,
+                  ease: 'Bounce.easeOut',
+                  onComplete: () => {
+                    if (!this.isSceneActive()) return;
+                    this.finishPaddleSpring();
+                  },
+                });
+              },
+            });
+          },
+        });
+      }
+
+      /** Subtle trampoline tap on a normal bounce */
+      doPaddleNormalTap() {
+        if (this.paddleCharging) return;
+        this.paddleSpringing = true;
+        this.killPaddleTweens();
+        this.tweens.add({
+          targets: this.paddle,
+          scaleX: 1.1,
+          scaleY: 0.72,
+          duration: 50,
+          yoyo: true,
+          ease: 'Quad.easeOut',
+          onComplete: () => {
+            if (!this.isSceneActive()) return;
+            this.finishPaddleSpring();
+          },
+        });
+      }
+
+      flashBallPowerSuccess() {
+        this.ball.setTint(0xffffff);
+        this.time.delayedCall(90, () => {
+          if (this.ball.active && this.ballPowerMode) {
+            this.ball.clearTint();
+          }
+        });
+      }
+
+      triggerPerfectTimingFeedback() {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(12);
+        }
+
+        const overlay = this.add.rectangle(
+          this.scale.width / 2,
+          this.scale.height / 2,
+          this.scale.width,
+          this.scale.height,
+          0xffffff,
+          0.12
+        ).setDepth(150);
+
+        this.tweens.add({
+          targets: overlay,
+          alpha: 0,
+          duration: POWER_BOUNCE.slowMoRealMs,
+          onComplete: () => overlay.destroy(),
+        });
+
+        const prevScale = this.time.timeScale;
+        this.time.timeScale = POWER_BOUNCE.slowMoTimeScale;
+        window.setTimeout(() => {
+          if (!this.isSceneActive()) return;
+          if (this.time) this.time.timeScale = prevScale === 0 ? 1 : prevScale;
+        }, POWER_BOUNCE.slowMoRealMs);
+      }
+
+      spawnDestroyParticles(x, y, tint) {
+        const emitter = this.add.particles(x, y, 'particle', {
+          speed: { min: 60, max: 180 },
+          angle: { min: 0, max: 360 },
+          scale: { start: 1.2, end: 0 },
+          lifespan: 350,
+          tint,
+          blendMode: 'ADD',
+          emitting: false,
+        });
+        emitter.explode(10);
+        this.time.delayedCall(400, () => emitter.destroy());
+      }
+
+      /** Chunky clay crumbs when a block is destroyed. */
+      spawnBlockClayDebris(x, y, tint) {
+        const emitter = this.add.particles(x, y, 'clay_debris', {
+          frame: ['chunk_a', 'chunk_b', 'chunk_c', 'chunk_d'],
+          speed: { min: 45, max: 130 },
+          angle: { min: 0, max: 360 },
+          gravityY: 420,
+          scale: { start: 1, end: 0.2, random: true },
+          alpha: { start: 1, end: 0 },
+          rotate: { min: 0, max: 360 },
+          lifespan: { min: 500, max: 800 },
+          tint,
+          blendMode: 'NORMAL',
+          emitting: false,
+        });
+        emitter.setDepth(12);
+        emitter.explode(14);
+        this.time.delayedCall(900, () => emitter.destroy());
+      }
+
+      // ---------------------------------------------------------------------------
+      // End screens
+      // ---------------------------------------------------------------------------
+
+      showOverlay(title, subtitle, buttonLabel, onRestart) {
+        const { width, height } = this.scale;
+        const overlay = this.add.container(0, 0).setDepth(250);
+
+        const dim = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75);
+        const panel = this.add.rectangle(width / 2, height / 2, width - 48, 220, 0x1a1a2e, 0.95);
+        panel.setStrokeStyle(3, 0xffe66d);
+
+        const titleText = this.add
+          .text(width / 2, height / 2 - 50, title, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '28px',
+            color: COLORS.accent,
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5);
+
+        const subText = this.add
+          .text(width / 2, height / 2, subtitle, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '18px',
+            color: COLORS.text,
+          })
+          .setOrigin(0.5);
+
+        const btnBg = this.add.rectangle(width / 2, height / 2 + 60, 180, 44, COLORS.paddle).setInteractive({ useHandCursor: true });
+        const btnLabel = this.add
+          .text(width / 2, height / 2 + 60, buttonLabel, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '18px',
+            color: '#1a1a2e',
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5);
+
+        btnBg.on('pointerdown', () => {
+          overlay.destroy();
+          onRestart();
+        });
+
+        overlay.add([dim, panel, titleText, subText, btnBg, btnLabel]);
+        return overlay;
+      }
+
+      showMultiButtonOverlay(title, subtitle, buttons) {
+        const { width, height } = this.scale;
+        const overlay = this.add.container(0, 0).setDepth(250);
+        const panelHeight = 180 + buttons.length * 52;
+
+        const dim = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75);
+        const panel = this.add.rectangle(width / 2, height / 2, width - 48, panelHeight, 0x1a1a2e, 0.95);
+        panel.setStrokeStyle(3, 0xffe66d);
+
+        const titleText = this.add
+          .text(width / 2, height / 2 - 70, title, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '28px',
+            color: COLORS.accent,
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5);
+
+        const subText = this.add
+          .text(width / 2, height / 2 - 20, subtitle, {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: '18px',
+            color: COLORS.text,
+          })
+          .setOrigin(0.5);
+
+        const nodes = [dim, panel, titleText, subText];
+        const startY = height / 2 + 20;
+        buttons.forEach((btn, i) => {
+          const y = startY + i * 52;
+          const fill = btn.primary === false ? 0x444466 : COLORS.paddle;
+          const labelColor = btn.primary === false ? COLORS.text : '#1a1a2e';
+          const btnBg = this.add.rectangle(width / 2, y, 200, 44, fill).setInteractive({ useHandCursor: true });
+          const btnLabel = this.add
+            .text(width / 2, y, btn.label, {
+              fontFamily: 'system-ui, sans-serif',
+              fontSize: '18px',
+              color: labelColor,
+              fontStyle: 'bold',
+            })
+            .setOrigin(0.5);
+          btnBg.on('pointerdown', () => {
+            overlay.destroy();
+            btn.onClick();
+          });
+          nodes.push(btnBg, btnLabel);
+        });
+
+        overlay.add(nodes);
+        return overlay;
+      }
+
+      updateBonusChanceTimer() {
+        if (!this.bonusChanceActive || !this.bonusChanceEndsAt) return;
+
+        const msLeft = this.bonusChanceEndsAt - performance.now();
+        if (msLeft <= 0) {
+          this.expireBonusChance();
+          return;
+        }
+        this.showBonusChanceTimer(msLeft);
+      }
+
+      showLevelClear() {
+        if (this.gameState !== 'playing') return;
+        this.bonusChanceActive = false;
+        this.bonusChanceEndsAt = 0;
+        this.hideBonusChanceTimer();
+        this.gameState = 'levelClear';
+        this.stopLaunchAimCycle();
+        this.ball.body.setVelocity(0, 0);
+        this.ball.body.moves = false;
+
+        if (ACTIVE_CAMPAIGN_CTX) {
+          const { campaign, worldId, worldName, stageIndex, stageNumber } = ACTIVE_CAMPAIGN_CTX;
+          markStageCompleted(worldId, stageIndex);
+          const next = getNextStage(campaign, worldId, stageIndex);
+          let title = 'Stage Clear!';
+          if (!next) {
+            title = 'Campaign Complete!';
+          } else if (next.worldId !== worldId) {
+            title = 'World Complete!';
+          }
+          const subtitle = `${worldName} — Stage ${stageNumber}\nFinal Score: ${this.score}`;
+          const buttons = [];
+          if (next) {
+            buttons.push({
+              label: 'Next Stage',
+              primary: true,
+              onClick: () => {
+                window.location.href = campaignPlayUrl(next.worldId, next.stageIndex + 1);
+              },
+            });
+          } else {
+            buttons.push({
+              label: 'Play Again',
+              primary: true,
+              onClick: () => this.scene.restart(),
+            });
+          }
+          buttons.push({
+            label: 'World Map',
+            primary: false,
+            onClick: () => {
+              window.location.href = campaignMenuUrl(next ? next.worldId : null);
+            },
+          });
+          this.showMultiButtonOverlay(title, subtitle, buttons);
+          return;
+        }
+
+        this.showOverlay('Level Clear!', `Final Score: ${this.score}`, 'Play Again', () => this.scene.restart());
+      }
+
+      showGameOver() {
+        this.bonusChanceActive = false;
+        this.bonusChanceEndsAt = 0;
+        this.hideBonusChanceTimer();
+        this.gameState = 'gameOver';
+        this.stopLaunchAimCycle();
+        this.showOverlay('Game Over', `Score: ${this.score}`, 'Try Again', () => this.scene.restart());
+      }
+
+      // ---------------------------------------------------------------------------
+      // Update loop
+      // ---------------------------------------------------------------------------
+
+      update(time, delta) {
+        if (this.gameState !== 'playing') return;
+
+        try {
+          if (this.ballOnPaddle) {
+            this.syncBallToPaddle();
+          } else if (this.ball?.active) {
+            if (!this.ballOnPaddle && this.ball.body) {
+              this.ballPreImpactVel = {
+                x: this.ball.body.velocity.x,
+                y: this.ball.body.velocity.y,
+              };
+            }
+            if (this.ball.y > this.scale.height - 28) {
+              this.loseBall();
+            }
+            this.clampBallSpeed();
+            this.updateBallSpin(delta);
+            this.updateBallTrail();
+          }
+
+          this.updatePaddleCharge();
+          this.updateHudAvatar();
+          this.updateBonusChanceTimer();
+
+          // Expire stale power bounce queue
+          if (this.powerBounceQueued && time - this.powerBounceQueuedAt > POWER_BOUNCE.queueWindowMs) {
+            this.powerBounceQueued = false;
+            if (!this.paddleSpringing && !this.paddleCharging) {
+              this.killPaddleTweens();
+              this.resetPaddleVisual();
+            }
+          }
+
+          // Keep enemy hitboxes aligned with tweened positions
+          this.enemies?.getChildren().forEach((enemy) => {
+            if (enemy.active && enemy.body) {
+              enemy.body.reset(enemy.x, enemy.y);
+            }
+          });
+        } catch (err) {
+          bbError('update()', err);
+        }
+      }
+    }
+
+    // =============================================================================
+    // PHASER BOOT
+    // =============================================================================
+
+    const config = {
+      type: Phaser.AUTO,
+      parent: 'game-container',
+      width: GAME_WIDTH,
+      height: GAME_HEIGHT,
+      backgroundColor: '#1a1a2e',
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+      },
+      physics: {
+        default: 'arcade',
+        arcade: {
+          gravity: { y: 0 },
+          debug: false,
+        },
+      },
+      scene: [GameScene],
+      render: {
+        antialias: true,
+        pixelArt: false,
+        roundPixels: true,
+      },
+    };
+
+    bbLog('boot Phaser', { width: GAME_WIDTH, height: GAME_HEIGHT });
+
+    function initLevelBar(activeEntry, campaignCtx) {
+      const bar = document.getElementById('level-bar');
+      const select = document.getElementById('level-select');
+      const selectLabel = document.getElementById('level-select-label');
+      const campaignLabel = document.getElementById('campaign-label');
+
+      if (campaignCtx) {
+        selectLabel.hidden = true;
+        select.hidden = true;
+        campaignLabel.hidden = false;
+        campaignLabel.textContent = `${campaignCtx.worldName} — Stage ${campaignCtx.stageNumber}`;
+      } else if (activeEntry.id === 'preview') {
+        const opt = document.createElement('option');
+        opt.value = 'preview';
+        opt.textContent = activeEntry.name || 'Editor preview';
+        opt.selected = true;
+        select.appendChild(opt);
+        select.disabled = true;
+      } else {
+        populateLevelSelect(select, activeEntry.id);
+      }
+      bar.hidden = false;
+
+      if (!campaignCtx) {
+        select.addEventListener('change', () => {
+          const id = select.value;
+          try {
+            localStorage.setItem('blockBall.level', id);
+          } catch (_) {
+            /* ignore */
+          }
+          window.location.search = `?level=${encodeURIComponent(id)}`;
+        });
+      }
+
+      document.getElementById('level-restart').addEventListener('click', () => {
+        window.location.reload();
       });
-    } catch (err) {
-      bbError('update()', err);
     }
-  }
-}
 
-// =============================================================================
-// PHASER BOOT
-// =============================================================================
-
-const config = {
-  type: Phaser.AUTO,
-  parent: 'game-container',
-  width: GAME_WIDTH,
-  height: GAME_HEIGHT,
-  backgroundColor: '#1a1a2e',
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-  },
-  physics: {
-    default: 'arcade',
-    arcade: {
-      gravity: { y: 0 },
-      debug: false,
-    },
-  },
-  scene: [GameScene],
-  render: {
-    antialias: true,
-    pixelArt: false,
-    roundPixels: true,
-  },
-};
-
-bbLog('boot Phaser', { width: GAME_WIDTH, height: GAME_HEIGHT });
-
-function initLevelBar(activeEntry) {
-  const bar = document.getElementById('level-bar');
-  const select = document.getElementById('level-select');
-  if (activeEntry.id === 'preview') {
-    const opt = document.createElement('option');
-    opt.value = 'preview';
-    opt.textContent = activeEntry.name || 'Editor preview';
-    opt.selected = true;
-    select.appendChild(opt);
-    select.disabled = true;
-  } else {
-    populateLevelSelect(select, activeEntry.id);
-  }
-  bar.hidden = false;
-
-  select.addEventListener('change', () => {
-    const id = select.value;
-    try {
-      localStorage.setItem('blockBall.level', id);
-    } catch (_) {
-      /* ignore */
+    async function bootGame() {
+      const status = document.getElementById('boot-status');
+      bbLog('bootGame start', {
+        href: window.location.href,
+        search: window.location.search,
+        previewFlag: URL_PARAMS.get('preview'),
+      });
+      try {
+        const { level, entry, campaignCtx } = await resolveActiveLevel();
+        ACTIVE_LEVEL = level;
+        ACTIVE_CAMPAIGN_CTX = campaignCtx || null;
+        const cells = level.blocks?.cells;
+        let filled = 0;
+        if (cells) for (const row of cells) for (const c of row) if (c) filled += 1;
+        bbLog('bootGame active level', {
+          entryId: entry.id,
+          entryName: entry.name,
+          levelId: level.id,
+          levelName: level.name,
+          filledCells: filled,
+          grid: cells ? `${cells.length}×${cells[0]?.length}` : 'none',
+          enemies: level.enemies?.length ?? 0,
+          items: level.items?.length ?? 0,
+        });
+        status.remove();
+        initLevelBar(entry, campaignCtx || null);
+        new Phaser.Game(config);
+        bbLog('Phaser.Game created');
+      } catch (err) {
+        bbError('bootGame failed', err);
+        status.className = 'error';
+        status.textContent = `Failed to load level: ${err.message}`;
+      }
     }
-    window.location.search = `?level=${encodeURIComponent(id)}`;
-  });
 
-  document.getElementById('level-restart').addEventListener('click', () => {
-    window.location.reload();
-  });
-}
+    bootGame();
+  </script>
 
-async function bootGame() {
-  const status = document.getElementById('boot-status');
-  bbLog('bootGame start', {
-    href: window.location.href,
-    search: window.location.search,
-    previewFlag: URL_PARAMS.get('preview'),
-  });
-  try {
-    const { level, entry } = await resolveActiveLevel();
-    ACTIVE_LEVEL = level;
-    const cells = level.blocks?.cells;
-    let filled = 0;
-    if (cells) for (const row of cells) for (const c of row) if (c) filled += 1;
-    bbLog('bootGame active level', {
-      entryId: entry.id,
-      entryName: entry.name,
-      levelId: level.id,
-      levelName: level.name,
-      filledCells: filled,
-      grid: cells ? `${cells.length}×${cells[0]?.length}` : 'none',
-      enemies: level.enemies?.length ?? 0,
-      items: level.items?.length ?? 0,
-    });
-    status.remove();
-    initLevelBar(entry);
-    new Phaser.Game(config);
-    bbLog('Phaser.Game created');
-  } catch (err) {
-    bbError('bootGame failed', err);
-    status.className = 'error';
-    status.textContent = `Failed to load level: ${err.message}`;
-  }
-}
-
-bootGame();
-</script>
-
-<!--
+  <!--
 ================================================================================
   KNOWN LIMITATIONS & SUGGESTED NEXT STEPS
 ================================================================================
@@ -2361,7 +2793,7 @@ bootGame();
 LIMITATIONS (this demo)
 -----------------------
   • Level select bar + ?level=id URL; register levels in levels/registry.js.
-  • Ball sprites: assets/ball/neutral.png, assets/ball/determined.png (power mode).
+  • Ball, blocks, paddle, items, enemies: procedural placeholders (generateTextures / editor-entity-art).
   • Power Bounce: release-only timing before contact; spike immunity while powered.
   • Enemies use simple tweens, not true AI or spawn waves.
   • No pause menu, settings, save data, or online leaderboards.
@@ -2382,4 +2814,5 @@ NEXT STEPS FOR A FULL GAME
 ================================================================================
 -->
 </body>
+
 </html>

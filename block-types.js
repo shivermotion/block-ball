@@ -9,7 +9,7 @@ const BLOCK_COMPENDIUM = [
     id: 'normal',
     name: 'Normal Block',
     implemented: true,
-    appearance: 'Cream block with hex cutout (assets/blocks/normal.png)',
+    appearance: 'Procedural — cream rounded block',
     points: 100,
     normalHit: 'destroy',
     powerHit: 'destroy',
@@ -19,7 +19,7 @@ const BLOCK_COMPENDIUM = [
     id: 'gray',
     name: 'Gray Block',
     implemented: true,
-    appearance: 'Pale blue-grey stone cube (assets/blocks/gray.png)',
+    appearance: 'Procedural — pale grey stone block',
     points: 200,
     normalHit: 'damage_to_normal',
     powerHit: 'destroy',
@@ -69,7 +69,7 @@ const BLOCK_COMPENDIUM = [
     id: 'power',
     name: 'Power Block',
     implemented: true,
-    appearance: 'Dark crystalline block — rotated 90°, fills cell (assets/blocks/power.png)',
+    appearance: 'Procedural — dark block with gold glow trim',
     points: 500,
     normalHit: 'immune',
     powerHit: 'destroy',
@@ -99,7 +99,7 @@ const BLOCK_COMPENDIUM = [
     id: 'spike',
     name: 'Spike Block',
     implemented: true,
-    appearance: 'Grey stone triangle (assets/blocks/spike.png); procedural fallback',
+    appearance: 'Procedural — red triple-spike hazard',
     points: 0,
     normalHit: 'hazard',
     powerHit: 'hazard_bounce',
@@ -137,13 +137,23 @@ const BLOCK_COMPENDIUM = [
   },
   {
     id: 'score',
-    name: 'Score / Bonus Block',
-    implemented: false,
-    appearance: 'Numbered or flashing',
+    name: 'Score Block',
+    implemented: true,
+    appearance: 'Procedural — lavender 2×2 tile with tier label (50→3200)',
     points: 0,
     normalHit: 'hit_increment',
     powerHit: 'hit_increment_high',
     notes: 'Up to ~7 hits; escalating points; 1-Ups at max with ability.',
+  },
+  {
+    id: 'bonus',
+    name: 'Bonus Block',
+    implemented: true,
+    appearance: 'Procedural gold tile — pass-through collectible',
+    points: 100,
+    normalHit: 'destroy',
+    powerHit: 'destroy',
+    notes: 'Solid when placed; pass-through collectible during Bonus Chance timer.',
   },
   {
     id: 'star',
@@ -305,6 +315,29 @@ const BLOCK_TYPES = {
     powerHit: 'immune',
     countsTowardClear: false,
   },
+  score: {
+    id: 'score',
+    texture: 'block_score',
+    colSpan: 2,
+    rowSpan: 2,
+    points: 0,
+    scoreTiers: [50, 100, 200, 400, 800, 1600, 3200],
+    maxHits: 7,
+    powerOnly: false,
+    normalHit: 'hit_increment',
+    powerHit: 'hit_increment_high',
+    countsTowardClear: false,
+  },
+  /** Placed in editor — solid until Bonus Chance; pass-through while timer runs. */
+  bonus: {
+    id: 'bonus',
+    texture: 'block_bonus',
+    points: 100,
+    powerOnly: false,
+    normalHit: 'destroy',
+    powerHit: 'destroy',
+    countsTowardClear: true,
+  },
 };
 
 /** Level grid cell → block type id (single-cell and long-block anchors only). */
@@ -321,6 +354,8 @@ const BLOCK_CELL_MAP = {
   12: 'gray_long_v',
   14: 'power_long_h',
   16: 'power_long_v',
+  18: 'score',
+  22: 'bonus',
 };
 
 /** Long-block extension cells (second half of footprint; not spawned as their own body). */
@@ -331,7 +366,18 @@ const BLOCK_CELL_EXTENSION = {
   13: { anchorCell: 12, dCol: 0, dRow: -1 },
   15: { anchorCell: 14, dCol: -1, dRow: 0 },
   17: { anchorCell: 16, dCol: 0, dRow: -1 },
+  19: { anchorCell: 18, dCol: -1, dRow: 0 },
+  20: { anchorCell: 18, dCol: 0, dRow: -1 },
+  21: { anchorCell: 18, dCol: -1, dRow: -1 },
 };
+
+/** Score block — 2×2 anchor `18` plus extension cells `19`–`21`. */
+const SCORE_BLOCK_CELLS = [
+  { dc: 0, dr: 0, v: 18 },
+  { dc: 1, dr: 0, v: 19 },
+  { dc: 0, dr: 1, v: 20 },
+  { dc: 1, dr: 1, v: 21 },
+];
 
 const LONG_BLOCK_PAINT = {
   6: { ext: 7, dCol: 1, dRow: 0 },
@@ -347,7 +393,93 @@ function isBlockExtensionCell(cell) {
 }
 
 function isBlockAnchorCell(cell) {
-  return Object.prototype.hasOwnProperty.call(LONG_BLOCK_PAINT, cell);
+  return Object.prototype.hasOwnProperty.call(LONG_BLOCK_PAINT, cell) || cell === 18;
+}
+
+function resolveBlockAnchor(cells, col, row) {
+  const v = cells?.[row]?.[col];
+  if (!v) return null;
+  if (isBlockAnchorCell(v)) return { col, row, anchorCell: v };
+  const ext = BLOCK_CELL_EXTENSION[v];
+  if (!ext) return null;
+  return { col: col + ext.dCol, row: row + ext.dRow, anchorCell: ext.anchorCell };
+}
+
+/** @deprecated Use resolveBlockAnchor */
+function resolveLongBlockAnchor(cells, col, row) {
+  return resolveBlockAnchor(cells, col, row);
+}
+
+function clearScoreFootprint(cells, col, row) {
+  for (const slot of SCORE_BLOCK_CELLS) {
+    const r = row + slot.dr;
+    const c = col + slot.dc;
+    if (cells[r]?.[c] != null) cells[r][c] = 0;
+  }
+}
+
+function canPaintScoreBlock(cells, cols, rows, col, row) {
+  for (const slot of SCORE_BLOCK_CELLS) {
+    const c = col + slot.dc;
+    const r = row + slot.dr;
+    if (c < 0 || r < 0 || c >= cols || r >= rows) return false;
+    const v = cells[r][c];
+    if (!v) continue;
+    const existing = resolveBlockAnchor(cells, c, r);
+    if (existing && existing.col === col && existing.row === row && existing.anchorCell === 18) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+function paintScoreBlockCells(cells, col, row) {
+  for (const slot of SCORE_BLOCK_CELLS) {
+    cells[row + slot.dr][col + slot.dc] = slot.v;
+  }
+  return true;
+}
+
+function migrateScoreFootprints(cells, cols, rows) {
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (cells[row][col] !== 18) continue;
+      const complete =
+        cells[row][col + 1] === 19 &&
+        cells[row + 1]?.[col] === 20 &&
+        cells[row + 1]?.[col + 1] === 21;
+      if (complete) continue;
+      if (canPaintScoreBlock(cells, cols, rows, col, row)) {
+        paintScoreBlockCells(cells, col, row);
+      } else {
+        clearScoreFootprint(cells, col, row);
+      }
+    }
+  }
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const v = cells[row][col];
+      if (v !== 19 && v !== 20 && v !== 21) continue;
+      const anchor = resolveBlockAnchor(cells, col, row);
+      if (!anchor || anchor.anchorCell !== 18) cells[row][col] = 0;
+    }
+  }
+}
+
+function clearBlockFootprint(cells, col, row) {
+  const anchor = resolveBlockAnchor(cells, col, row);
+  if (anchor?.anchorCell === 18) {
+    clearScoreFootprint(cells, anchor.col, anchor.row);
+    return;
+  }
+  if (anchor && LONG_BLOCK_PAINT[anchor.anchorCell]) {
+    const paint = LONG_BLOCK_PAINT[anchor.anchorCell];
+    cells[anchor.row][anchor.col] = 0;
+    cells[anchor.row + paint.dRow][anchor.col + paint.dCol] = 0;
+    return;
+  }
+  if (cells[row]?.[col]) cells[row][col] = 0;
 }
 
 function getBlockTypeFromCell(cell) {
@@ -360,24 +492,22 @@ function getBlockFootprint(typeId) {
   return { colSpan: def.colSpan ?? 1, rowSpan: def.rowSpan ?? 1 };
 }
 
-function resolveLongBlockAnchor(cells, col, row) {
-  const v = cells?.[row]?.[col];
-  if (!v) return null;
-  if (isBlockAnchorCell(v)) return { col, row, anchorCell: v };
-  const ext = BLOCK_CELL_EXTENSION[v];
-  if (!ext) return null;
-  return { col: col + ext.dCol, row: row + ext.dRow, anchorCell: ext.anchorCell };
+const BONUS_CHANCE_IMMUNE_TYPES = new Set(['indestructible', 'spike']);
+
+/** Whether a live block can be turned into a pass-through bonus block (Bonus Chance item). */
+function canBlockBecomeBonus(typeId) {
+  return Boolean(typeId) && !BONUS_CHANCE_IMMUNE_TYPES.has(typeId);
 }
 
-function clearBlockFootprint(cells, col, row) {
-  const anchor = resolveLongBlockAnchor(cells, col, row);
-  if (anchor && LONG_BLOCK_PAINT[anchor.anchorCell]) {
-    const paint = LONG_BLOCK_PAINT[anchor.anchorCell];
-    cells[anchor.row][anchor.col] = 0;
-    cells[anchor.row + paint.dRow][anchor.col + paint.dCol] = 0;
-    return;
+/** Points awarded when collecting a converted bonus block. */
+function getBonusCollectPoints(typeId, extra = {}) {
+  if (typeId === 'score') {
+    const tiers = getBlockDef('score').scoreTiers || [50];
+    const hits = extra.scoreHits || 0;
+    return tiers[Math.min(hits, tiers.length - 1)];
   }
-  if (cells[row]?.[col]) cells[row][col] = 0;
+  const def = getBlockDef(typeId);
+  return typeof def.points === 'number' ? def.points : 0;
 }
 
 function canPaintLongBlock(cells, cols, rows, col, row, anchorCell) {
@@ -395,7 +525,7 @@ function canPaintLongBlock(cells, cols, rows, col, row, anchorCell) {
   for (const { c, r } of slots) {
     const v = cells[r][c];
     if (!v) continue;
-    const existing = resolveLongBlockAnchor(cells, c, r);
+    const existing = resolveBlockAnchor(cells, c, r);
     if (existing && existing.col === col && existing.row === row && existing.anchorCell === anchorCell) {
       continue;
     }
@@ -433,6 +563,12 @@ function resolveBlockHit(typeId, isPowered) {
   if (def.powerOnly || def.normalHit === 'immune') return { action: 'immune', points: 0 };
   if (def.normalHit === 'damage_to_normal' && def.downgradeTo) {
     return { action: 'downgrade', toType: def.downgradeTo, points: 0 };
+  }
+  if (def.normalHit === 'hit_increment' || def.powerHit === 'hit_increment_high') {
+    return { action: 'score_hit', powered: isPowered };
+  }
+  if (def.normalHit === 'collect' || def.normalHit === 'pass_through') {
+    return { action: 'collect', points: def.points ?? 0 };
   }
   if (def.normalHit === 'destroy') return { action: 'destroy', points: def.points };
   return { action: 'immune', points: 0 };

@@ -3,8 +3,6 @@
  */
 /* global Phaser */
 
-const ITEM_ART_VERSION = '1';
-
 const ITEM_CATEGORY = {
   food: 'food',
   powerUp: 'powerUp',
@@ -18,7 +16,6 @@ const ITEM_COMPENDIUM = [
     name: 'Apple',
     category: ITEM_CATEGORY.food,
     points: 1000,
-    image: 'assets/items/food_apple.png',
     implemented: false,
     notes: 'Most common food; most regular enemies.',
   },
@@ -87,12 +84,23 @@ const ITEM_COMPENDIUM = [
     notes: 'Roulette for a new Copy Ability.',
   },
   {
+    id: 'item_bonus_chance',
+    name: 'Bonus Chance',
+    category: ITEM_CATEGORY.powerUp,
+    effect: 'bonus_chance',
+    duration: 'instant',
+    colSpan: 2,
+    rowSpan: 2,
+    points: 0,
+    implemented: true,
+    notes: '2×2 pickup; 30s timer — collect all converted blocks or they revert to original types.',
+  },
+  {
     id: 'warp_star',
     name: 'Warp Star',
     category: ITEM_CATEGORY.powerUp,
     effect: 'bonus_minigame',
     duration: 'instant',
-    image: 'assets/items/warp_star.png',
     colSpan: 2,
     rowSpan: 3,
     implemented: false,
@@ -159,13 +167,13 @@ function getItemPoints(itemId) {
   return typeof p === 'number' && p > 0 ? p : 0;
 }
 
-function getCompendiumItem(itemId) {
-  return ITEM_COMPENDIUM.find((i) => i.id === itemId);
+/** Gameplay effect id (e.g. `bonus_chance`, `split_ball_two`). */
+function getItemEffect(itemId) {
+  return getItemDef(itemId)?.effect ?? null;
 }
 
-/** Relative asset path for preload (`?v=ITEM_ART_VERSION`), or null if no art yet. */
-function getItemImagePath(itemId) {
-  return getItemDef(itemId)?.image ?? null;
+function getCompendiumItem(itemId) {
+  return ITEM_COMPENDIUM.find((i) => i.id === itemId);
 }
 
 /** Phaser texture key for level-placed items. */

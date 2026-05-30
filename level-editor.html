@@ -67,6 +67,25 @@
       line-height: 1.3;
     }
 
+    .sidebar-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .sidebar-nav a {
+      font-size: 12px;
+      color: var(--accent);
+      text-decoration: none;
+      border: 1px solid #555;
+      border-radius: 6px;
+      padding: 4px 8px;
+    }
+
+    .sidebar-nav a:hover {
+      border-color: var(--accent);
+    }
+
     .sidebar-section {
       display: flex;
       flex-direction: column;
@@ -366,6 +385,11 @@
     </main>
     <aside class="editor-sidebar" aria-label="Editor controls">
       <h1>Block Ball Level Editor</h1>
+      <nav class="sidebar-nav" aria-label="Site navigation">
+        <a href="campaign-menu.html">Campaign</a>
+        <a href="campaign-editor.html">Planner</a>
+        <a href="block-ball-demo.html">Free Play</a>
+      </nav>
 
       <section class="sidebar-section">
         <h2 class="sidebar-heading">Mode</h2>
@@ -425,7 +449,8 @@
     <form method="dialog" class="save-dialog" id="save-form">
       <h2>Save level</h2>
       <p>Writes <code>levels/&lt;id&gt;.js</code> and updates <code>levels/manifest.json</code>. Requires
-        <code>yarn start</code> (dev server).</p>
+        <code>yarn start</code> (dev server).
+      </p>
       <div class="save-field">
         <label for="save-id">Level id</label>
         <input type="text" id="save-id" name="id" pattern="[a-z0-9]+(-[a-z0-9]+)*" required autocomplete="off"
@@ -497,7 +522,6 @@
     let itemBrushValue = 'food_apple';
     let entityArt = null;
     let entityArtKey = '';
-    let paddleArt = null;
 
     function getBlockBrushValue() {
       return blockBrushValue;
@@ -609,6 +633,9 @@
         } else if (opt?.long) {
           const c = canvas.getContext('2d');
           EditorEntityArt.drawLongPickerThumb(c, PICKER_THUMB, entityArt?.blocks?.[v], opt);
+        } else if (opt?.span === '2x2') {
+          const c = canvas.getContext('2d');
+          EditorEntityArt.drawSpan2PickerThumb(c, PICKER_THUMB, entityArt?.blocks?.[v], opt);
         } else {
           paintPickerThumb(canvas, entityArt?.blocks?.[v], false);
         }
@@ -629,7 +656,13 @@
         const id = btn.dataset.entityId;
         const canvas = btn.querySelector('canvas');
         if (!canvas) return;
-        paintPickerThumb(canvas, entityArt?.items?.[id], false);
+        const foot = getItemFootprint(id);
+        if (foot.colSpan > 1 || foot.rowSpan > 1) {
+          const c = canvas.getContext('2d');
+          EditorEntityArt.drawSpan2PickerThumb(c, PICKER_THUMB, entityArt?.items?.[id], { value: id });
+        } else {
+          paintPickerThumb(canvas, entityArt?.items?.[id], false);
+        }
       });
     }
 
@@ -689,7 +722,7 @@
         enemyBrushRoot.appendChild(
           createPickerButton({
             entityId: entry.id,
-            label: entry.name + (entry.implemented ? '' : ' (no art yet)'),
+            label: entry.name + (entry.implemented ? '' : ' (planned)'),
             keyHint: entry.implemented ? undefined : '?',
             placeholder: !entry.implemented,
             onPick: () => {
@@ -710,13 +743,10 @@
       itemBrushRoot.innerHTML = '';
       const entries = EditorEntityArt.getItemPickerOptions();
       for (const entry of entries) {
-        const hasArt = Boolean(entry.image);
         itemBrushRoot.appendChild(
           createPickerButton({
             entityId: entry.id,
-            label: entry.name + (hasArt ? '' : ' (no art yet)'),
-            keyHint: hasArt ? undefined : '?',
-            placeholder: !hasArt,
+            label: entry.name,
             onPick: () => {
               setItemBrushValue(entry.id);
               setMode('items');
@@ -735,31 +765,12 @@
     initEnemyPicker();
     initItemPicker();
 
-    async function ensurePaddleArt() {
-      if (paddleArt) return;
-      try {
-        paddleArt = await loadImage('assets/paddle/paddle.png?v=13');
-      } catch {
-        paddleArt = null;
-      }
-    }
-
-    function loadImage(src) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Failed to load ${src}`));
-        img.src = src;
-      });
-    }
-
     async function ensureEntityArt() {
       const g = levelGrid.config;
       const key = `${g.cellWidth}|${g.cellHeight}`;
       if (entityArt && entityArtKey === key) return;
 
-      await ensurePaddleArt();
-      entityArt = await EditorEntityArt.buildEntityArt(g.cellWidth, g.cellHeight);
+      entityArt = EditorEntityArt.buildEntityArt(g.cellWidth, g.cellHeight);
       entityArtKey = key;
       updateBlockPickerThumbs();
       updateEnemyPickerThumbs();
@@ -772,10 +783,9 @@
       if (!typeId || typeof isPowerBlockType !== 'function' || !isPowerBlockType(typeId)) return false;
       const sprite = entityArt?.blocks?.[3];
       if (!sprite) return false;
-      const rotate = getPowerBlockRotate(typeId);
       const w = spanW ?? cellW;
       const h = spanH ?? cellH;
-      EditorEntityArt.drawStretchedRotated(ctx, sprite, tl.x, tl.y, w, h, 2, rotate);
+      EditorEntityArt.drawStretched(ctx, sprite, tl.x, tl.y, w, h, 2);
       return true;
     }
 
@@ -784,12 +794,15 @@
       if (drawPowerBlock(tl, cellW, cellH, v)) return;
       const sprite = entityArt?.blocks?.[v];
       if (sprite) {
-        EditorEntityArt.drawContained(ctx, sprite, tl.x, tl.y, cellW, cellH, 2);
+        EditorEntityArt.drawStretched(ctx, sprite, tl.x, tl.y, cellW, cellH, 2);
         if (v === 4) {
           ctx.strokeStyle = '#cc1144';
           ctx.strokeRect(tl.x + 0.5, tl.y + 0.5, cellW - 1, cellH - 1);
         } else if (v === 5) {
           ctx.strokeStyle = '#3d4d5d';
+          ctx.strokeRect(tl.x + 0.5, tl.y + 0.5, cellW - 1, cellH - 1);
+        } else if (v === 18) {
+          ctx.strokeStyle = '#6b5a9e';
           ctx.strokeRect(tl.x + 0.5, tl.y + 0.5, cellW - 1, cellH - 1);
         }
         return;
@@ -959,8 +972,13 @@
 
       if (value !== 0) {
         if (isBlockAnchorCell(value)) {
-          if (!canPaintLongBlock(cells, cols, rows, gridCol, gridRow, value)) return;
-          paintLongBlockCells(cells, gridCol, gridRow, value);
+          if (value === 18) {
+            if (!canPaintScoreBlock(cells, cols, rows, gridCol, gridRow)) return;
+            paintScoreBlockCells(cells, gridCol, gridRow);
+          } else {
+            if (!canPaintLongBlock(cells, cols, rows, gridCol, gridRow, value)) return;
+            paintLongBlockCells(cells, gridCol, gridRow, value);
+          }
         } else {
           cells[gridRow][gridCol] = value;
         }
@@ -1157,12 +1175,8 @@
       const paddleH = g.cellHeight * 0.5;
       const paddleX = paddlePos.x - paddleW / 2;
       const paddleY = paddlePos.y - paddleH / 2;
-      if (paddleArt) {
-        EditorEntityArt.drawStretched(ctx, paddleArt, paddleX, paddleY, paddleW, paddleH);
-      } else {
-        ctx.fillStyle = 'rgba(0,212,170,0.5)';
-        ctx.fillRect(paddleX + 1, paddleY + 1, paddleW - 2, paddleH - 2);
-      }
+      const paddleCanvas = EditorEntityArt.buildProceduralPaddleCanvas(paddleW, paddleH);
+      ctx.drawImage(paddleCanvas, paddleX, paddleY, paddleW, paddleH);
 
       if (!fromFloatLoop) syncItemFloatLoop();
     }
@@ -1554,6 +1568,10 @@
         '8': 8,
         a: 10,
         b: 12,
+        c: 14,
+        d: 16,
+        e: 18,
+        u: 22,
       };
       if (map[ev.key] != null) {
         setBlockBrushValue(map[ev.key]);
@@ -1564,7 +1582,6 @@
     (async function bootEditor() {
       editorLog('editor boot', window.location.href);
       try {
-        await ensurePaddleArt();
         await ensureEntityArt();
       } catch (err) {
         editorLog('initial entity art preload failed', err?.message || err);

@@ -1,24 +1,23 @@
 /**
- * Level editor — entity thumbnails, placeholders, and canvas sprites.
- * PNG paths: assets/blocks/{type}.png, assets/enemies/{id}.png (optional).
+ * Level editor — procedural entity thumbnails and canvas sprites.
  */
 /* global ENEMY_COMPENDIUM, ENEMY_TIER, ITEM_COMPENDIUM, ITEM_CATEGORY */
 
-const EDITOR_ART_VERSION = '13';
-
 const BLOCK_PICKER_OPTIONS = [
   { value: 0, label: 'Empty', key: '0' },
-  { value: 1, label: 'Normal', key: '1', image: 'assets/blocks/normal.png' },
-  { value: 2, label: 'Gray', key: '2', image: 'assets/blocks/gray.png' },
-  { value: 6, label: 'Normal Long ↔', key: '6', image: 'assets/blocks/normal.png', long: 'h' },
-  { value: 8, label: 'Normal Long ↕', key: '8', image: 'assets/blocks/normal.png', long: 'v' },
-  { value: 10, label: 'Gray Long ↔', key: 'a', image: 'assets/blocks/gray.png', long: 'h' },
-  { value: 12, label: 'Gray Long ↕', key: 'b', image: 'assets/blocks/gray.png', long: 'v' },
-  { value: 3, label: 'Power', key: '3', image: 'assets/blocks/power.png', power: true },
-  { value: 14, label: 'Power Long ↔', key: 'c', image: 'assets/blocks/power.png', power: true, long: 'h' },
-  { value: 16, label: 'Power Long ↕', key: 'd', image: 'assets/blocks/power.png', power: true, long: 'v' },
-  { value: 4, label: 'Spike', key: '4', image: 'assets/blocks/spike.png' },
+  { value: 1, label: 'Normal', key: '1', procedural: 'normal' },
+  { value: 2, label: 'Gray', key: '2', procedural: 'gray' },
+  { value: 6, label: 'Normal Long ↔', key: '6', procedural: 'normal', long: 'h' },
+  { value: 8, label: 'Normal Long ↕', key: '8', procedural: 'normal', long: 'v' },
+  { value: 10, label: 'Gray Long ↔', key: 'a', procedural: 'gray', long: 'h' },
+  { value: 12, label: 'Gray Long ↕', key: 'b', procedural: 'gray', long: 'v' },
+  { value: 3, label: 'Power', key: '3', procedural: 'power', power: true },
+  { value: 14, label: 'Power Long ↔', key: 'c', procedural: 'power', power: true, long: 'h' },
+  { value: 16, label: 'Power Long ↕', key: 'd', procedural: 'power', power: true, long: 'v' },
+  { value: 4, label: 'Spike', key: '4', procedural: 'spike' },
   { value: 5, label: 'Indestructible', key: '5', procedural: 'indestructible' },
+  { value: 18, label: 'Score', key: 'e', procedural: 'score', span: '2x2' },
+  { value: 22, label: 'Bonus', key: 'u', procedural: 'bonus' },
 ];
 
 const BLOCK_FALLBACK_COLORS = {
@@ -33,6 +32,8 @@ const BLOCK_FALLBACK_COLORS = {
   16: '#6b7280',
   4: '#ff3366',
   5: '#6b7c8c',
+  18: '#9b7ede',
+  22: '#ffd54f',
 };
 
 const ENEMY_TIER_COLORS = {
@@ -42,28 +43,11 @@ const ENEMY_TIER_COLORS = {
 };
 
 const ITEM_CATEGORY_COLORS = {
-  food: '#c45c5c',
-  powerUp: '#3d9a6a',
-  copyAbility: '#6b8cce',
-  life: '#9b7ede',
+  food: { fill: '#c45c5c', border: '#8b3a3a' },
+  powerUp: { fill: '#3d9a6a', border: '#2a6b4a' },
+  copyAbility: { fill: '#6b8cce', border: '#4a6299' },
+  life: { fill: '#9b7ede', border: '#6b5a9e' },
 };
-
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`Failed to load ${src}`));
-    img.src = src;
-  });
-}
-
-async function tryLoadImage(src) {
-  try {
-    return await loadImage(`${src}?v=${EDITOR_ART_VERSION}`);
-  } catch {
-    return null;
-  }
-}
 
 function roundRectPath(c, x, y, w, h, r) {
   const rad = Math.min(r, w / 2, h / 2);
@@ -95,7 +79,10 @@ function buildProceduralBlockCanvas(cellW, cellH, type) {
   const innerW = cellW - pad * 2;
   const innerH = cellH - pad * 2;
 
-  if (type === 'gray') {
+  if (type === 'normal') {
+    fillRoundRect(c, pad, pad, innerW, innerH, 4, '#ffb347');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#fff5e6');
+  } else if (type === 'gray') {
     fillRoundRect(c, pad, pad, innerW, innerH, 4, '#4b5563');
     fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#9ca3af');
     c.strokeStyle = 'rgba(107, 114, 128, 0.8)';
@@ -110,6 +97,23 @@ function buildProceduralBlockCanvas(cellW, cellH, type) {
     c.stroke();
     c.fillStyle = 'rgba(255, 230, 109, 0.35)';
     c.fillRect(pad + 6, pad + 6, innerW - 12, Math.max(4, innerH * 0.2));
+  } else if (type === 'spike') {
+    fillRoundRect(c, pad, pad, innerW, innerH, 3, '#4a1028');
+    c.fillStyle = '#ff3366';
+    const spikeW = innerW / 3;
+    for (let i = 0; i < 3; i++) {
+      const cx = pad + spikeW * i + spikeW * 0.5;
+      const half = spikeW * 0.38;
+      c.beginPath();
+      c.moveTo(cx - half, pad + innerH);
+      c.lineTo(cx, pad + innerH * 0.12);
+      c.lineTo(cx + half, pad + innerH);
+      c.closePath();
+      c.fill();
+    }
+    c.strokeStyle = 'rgba(204, 17, 68, 0.7)';
+    c.lineWidth = 2;
+    c.strokeRect(pad + 1, pad + innerH - 2, innerW - 2, 2);
   } else if (type === 'indestructible') {
     fillRoundRect(c, pad, pad, innerW, innerH, 4, '#3d4d5d');
     fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#6b7c8c');
@@ -122,7 +126,43 @@ function buildProceduralBlockCanvas(cellW, cellH, type) {
     c.moveTo(pad + innerW - 4, pad + 4);
     c.lineTo(pad + 4, pad + innerH - 4);
     c.stroke();
+  } else if (type === 'score') {
+    fillRoundRect(c, pad, pad, innerW, innerH, 4, '#6b5a9e');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#9b7ede');
+    c.fillStyle = '#ffffff';
+    c.font = `bold ${Math.max(8, Math.floor(innerW * 0.36))}px system-ui, sans-serif`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('50', cellW / 2, cellH * 0.46);
+    c.fillStyle = 'rgba(255, 255, 255, 0.65)';
+    c.font = `${Math.max(6, Math.floor(innerW * 0.18))}px system-ui, sans-serif`;
+    c.fillText('×7', cellW / 2, cellH * 0.72);
+  } else if (type === 'bonus') {
+    fillRoundRect(c, pad, pad, innerW, innerH, 4, '#ffb300');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#ffd54f');
+    c.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    c.beginPath();
+    c.arc(cellW / 2, cellH * 0.44, Math.min(innerW, innerH) * 0.14, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    c.font = `bold ${Math.max(7, Math.floor(innerW * 0.28))}px system-ui, sans-serif`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('100', cellW / 2, cellH * 0.72);
   }
+  return canvas;
+}
+
+/** Matches demo procedural paddle (generateTextures). */
+function buildProceduralPaddleCanvas(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width));
+  canvas.height = Math.max(1, Math.round(height));
+  const c = canvas.getContext('2d');
+  const pad = 2;
+  const innerH = canvas.height - pad - 2;
+  fillRoundRect(c, 0, 2, canvas.width, innerH, 6, '#00a080');
+  fillRoundRect(c, 0, 0, canvas.width, innerH, 6, '#00d4aa');
   return canvas;
 }
 
@@ -158,6 +198,69 @@ function buildProceduralEnemyCanvas(cellW, cellH) {
   c.beginPath();
   c.ellipse(cellW / 2, cellH * 0.72, cellW * 0.15, cellH * 0.1, 0, 0, Math.PI * 2);
   c.fill();
+  return canvas;
+}
+
+function drawStar(c, cx, cy, outerR, innerR, points) {
+  c.beginPath();
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = -Math.PI / 2 + (i * Math.PI) / points;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    if (i === 0) c.moveTo(x, y);
+    else c.lineTo(x, y);
+  }
+  c.closePath();
+  c.fill();
+}
+
+function drawBonusChanceItemArt(c, w, h) {
+  const cx = w / 2;
+  const cy = h / 2;
+  const circleR = Math.min(w, h) * 0.42;
+  const outerR = circleR * 0.55;
+  const innerR = outerR * 0.42;
+
+  c.fillStyle = '#3d9a6a';
+  c.beginPath();
+  c.arc(cx, cy, circleR, 0, Math.PI * 2);
+  c.fill();
+
+  c.fillStyle = '#ffe66d';
+  drawStar(c, cx, cy, outerR, innerR, 5);
+}
+
+function buildProceduralItemCanvas(cellW, cellH, entry) {
+  const foot = getItemFootprint(entry.id);
+  const canvas = document.createElement('canvas');
+  canvas.width = cellW * foot.colSpan;
+  canvas.height = cellH * foot.rowSpan;
+  const c = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  if (entry.id === 'item_bonus_chance') {
+    drawBonusChanceItemArt(c, w, h);
+    return canvas;
+  }
+
+  const size = Math.max(8, Math.min(cellW, cellH) - 4);
+  const ox = (w - size) / 2;
+  const oy = (h - size) / 2;
+  const colors = ITEM_CATEGORY_COLORS[entry.category] || { fill: '#888888', border: '#555555' };
+  fillRoundRect(c, ox, oy, size, size, 4, colors.border);
+  fillRoundRect(c, ox + 2, oy + 2, size - 4, size - 4, 3, colors.fill);
+  c.fillStyle = 'rgba(255,255,255,0.35)';
+  c.beginPath();
+  c.arc(ox + size * 0.72, oy + size * 0.28, Math.max(2, size * 0.1), 0, Math.PI * 2);
+  c.fill();
+  const abbrev = itemAbbrev(entry.id);
+  c.fillStyle = 'rgba(255,255,255,0.85)';
+  c.font = `bold ${Math.max(7, Math.floor(size * 0.32))}px system-ui, sans-serif`;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(abbrev, ox + size / 2, oy + size * 0.58);
   return canvas;
 }
 
@@ -224,35 +327,12 @@ function itemCategoryHint(category) {
 function getItemPickerOptions() {
   const list = typeof ITEM_COMPENDIUM !== 'undefined' ? [...ITEM_COMPENDIUM] : [];
   return list.sort((a, b) => {
-    const artA = Boolean(a.image);
-    const artB = Boolean(b.image);
-    if (artA !== artB) return artA ? -1 : 1;
     const catOrder = { food: 0, powerUp: 1, copyAbility: 2, life: 3 };
     const ca = catOrder[a.category] ?? 9;
     const cb = catOrder[b.category] ?? 9;
     if (ca !== cb) return ca - cb;
     return a.name.localeCompare(b.name);
   });
-}
-
-/** Stretch sprite to fill rect; optional 90° CW rotation (power blocks). */
-function drawStretchedRotated(ctx, sprite, x, y, w, h, pad, rotate) {
-  if (!sprite) return;
-  const px = x + pad;
-  const py = y + pad;
-  const pw = w - pad * 2;
-  const ph = h - pad * 2;
-  if (pw <= 0 || ph <= 0) return;
-
-  if (rotate === 'cw') {
-    ctx.save();
-    ctx.translate(px + pw / 2, py + ph / 2);
-    ctx.rotate(Math.PI / 2);
-    ctx.drawImage(sprite, -ph / 2, -pw / 2, ph, pw);
-    ctx.restore();
-  } else {
-    ctx.drawImage(sprite, px, py, pw, ph);
-  }
 }
 
 /** Stretch sprite to fill rect (same art as 1×1, scaled to footprint). */
@@ -266,7 +346,6 @@ function drawStretched(ctx, sprite, x, y, w, h, pad = 0) {
   ctx.drawImage(sprite, px, py, pw, ph);
 }
 
-/** Picker thumbnail for long brushes — stretched normal/gray PNG in a bar shape. */
 function drawPowerPickerThumb(c, size, sprite, opt) {
   c.clearRect(0, 0, size, size);
   const pad = 2;
@@ -281,14 +360,26 @@ function drawPowerPickerThumb(c, size, sprite, opt) {
     }
     return;
   }
-  const rotate = opt.long === 'v' ? 'none' : 'cw';
   if (opt.long === 'h') {
-    drawStretchedRotated(c, sprite, pad, pad + size * 0.2, size - pad * 2, size * 0.55, 0, rotate);
+    drawStretched(c, sprite, pad, pad + size * 0.2, size - pad * 2, size * 0.55, 0);
   } else if (opt.long === 'v') {
-    drawStretchedRotated(c, sprite, pad + size * 0.2, pad, size * 0.55, size - pad * 2, 0, rotate);
+    drawStretched(c, sprite, pad + size * 0.2, pad, size * 0.55, size - pad * 2, 0);
   } else {
-    drawStretchedRotated(c, sprite, pad, pad, size - pad * 2, size - pad * 2, 0, rotate);
+    drawStretched(c, sprite, pad, pad, size - pad * 2, size - pad * 2, 0);
   }
+}
+
+function drawSpan2PickerThumb(c, size, sprite, opt) {
+  c.clearRect(0, 0, size, size);
+  const pad = 2;
+  const w = size - pad * 2;
+  const h = size - pad * 2;
+  if (sprite) {
+    drawStretched(c, sprite, pad, pad, w, h, 0);
+    return;
+  }
+  c.fillStyle = BLOCK_FALLBACK_COLORS[opt.value] || '#9b7ede';
+  c.fillRect(pad, pad, w, h);
 }
 
 function drawLongPickerThumb(c, size, sprite, opt) {
@@ -310,12 +401,8 @@ function drawLongPickerThumb(c, size, sprite, opt) {
   }
 }
 
-async function resolveBlockSprite(opt, cellW, cellH) {
+function resolveBlockSprite(opt, cellW, cellH) {
   if (opt.value === 0) return null;
-  if (opt.image) {
-    const img = await tryLoadImage(opt.image);
-    if (img) return img;
-  }
   if (opt.procedural) {
     return buildProceduralBlockCanvas(cellW, cellH, opt.procedural);
   }
@@ -326,9 +413,7 @@ async function resolveBlockSprite(opt, cellW, cellH) {
   });
 }
 
-async function resolveEnemySprite(entry, cellW, cellH) {
-  const img = await tryLoadImage(`assets/enemies/${entry.id}.png`);
-  if (img) return img;
+function resolveEnemySprite(entry, cellW, cellH) {
   if (entry.implemented) {
     return buildProceduralEnemyCanvas(cellW, cellH);
   }
@@ -339,41 +424,25 @@ async function resolveEnemySprite(entry, cellW, cellH) {
   });
 }
 
-async function resolveItemSprite(entry, cellW, cellH) {
-  if (entry.image) {
-    const img = await tryLoadImage(entry.image);
-    if (img) return img;
-  }
-  return buildPlaceholderCanvas(cellW, cellH, {
-    bg: ITEM_CATEGORY_COLORS[entry.category] || '#555',
-    label: itemAbbrev(entry.id),
-    hint: itemCategoryHint(entry.category),
-  });
+function resolveItemSprite(entry, cellW, cellH) {
+  return buildProceduralItemCanvas(cellW, cellH, entry);
 }
 
-async function buildEntityArt(cellW, cellH) {
+function buildEntityArt(cellW, cellH) {
   const blocks = {};
-  await Promise.all(
-    BLOCK_PICKER_OPTIONS.map(async (opt) => {
-      blocks[opt.value] = await resolveBlockSprite(opt, cellW, cellH);
-    })
-  );
+  for (const opt of BLOCK_PICKER_OPTIONS) {
+    blocks[opt.value] = resolveBlockSprite(opt, cellW, cellH);
+  }
 
   const enemies = {};
-  const enemyOpts = getEnemyPickerOptions();
-  await Promise.all(
-    enemyOpts.map(async (entry) => {
-      enemies[entry.id] = await resolveEnemySprite(entry, cellW, cellH);
-    })
-  );
+  for (const entry of getEnemyPickerOptions()) {
+    enemies[entry.id] = resolveEnemySprite(entry, cellW, cellH);
+  }
 
   const items = {};
-  const itemOpts = getItemPickerOptions();
-  await Promise.all(
-    itemOpts.map(async (entry) => {
-      items[entry.id] = await resolveItemSprite(entry, cellW, cellH);
-    })
-  );
+  for (const entry of getItemPickerOptions()) {
+    items[entry.id] = resolveItemSprite(entry, cellW, cellH);
+  }
 
   return { blocks, enemies, items };
 }
@@ -381,8 +450,8 @@ async function buildEntityArt(cellW, cellH) {
 function drawThumbContained(c, sprite, size, pad) {
   c.clearRect(0, 0, size, size);
   if (!sprite) return;
-  const iw = sprite.naturalWidth || sprite.width;
-  const ih = sprite.naturalHeight || sprite.height;
+  const iw = sprite.width;
+  const ih = sprite.height;
   const inner = size - pad * 2;
   const scale = Math.min(inner / iw, inner / ih);
   const dw = iw * scale;
@@ -411,8 +480,8 @@ function drawEmptyThumb(c, size) {
 
 function drawContained(ctx, sprite, x, y, w, h, pad) {
   if (!sprite) return;
-  const iw = sprite.naturalWidth || sprite.width;
-  const ih = sprite.naturalHeight || sprite.height;
+  const iw = sprite.width;
+  const ih = sprite.height;
   const innerW = w - pad * 2;
   const innerH = h - pad * 2;
   const scale = Math.min(innerW / iw, innerH / ih);
@@ -422,19 +491,20 @@ function drawContained(ctx, sprite, x, y, w, h, pad) {
 }
 
 const EditorEntityArt = {
-  EDITOR_ART_VERSION,
   BLOCK_PICKER_OPTIONS,
   BLOCK_FALLBACK_COLORS,
   getEnemyPickerOptions,
   getItemPickerOptions,
   buildEntityArt,
+  buildProceduralPaddleCanvas,
   drawThumbContained,
   drawEmptyThumb,
   drawContained,
   drawStretched,
-  drawStretchedRotated,
   drawPowerPickerThumb,
   drawLongPickerThumb,
+  drawSpan2PickerThumb,
+  drawBonusChanceItemArt,
   buildPlaceholderCanvas,
 };
 
