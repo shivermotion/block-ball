@@ -18,9 +18,9 @@
     "global": "LEVEL_DEMO_LEVEL_02"
   },
   {
-    "id": "score-test-block",
-    "name": "score block test",
-    "script": "levels/score-test-block.js",
-    "global": "LEVEL_SCORE_TEST_BLOCK"
+    "id": "score-test-block-fix",
+    "name": "score-test-block-fix",
+    "script": "levels/score-test-block-fix.js",
+    "global": "LEVEL_SCORE_TEST_BLOCK_FIX"
   }
 ]
