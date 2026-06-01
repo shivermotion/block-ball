@@ -1201,7 +1201,13 @@ PACKAGING FOR REAL MOBILE APPS
         // Physics world — only the playfield (below HUD), not the full frame
         const playBounds = this.levelGrid.getPlayBounds();
         this.physics.world.setBounds(playBounds.x, playBounds.y, playBounds.width, playBounds.height);
-        this.physics.world.setBoundsCollision(true, true, true, false);
+        this.physics.world.setBoundsCollision(true, true, true, true);
+
+        const playFloor = this.add.graphics().setDepth(8);
+        const floorH = 6;
+        const floorY = playBounds.y + playBounds.height - floorH;
+        playFloor.fillStyle(0x000000, 1);
+        playFloor.fillRoundedRect(playBounds.x, floorY, playBounds.width, floorH, floorH / 2);
 
         this.createBlocks();
         this.createEnemies();
@@ -1544,6 +1550,7 @@ PACKAGING FOR REAL MOBILE APPS
         this.paddle.setCollideWorldBounds(true);
         this.paddle.setDepth(10);
         this.paddle.setOrigin(0.5, 0.5);
+        this.threeOverlay?.registerPaddle(this.paddle);
       }
 
       createBall() {
@@ -2357,6 +2364,7 @@ PACKAGING FOR REAL MOBILE APPS
             this.doPaddleSpringBounce();
           }
           this.flashBallPowerSuccess();
+          this.threeOverlay?.triggerPaddlePowerStarSpin?.();
           this.triggerPerfectTimingFeedback();
         } else {
           if (this.powerBounceQueued) {
@@ -3923,9 +3931,6 @@ PACKAGING FOR REAL MOBILE APPS
                 x: this.ball.body.velocity.x,
                 y: this.ball.body.velocity.y,
               };
-            }
-            if (this.ball.y > this.scale.height - 28) {
-              this.loseBall();
             }
             this.clampBallSpeed();
             this.updateBallSpin(delta);
