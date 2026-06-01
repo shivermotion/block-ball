@@ -6,10 +6,10 @@
       "name": "World 1",
       "stages": [
         "demo-level-01",
-        null,
-        null,
-        null,
-        null
+        "demo-level-02",
+        "demo-level-02",
+        "bonus",
+        "score-test-block-fix"
       ]
     },
     {

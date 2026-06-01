@@ -2,7 +2,7 @@
  * Block Ball — transparent Three.js overlay synced to Phaser sprites.
  * Enable with ?3d=1 on block-ball-demo.html
  *
- * Phaser sprites for meshed entities are hidden; Three.js meshes render on top.
+ * Phaser sprites for meshed entities (blocks, paddle, ball) are hidden; Three.js meshes render on top.
  */
 
 import * as THREE from 'three';
@@ -564,11 +564,11 @@ function createCuteSpikeShape(pw, ph) {
     typeof globalThis.cuteSpikeLayout === 'function'
       ? globalThis.cuteSpikeLayout(0, pw, ph)
       : {
-          cx: pw * 0.5,
-          tipY: ph * 0.1,
-          baseY: ph * 0.9,
-          halfW: pw * 0.38,
-        };
+        cx: pw * 0.5,
+        tipY: ph * 0.1,
+        baseY: ph * 0.9,
+        halfW: pw * 0.38,
+      };
   const sample =
     typeof globalThis.sampleCuteSpikePoints === 'function'
       ? globalThis.sampleCuteSpikePoints
@@ -1318,31 +1318,214 @@ function createBlockMesh(block) {
   return group;
 }
 
+/** Matches COLORS.paddle / COLORS.paddleDark in block-ball-demo.html */
+const PADDLE_COLORS = {
+  main: 0x00ffcc,
+  shadow: 0x00ccaa,
+  chargeTint: 0xccffff,
+};
+
+/** End-cap ticker stars — rapid smooth spin after a power bounce hit. */
+const PADDLE_STAR_POWER_SPIN = {
+  durationMs: 760,
+  revolutions: 4.25,
+};
+
+/** Brief pop on power bounce — not tied to full power-ball duration. */
+const PADDLE_STAR_SCALE_BURST = {
+  durationMs: 380,
+  peak: 1.55,
+};
+
+const PADDLE_STAR_SCALE = {
+  /** Per-frame lerp toward target scale. */
+  lerp: 0.28,
+  /** Extra outward push when enlarged (keeps overflow past paddle caps). */
+  xOverflowMul: 0.2,
+};
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+function createPaddleTickerStar(outerR, phase = 0) {
+  const starGroup = new THREE.Group();
+  const fill = new THREE.Mesh(
+    new THREE.ShapeGeometry(createCuteStarShape(outerR)),
+    new THREE.MeshBasicMaterial({
+      color: 0xffff88,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    })
+  );
+  fill.userData.paddleDetail = true;
+
+  const outline = new THREE.Mesh(
+    new THREE.ShapeGeometry(createStarOutlineShape(outerR, 0.66, 0.42, 0.2)),
+    new THREE.MeshBasicMaterial({
+      color: 0x220044,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    })
+  );
+  outline.position.z = 0.02;
+  outline.userData.paddleDetail = true;
+
+  starGroup.add(fill, outline);
+  starGroup.userData.phase = phase;
+  starGroup.renderOrder = 7;
+  return starGroup;
+}
+
+function addPaddleEndStars(group, pw, ph, depth) {
+  const outerR = Math.min(pw * 0.28, ph * 0.58);
+  const zFront = dioramaFrontZ(depth) + 0.06;
+  /** Center slightly past the cap — partial overflow past the paddle ends. */
+  const xEnd = pw * 0.5 + outerR * 0.08;
+
+  const left = createPaddleTickerStar(outerR, 0);
+  left.position.set(-xEnd, 0, zFront);
+  left.userData.baseX = xEnd;
+  left.userData.xSign = -1;
+  group.add(left);
+
+  const right = createPaddleTickerStar(outerR, Math.PI / 4);
+  right.position.set(xEnd, 0, zFront);
+  right.userData.baseX = xEnd;
+  right.userData.xSign = 1;
+  group.add(right);
+
+  group.userData.endStars = [left, right];
+}
+
+function resolvePaddleStarScale(star, timeMs) {
+  const fx = star.userData.scaleBurstFx;
+  if (!fx) return 1;
+  const elapsed = timeMs - fx.start;
+  if (elapsed >= fx.durationMs) {
+    star.userData.scaleBurstFx = null;
+    return 1;
+  }
+  const t = elapsed / fx.durationMs;
+  const peak = fx.peak ?? PADDLE_STAR_SCALE_BURST.peak;
+  return 1 + (peak - 1) * Math.sin(t * Math.PI);
+}
+
+function syncPaddleEndStarVisuals(star, timeMs) {
+  star.rotation.z = resolvePaddleStarRotationZ(star, timeMs);
+
+  const target = resolvePaddleStarScale(star, timeMs);
+  const cur = star.scale.x;
+  const next = cur + (target - cur) * PADDLE_STAR_SCALE.lerp;
+  star.scale.set(next, next, 1);
+
+  const baseX = star.userData.baseX;
+  if (baseX != null) {
+    const sign = star.userData.xSign ?? 1;
+    const outward = 1 + (next - 1) * PADDLE_STAR_SCALE.xOverflowMul;
+    star.position.x = sign * baseX * outward;
+  }
+}
+
+function resolvePaddleStarRotationZ(star, timeMs) {
+  const fx = star.userData.powerSpinFx;
+  if (fx) {
+    const elapsed = timeMs - fx.start;
+    if (elapsed < fx.durationMs) {
+      const t = elapsed / fx.durationMs;
+      return fx.fromAngle + easeInOutCubic(t) * fx.revolutions * Math.PI * 2;
+    }
+    star.userData.powerSpinFx = null;
+  }
+  return resolveNormalStarTickerAngle(timeMs, star.userData.phase ?? 0);
+}
+
+function triggerPaddleEndStarPowerSpin(stars, timeMs) {
+  if (!stars?.length) return;
+  for (const star of stars) {
+    const fromAngle = resolvePaddleStarRotationZ(star, timeMs);
+    star.userData.powerSpinFx = {
+      start: timeMs,
+      fromAngle,
+      durationMs: PADDLE_STAR_POWER_SPIN.durationMs,
+      revolutions: PADDLE_STAR_POWER_SPIN.revolutions,
+    };
+    star.userData.scaleBurstFx = {
+      start: timeMs,
+      durationMs: PADDLE_STAR_SCALE_BURST.durationMs,
+      peak: PADDLE_STAR_SCALE_BURST.peak,
+    };
+  }
+}
+
+function makePaddleMaterial(colorHex) {
+  const color = new THREE.Color(colorHex);
+  return new THREE.MeshPhysicalMaterial({
+    color,
+    emissive: color,
+    emissiveIntensity: 0.24,
+    roughness: 0.4,
+    metalness: 0,
+    clearcoat: 0.38,
+    clearcoatRoughness: 0.48,
+  });
+}
+
+function createPaddleMesh(width, height) {
+  const w = Math.max(1, width);
+  const h = Math.max(1, height);
+  const base = Math.min(w, h);
+  const pw = w * 1.02;
+  const ph = h * 1.02;
+  const depth = base * 0.36;
+  const radius = Math.min(pw, ph, depth) * DIORAMA.blockCornerRadiusFrac;
+  const group = new THREE.Group();
+  const shadowGeo = new RoundedBoxGeometry(pw, ph, depth, DIORAMA.roundedBoxSegments, radius);
+  const shadow = new THREE.Mesh(shadowGeo, makePaddleMaterial(PADDLE_COLORS.shadow));
+  shadow.position.set(0, -2, -depth * 0.2);
+  group.add(shadow);
+
+  const mainGeo = new RoundedBoxGeometry(pw, ph, depth, DIORAMA.roundedBoxSegments, radius);
+  const main = new THREE.Mesh(mainGeo, makePaddleMaterial(PADDLE_COLORS.main));
+  group.add(main);
+
+  addPaddleEndStars(group, pw, ph, depth);
+
+  group.userData.baseW = w;
+  group.userData.baseH = h;
+  group.userData.mainMesh = main;
+  group.userData.shadowMesh = shadow;
+  group.renderOrder = 6;
+  return group;
+}
+
 function createBallMesh(radius) {
   const tex = ballFaceTexture;
   const material = tex
     ? new THREE.MeshBasicMaterial({
-        map: tex,
-        color: 0xffffff,
-        transparent: false,
-        opacity: 1,
-        depthWrite: true,
-        depthTest: true,
-      })
+      map: tex,
+      color: 0xffffff,
+      transparent: false,
+      opacity: 1,
+      depthWrite: true,
+      depthTest: true,
+    })
     : new THREE.MeshPhysicalMaterial({
-        color: 0xffffff,
-        emissive: 0x44ddff,
-        emissiveIntensity: 0.38,
-        roughness: 0.68,
-        metalness: 0,
-        clearcoat: 0.32,
-        clearcoatRoughness: 0.78,
-        sheen: 0.65,
-        sheenRoughness: 0.55,
-        sheenColor: new THREE.Color(0xffffff),
-        transparent: false,
-        opacity: 1,
-      });
+      color: 0xffffff,
+      emissive: 0x44ddff,
+      emissiveIntensity: 0.38,
+      roughness: 0.68,
+      metalness: 0,
+      clearcoat: 0.32,
+      clearcoatRoughness: 0.78,
+      sheen: 0.65,
+      sheenRoughness: 0.55,
+      sheenColor: new THREE.Color(0xffffff),
+      transparent: false,
+      opacity: 1,
+    });
 
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 20), material);
   mesh.userData.baseRadius = radius;
@@ -1487,6 +1670,8 @@ export function createThreeOverlay(opts) {
   const scoreStarLiberations = [];
   let ballMesh = null;
   let ballRef = null;
+  let paddleMesh = null;
+  let paddleRef = null;
   let phaserScene = null;
   let resizeObserver = null;
   let rafId = 0;
@@ -1629,6 +1814,38 @@ export function createThreeOverlay(opts) {
     entry.group.visible = block.active && !hidePanel;
   }
 
+  function syncPaddleMesh() {
+    if (!paddleRef?.active || !paddleMesh) return;
+
+    const depth =
+      Math.min(paddleMesh.userData.baseW, paddleMesh.userData.baseH) * 0.36;
+    placeMesh(paddleMesh, paddleRef, 5, dioramaBlockLift(depth));
+
+    const baseW = paddleMesh.userData.baseW;
+    const baseH = paddleMesh.userData.baseH;
+    if (baseW > 0 && baseH > 0) {
+      paddleMesh.scale.set(paddleRef.displayWidth / baseW, paddleRef.displayHeight / baseH, 1);
+    }
+    paddleMesh.visible = paddleRef.active;
+
+    const main = paddleMesh.userData.mainMesh;
+    if (main?.material) {
+      const charging = Boolean(phaserScene?.paddleCharging);
+      const hex = charging ? PADDLE_COLORS.chargeTint : PADDLE_COLORS.main;
+      main.material.color.setHex(hex);
+      main.material.emissive.setHex(hex);
+      main.material.emissiveIntensity = charging ? 0.32 : 0.24;
+    }
+
+    const stars = paddleMesh.userData.endStars;
+    if (stars?.length && phaserScene?.time) {
+      const timeMs = phaserScene.time.now;
+      for (const star of stars) {
+        syncPaddleEndStarVisuals(star, timeMs);
+      }
+    }
+  }
+
   function syncBallMesh() {
     if (!ballRef?.active || !ballMesh) return;
 
@@ -1673,6 +1890,7 @@ export function createThreeOverlay(opts) {
   function syncMeshes() {
     if (!phaserScene) return;
 
+    syncPaddleMesh();
     syncBallMesh();
 
     for (const block of blockMeshes.keys()) {
@@ -1852,6 +2070,24 @@ export function createThreeOverlay(opts) {
       return true;
     },
 
+    registerPaddle(paddle) {
+      paddleRef = paddle;
+      if (paddleMesh) {
+        root.remove(paddleMesh);
+        disposeMeshTree(paddleMesh);
+        paddleMesh = null;
+      }
+      paddleMesh = createPaddleMesh(paddle.displayWidth, paddle.displayHeight);
+      root.add(paddleMesh);
+      hidePhaserSprite(paddle);
+      syncPaddleMesh();
+    },
+
+    triggerPaddlePowerStarSpin() {
+      if (!paddleMesh || !phaserScene?.time) return;
+      triggerPaddleEndStarPowerSpin(paddleMesh.userData.endStars, phaserScene.time.now);
+    },
+
     registerBall(ball) {
       ballRef = ball;
       if (ballMesh) {
@@ -1892,6 +2128,13 @@ export function createThreeOverlay(opts) {
         disposeMeshTree(lib.starGroup);
       }
       scoreStarLiberations.length = 0;
+      if (paddleRef) restorePhaserSprite(paddleRef);
+      if (paddleMesh) {
+        disposeMeshTree(paddleMesh);
+        root.remove(paddleMesh);
+        paddleMesh = null;
+      }
+      paddleRef = null;
       if (ballRef) restorePhaserSprite(ballRef);
       if (ballMesh) {
         disposeMeshTree(ballMesh);

@@ -1,11 +1,11 @@
 /**
- * score block test
+ * score-test-block-fix
  */
 
-const LEVEL_SCORE_TEST_BLOCK = {
+const LEVEL_SCORE_TEST_BLOCK_FIX = {
   "version": 1,
-  "id": "score-test-block",
-  "name": "score block test",
+  "id": "score-test-block-fix",
+  "name": "score-test-block-fix",
   "hud": {
     "height": 72,
     "padX": 12,
@@ -54,8 +54,8 @@ const LEVEL_SCORE_TEST_BLOCK = {
         24,
         25,
         0,
-        0,
-        0,
+        23,
+        23,
         0,
         24,
         25,
@@ -87,14 +87,14 @@ const LEVEL_SCORE_TEST_BLOCK = {
       ],
       [
         0,
-        0,
+        23,
         0,
         0,
         18,
         19,
         0,
         0,
-        0,
+        23,
         0
       ],
       [
@@ -284,20 +284,8 @@ const LEVEL_SCORE_TEST_BLOCK = {
         18,
         18,
         0,
-        0,
-        0,
-        0,
-        18,
-        18,
-        0
-      ],
-      [
-        0,
-        18,
-        18,
-        0,
-        0,
-        0,
+        2,
+        2,
         0,
         18,
         18,
@@ -305,14 +293,14 @@ const LEVEL_SCORE_TEST_BLOCK = {
       ],
       [
         0,
+        18,
+        18,
         0,
         0,
         0,
         0,
-        0,
-        0,
-        0,
-        0,
+        18,
+        18,
         0
       ],
       [
@@ -325,6 +313,18 @@ const LEVEL_SCORE_TEST_BLOCK = {
         0,
         0,
         0,
+        0
+      ],
+      [
+        0,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        2,
         0
       ],
       [
@@ -506,9 +506,9 @@ const LEVEL_SCORE_TEST_BLOCK = {
   },
   "meta": {
     "lives": 3,
-    "description": "score block test"
+    "description": "score-test-block-fix"
   }
 };
 
 /** Dynamic loader (registry.js) reads `window`; `const` does not set that. */
-window.LEVEL_SCORE_TEST_BLOCK = LEVEL_SCORE_TEST_BLOCK;
+window.LEVEL_SCORE_TEST_BLOCK_FIX = LEVEL_SCORE_TEST_BLOCK_FIX;
