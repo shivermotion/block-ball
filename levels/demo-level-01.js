@@ -289,6 +289,13 @@ const LEVEL_DEMO_LEVEL_01 = {
       "type": "drifter"
     }
   ],
+  "items": [
+    {
+      "col": 4,
+      "row": 6,
+      "type": "item_bonus_chance"
+    }
+  ],
   "paddle": {
     "col": 4,
     "colSpan": 2,

@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "worlds": [
+    {
+      "id": "world-01",
+      "name": "World 1",
+      "stages": [
+        "demo-level-01",
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "world-02",
+      "name": "World 2",
+      "stages": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "world-03",
+      "name": "World 3",
+      "stages": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "world-04",
+      "name": "World 4",
+      "stages": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "world-05",
+      "name": "World 5",
+      "stages": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "world-06",
+      "name": "World 6",
+      "stages": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "world-07",
+      "name": "World 7",
+      "stages": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "world-08",
+      "name": "World 8",
+      "stages": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "world-09",
+      "name": "World 9",
+      "stages": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "id": "world-10",
+      "name": "World 10",
+      "stages": [
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  ]
+}

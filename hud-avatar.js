@@ -20,10 +20,10 @@ function drawAvatarFace(g, av, skin, ringColor) {
   g.fillCircle(av / 2, av / 2, av / 2 - 1);
   g.fillStyle(skin, 1);
   g.fillCircle(av / 2, av * 0.42, av * 0.22);
-  g.fillStyle(0x1a1a2e, 1);
+  g.fillStyle(0x220044, 1);
   g.fillCircle(av * 0.38, av * 0.4, 2.5);
   g.fillCircle(av * 0.62, av * 0.4, 2.5);
-  g.lineStyle(2, 0x1a1a2e, 0.85);
+  g.lineStyle(2, 0x220044, 0.9);
   g.beginPath();
   g.arc(av / 2, av * 0.48, av * 0.12, 0.15, Math.PI - 0.15, false);
   g.strokePath();
@@ -36,42 +36,42 @@ function generateHudAvatarTextures(scene, size = 48) {
 
   if (!scene.textures.exists('ball')) {
     g.clear();
-    drawAvatarFace(g, av, 0xffd4a8, 0x3d4f6f);
+    drawAvatarFace(g, av, 0xffd4a8, 0x8844ff);
     g.generateTexture('hud_avatar_default', av, av);
   }
 
   g.clear();
-  drawAvatarFace(g, av, 0xffb8a8, 0x8b2942);
-  g.fillStyle(0xff6b6b, 0.9);
+  drawAvatarFace(g, av, 0xffb8a8, 0xff2266);
+  g.fillStyle(0xff4488, 0.95);
   g.fillTriangle(av * 0.72, av * 0.18, av * 0.88, av * 0.34, av * 0.72, av * 0.34);
   g.generateTexture('hud_avatar_hurt', av, av);
 
   g.clear();
-  drawAvatarFace(g, av, 0xffd4a8, 0x00a884);
-  g.lineStyle(3, 0xb8ffec, 0.9);
+  drawAvatarFace(g, av, 0xffd4a8, 0x00ccaa);
+  g.lineStyle(3, 0x88ffee, 0.95);
   g.strokeCircle(av / 2, av / 2, av / 2 - 4);
   g.generateTexture('hud_avatar_charging', av, av);
 
   g.clear();
-  drawAvatarFace(g, av, 0xffd4a8, 0x6b7280);
-  g.fillStyle(0xffe66d, 1);
+  drawAvatarFace(g, av, 0xffd4a8, 0x8844ff);
+  g.fillStyle(0xffee44, 1);
   g.fillCircle(av * 0.78, av * 0.22, av * 0.1);
-  g.lineStyle(2, 0xffe66d, 0.85);
+  g.lineStyle(2, 0xffee44, 0.95);
   g.strokeCircle(av * 0.78, av * 0.22, av * 0.14);
   g.generateTexture('hud_avatar_armed', av, av);
 
   g.clear();
-  drawAvatarFace(g, av, 0xcfd4dc, 0x6b7280);
-  g.lineStyle(2, 0x9ca3af, 0.7);
+  drawAvatarFace(g, av, 0xd8e4ff, 0x4466ff);
+  g.lineStyle(2, 0xa8c0ff, 0.85);
   g.strokeCircle(av / 2, av / 2, av / 2 - 3);
   g.generateTexture('hud_avatar_cooling', av, av);
 
   if (!scene.textures.exists('ball_determined')) {
     g.clear();
-    drawAvatarFace(g, av, 0xfff0a0, 0xffe66d);
-    g.lineStyle(3, 0xffffff, 0.95);
+    drawAvatarFace(g, av, 0xffff88, 0xffee44);
+    g.lineStyle(3, 0xffffff, 1);
     g.strokeCircle(av / 2, av / 2, av / 2 - 3);
-    g.fillStyle(0xffe66d, 1);
+    g.fillStyle(0xffee44, 1);
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 - Math.PI / 2;
       g.fillCircle(av / 2 + Math.cos(a) * (av * 0.38), av / 2 + Math.sin(a) * (av * 0.38), 3);
@@ -80,7 +80,7 @@ function generateHudAvatarTextures(scene, size = 48) {
   }
 
   g.clear();
-  drawAvatarFace(g, av, 0xffd4a8, 0x00d4aa);
+  drawAvatarFace(g, av, 0xffd4a8, 0x00ffcc);
   g.lineStyle(3, 0xffffff, 0.9);
   g.beginPath();
   g.arc(av / 2, av * 0.55, av * 0.18, 0.1, Math.PI - 0.1, false);
@@ -88,8 +88,8 @@ function generateHudAvatarTextures(scene, size = 48) {
   g.generateTexture('hud_avatar_happy', av, av);
 
   g.clear();
-  drawAvatarFace(g, av, 0x9ca3af, 0x374151);
-  g.lineStyle(2, 0x1a1a2e, 0.9);
+  drawAvatarFace(g, av, 0xa8c0ff, 0x6622cc);
+  g.lineStyle(2, 0x220044, 0.95);
   g.beginPath();
   g.arc(av / 2, av * 0.52, av * 0.14, Math.PI + 0.2, -0.2, true);
   g.strokePath();

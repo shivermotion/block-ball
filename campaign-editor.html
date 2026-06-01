@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Block Ball — Campaign Planner</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --panel: #252545;
+      --text: #eee;
+      --accent: #ffe66d;
+      --muted: #888;
+      --slot-empty: #2a2a4a;
+      --slot-fill: #3d3558;
+      --danger: #ff6b6b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .top-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #333;
+      background: var(--panel);
+    }
+
+    .top-nav h1 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-right: auto;
+    }
+
+    .top-nav a,
+    .top-nav button {
+      font: inherit;
+      color: var(--accent);
+      background: transparent;
+      border: 1px solid #555;
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .top-nav button.primary {
+      background: var(--accent);
+      color: #1a1a2e;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .top-nav button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #save-status {
+      font-size: 12px;
+      color: var(--muted);
+      width: 100%;
+    }
+
+    .layout {
+      display: flex;
+      min-height: calc(100vh - 52px);
+    }
+
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      border-right: 1px solid #333;
+      background: var(--panel);
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .sidebar h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .library-drop {
+      min-height: 48px;
+      border: 2px dashed #444;
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 12px;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .library-drop.drag-over {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .level-card {
+      background: var(--slot-fill);
+      border: 1px solid #555;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .level-card:active {
+      cursor: grabbing;
+    }
+
+    .level-card .name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .level-card .id {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .main {
+      flex: 1;
+      padding: 16px;
+      overflow: auto;
+    }
+
+    .world-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 12px;
+      background: var(--panel);
+      border-radius: 8px;
+      border: 1px solid #333;
+    }
+
+    .world-label {
+      width: 120px;
+      flex-shrink: 0;
+    }
+
+    .world-label input {
+      width: 100%;
+      font: inherit;
+      background: #1a1a2e;
+      border: 1px solid #444;
+      border-radius: 4px;
+      color: var(--text);
+      padding: 6px 8px;
+      margin-top: 4px;
+    }
+
+    .world-id {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .stage-slots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .stage-slot {
+      width: 140px;
+      min-height: 64px;
+      border: 2px dashed #555;
+      border-radius: 8px;
+      padding: 6px 8px;
+      background: var(--slot-empty);
+      font-size: 11px;
+      position: relative;
+    }
+
+    .stage-slot.filled {
+      border-style: solid;
+      border-color: var(--accent);
+      background: var(--slot-fill);
+      cursor: grab;
+    }
+
+    .stage-slot.invalid {
+      border-color: var(--danger);
+    }
+
+    .stage-slot.drag-over {
+      border-color: var(--accent);
+      background: #3a3a5a;
+    }
+
+    .stage-slot .stage-num {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .stage-slot .slot-name {
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .stage-slot .slot-id {
+      color: var(--muted);
+      word-break: break-all;
+    }
+
+    .stage-slot .empty-hint {
+      color: var(--muted);
+      margin-top: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="top-nav">
+    <h1>Campaign Planner</h1>
+    <a href="level-editor.html">Level Editor</a>
+    <a href="campaign-menu.html">Campaign Menu</a>
+    <a href="block-ball-demo.html">Free Play</a>
+    <button type="button" id="btn-save" class="primary">Save campaign</button>
+    <span id="save-status"></span>
+  </nav>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Level library</h2>
+      <div id="library-drop" class="library-drop">Drop here to unassign</div>
+      <div id="level-library"></div>
+    </aside>
+    <main class="main" id="worlds-root"></main>
+  </div>
+
+  <script src="levels/campaign.js"></script>
+  <script src="levels/registry.js"></script>
+  <script>
+    let campaign = ensureCampaign(null);
+    let levelMap = new Map();
+    let dragPayload = null;
+
+    const worldsRoot = document.getElementById('worlds-root');
+    const libraryRoot = document.getElementById('level-library');
+    const libraryDrop = document.getElementById('library-drop');
+    const saveBtn = document.getElementById('btn-save');
+    const saveStatus = document.getElementById('save-status');
+
+    function assignableLevels() {
+      return BLOCK_BALL_LEVELS.filter((e) => e.id !== 'blank' && e.id !== 'preview' && e.script);
+    }
+
+    function levelLabel(id) {
+      const entry = levelMap.get(id);
+      return entry?.name || id;
+    }
+
+    function setDragPayload(data) {
+      dragPayload = data;
+    }
+
+    function readDragPayload(ev) {
+      try {
+        const raw = ev.dataTransfer.getData('application/x-blockball-campaign');
+        if (raw) return JSON.parse(raw);
+      } catch (_) {
+        /* ignore */
+      }
+      return dragPayload;
+    }
+
+    function onDragStart(ev, payload) {
+      setDragPayload(payload);
+      ev.dataTransfer.setData('application/x-blockball-campaign', JSON.stringify(payload));
+      ev.dataTransfer.effectAllowed = 'move';
+    }
+
+    function clearSlot(worldIndex, stageIndex) {
+      campaign.worlds[worldIndex].stages[stageIndex] = null;
+      render();
+    }
+
+    function assignSlot(worldIndex, stageIndex, levelId) {
+      campaign.worlds[worldIndex].stages[stageIndex] = levelId;
+      render();
+    }
+
+    function handleDropOnSlot(ev, worldIndex, stageIndex) {
+      ev.preventDefault();
+      const payload = readDragPayload(ev);
+      if (!payload?.levelId) return;
+
+      if (payload.fromWorldIndex != null && payload.fromStageIndex != null) {
+        const fromW = payload.fromWorldIndex;
+        const fromS = payload.fromStageIndex;
+        if (fromW === worldIndex && fromS === stageIndex) return;
+        const moving = campaign.worlds[fromW].stages[fromS];
+        const target = campaign.worlds[worldIndex].stages[stageIndex];
+        campaign.worlds[fromW].stages[fromS] = target;
+        campaign.worlds[worldIndex].stages[stageIndex] = moving;
+      } else {
+        campaign.worlds[worldIndex].stages[stageIndex] = payload.levelId;
+      }
+      render();
+    }
+
+    function renderLibrary() {
+      libraryRoot.innerHTML = '';
+      for (const entry of assignableLevels()) {
+        const card = document.createElement('div');
+        card.className = 'level-card';
+        card.draggable = true;
+        card.innerHTML = `<div class="name">${entry.name}</div><div class="id">${entry.id}</div>`;
+        card.addEventListener('dragstart', (ev) => onDragStart(ev, { levelId: entry.id }));
+        libraryRoot.appendChild(card);
+      }
+    }
+
+    function renderWorlds() {
+      worldsRoot.innerHTML = '';
+      campaign.worlds.forEach((world, wi) => {
+        const row = document.createElement('div');
+        row.className = 'world-row';
+
+        const label = document.createElement('div');
+        label.className = 'world-label';
+        label.innerHTML = `<div class="world-id">${world.id}</div>`;
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.value = world.name;
+        nameInput.addEventListener('change', () => {
+          campaign.worlds[wi].name = nameInput.value.trim() || `World ${wi + 1}`;
+        });
+        label.appendChild(nameInput);
+        row.appendChild(label);
+
+        const slots = document.createElement('div');
+        slots.className = 'stage-slots';
+
+        world.stages.forEach((levelId, si) => {
+          const slot = document.createElement('div');
+          slot.className = 'stage-slot' + (levelId ? ' filled' : '');
+          if (levelId && !levelMap.has(levelId)) slot.classList.add('invalid');
+
+          slot.innerHTML = `<div class="stage-num">Stage ${si + 1}</div>`;
+          if (levelId) {
+            slot.innerHTML += `<div class="slot-name">${levelLabel(levelId)}</div><div class="slot-id">${levelId}</div>`;
+            slot.draggable = true;
+            slot.addEventListener('dragstart', (ev) => {
+              ev.stopPropagation();
+              onDragStart(ev, { levelId, fromWorldIndex: wi, fromStageIndex: si });
+            });
+          } else {
+            slot.innerHTML += `<div class="empty-hint">Drop level</div>`;
+          }
+
+          slot.addEventListener('dragover', (ev) => {
+            ev.preventDefault();
+            slot.classList.add('drag-over');
+          });
+          slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+          slot.addEventListener('drop', (ev) => {
+            slot.classList.remove('drag-over');
+            handleDropOnSlot(ev, wi, si);
+          });
+          slot.addEventListener('dblclick', () => {
+            if (levelId) clearSlot(wi, si);
+          });
+
+          slots.appendChild(slot);
+        });
+
+        row.appendChild(slots);
+        worldsRoot.appendChild(row);
+      });
+    }
+
+    function render() {
+      renderLibrary();
+      renderWorlds();
+    }
+
+    libraryDrop.addEventListener('dragover', (ev) => {
+      ev.preventDefault();
+      libraryDrop.classList.add('drag-over');
+    });
+    libraryDrop.addEventListener('dragleave', () => libraryDrop.classList.remove('drag-over'));
+    libraryDrop.addEventListener('drop', (ev) => {
+      ev.preventDefault();
+      libraryDrop.classList.remove('drag-over');
+      const payload = readDragPayload(ev);
+      if (payload?.fromWorldIndex != null && payload?.fromStageIndex != null) {
+        clearSlot(payload.fromWorldIndex, payload.fromStageIndex);
+      }
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      saveStatus.textContent = 'Saving…';
+      saveBtn.disabled = true;
+      try {
+        const ok = await isCampaignSaveAvailable();
+        if (!ok) {
+          throw new Error('Save API unavailable. Run yarn start and open http://localhost:8080/campaign-editor');
+        }
+        campaign = ensureCampaign(campaign);
+        await saveCampaignToServer(campaign);
+        await fetchCampaign(true);
+        saveStatus.textContent = 'Campaign saved.';
+      } catch (err) {
+        saveStatus.textContent = err.message || String(err);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+
+    (async function boot() {
+      await ensureLevelRegistry();
+      assignableLevels().forEach((e) => levelMap.set(e.id, e));
+      campaign = await fetchCampaign();
+      const canSave = await isCampaignSaveAvailable();
+      saveStatus.textContent = canSave
+        ? 'Drag levels onto stage slots. Double-click a slot to clear.'
+        : 'Read-only — run yarn start to save campaign.json.';
+      render();
+    })();
+  </script>
+</body>
+
+</html>

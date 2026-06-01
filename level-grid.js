@@ -170,6 +170,17 @@ const BLOCK_LAYOUT_CHARS = {
   '5': 5,
   i: 5,
   I: 5,
+  e: 18,
+  E: 18,
+  o: 18,
+  O: 18,
+  u: 22,
+  U: 22,
+  h: 23,
+  H: 23,
+  '?': 23,
+  x: 24,
+  X: 24,
 };
 
 function createLevelGrid(level, gameHeight = 780, gameWidth = 390) {
@@ -345,6 +356,9 @@ function migrateLegacyBlocksToCells(level, levelGrid) {
  */
 function ensurePlayBlockCells(level, levelGrid) {
   const { cols, rows } = levelGrid.config;
+  if (!level) {
+    return Array.from({ length: rows }, () => Array(cols).fill(0));
+  }
   if (!level.blocks) level.blocks = {};
 
   const raw = level.blocks.cells;
@@ -356,6 +370,13 @@ function ensurePlayBlockCells(level, levelGrid) {
 
   if (sizeOk) {
     level.blocks.cells = parsed;
+    migrateScoreFootprints(parsed, cols, rows);
+    if (typeof migrateHidden2x2Footprints === 'function') {
+      migrateHidden2x2Footprints(parsed, cols, rows);
+    }
+    if (typeof ensureHiddenBehindGrid === 'function') {
+      ensureHiddenBehindGrid(level, cols, rows);
+    }
     return parsed;
   }
 
@@ -377,6 +398,13 @@ function ensurePlayBlockCells(level, levelGrid) {
   }
 
   level.blocks.cells = grid;
+  migrateScoreFootprints(grid, cols, rows);
+  if (typeof migrateHidden2x2Footprints === 'function') {
+    migrateHidden2x2Footprints(grid, cols, rows);
+  }
+  if (typeof ensureHiddenBehindGrid === 'function') {
+    ensureHiddenBehindGrid(level, cols, rows);
+  }
   return grid;
 }
 
@@ -457,7 +485,7 @@ function parseBlockLayoutRows(rows) {
 }
 
 function layoutToStrings(layout) {
-  const inv = { 0: '.', 1: '1', 2: 'g', 3: 'p', 4: 's', 5: 'i' };
+  const inv = { 0: '.', 1: '1', 2: 'g', 3: 'p', 4: 's', 5: 'i', 18: 'e', 22: 'u', 23: 'h', 24: 'x' };
   return layout.map((row) => row.map((c) => inv[c] ?? '.').join(''));
 }
 

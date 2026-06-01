@@ -108,12 +108,18 @@ Blocks (including **spike** hazards), enemies, and paddle use **only** the playf
 | `12` + `13` | Gray long **vertical** (anchor `12`, extension `13`) |
 | `14` + `15` | Power long **horizontal** (2×1; anchor `14` left, `15` right) |
 | `16` + `17` | Power long **vertical** (1×2; anchor `16` top, `17` bottom) |
+| `18` + `19`–`21` | Score **2×2** (anchor `18` top-left; `19` top-right, `20` bottom-left, `21` bottom-right) |
+| `22` | Bonus — pass-through collectible (**100** pts when placed; also created by Bonus Chance item) |
+| `23` | Hidden — wooden panel (1×1); first hit flips to reveal block behind (see `blocks.hiddenBehind`) |
+| `24` + `25`–`27` | Hidden **2×2** (anchor `24` top-left; `25` top-right, `26` bottom-left, `27` bottom-right) |
 
-Power blocks use portrait art rotated 90° (↔) or upright (↕), stretched to fill the footprint.
+### Hidden blocks (`blocks.hiddenBehind`)
 
-Long blocks use the same hit rules and art as their 1×1 type; the game spawns one physics body across the footprint. Paint from the **anchor** cell (top-left for ↔, top for ↕).
+Parallel grid, same size as `blocks.cells`. For each cell where the surface is `23` or part of a `24` footprint, `hiddenBehind[row][col]` stores the **reveal** cell value (`1` normal, `2` gray, `3` power, `4` spike, `5` indestructible, `22` bonus; **`18` score** only for 2×2 hidden). Omitted or `0` defaults to **normal** (`1`). Set in the level editor via **Hidden reveals as** when the Hidden or Hidden 2×2 brush is selected.
 
-String keys in row strings (legacy import): `.` `1` `g` `p` `s` `i`. Older levels may use `anchor` + `layer` + `spikes`; they are migrated to `blocks.cells` at load time.
+Long blocks and score blocks use one physics body across the footprint. Paint from the **anchor** cell (top-left for ↔ and 2×2, top for ↕).
+
+String keys in row strings (legacy import): `.` `1` `g` `p` `s` `i` `e` `u` `h` `x` (hidden 2×2). Older levels may use `anchor` + `layer` + `spikes`; they are migrated to `blocks.cells` at load time.
 
 ## Files
 
@@ -141,6 +147,8 @@ String keys in row strings (legacy import): `.` `1` `g` `p` `s` `i`. Older level
 1. **Play test** from the editor opens the game with your current layout (preview in `localStorage`).
 2. Return via the game **Editor** link (`?restore=1`) to restore your draft.
 3. Or play a saved level: **`/block-ball-demo?level=my-level`** or the in-game dropdown.
+
+**Campaign vs flat levels:** Individual levels are still one file per level (`levels/<id>.js`). The campaign (`levels/campaign.json`) assigns those level ids to world/stage slots for progression — see [CAMPAIGN.md](CAMPAIGN.md).
 
 ## Debug
 

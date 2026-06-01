@@ -2,7 +2,7 @@
 
 Reference for every block type: durability, scoring, and how each block responds to **Normal Bounce** vs **Power Bounce** hits.
 
-**Demo implementation today:** `normal`, `gray`, `normal_long_h` / `normal_long_v`, `gray_long_h` / `gray_long_v`, `power`, `power_long_h` / `power_long_v`, `spike`, `indestructible` (see [`block-types.js`](block-types.js)). Long variants span **2×1** or **1×2** cells with the same rules and art as their base type. All other types below are design targets for future levels.
+**Demo implementation today:** `normal`, `gray`, `normal_long_h` / `normal_long_v`, `gray_long_h` / `gray_long_v`, `power`, `power_long_h` / `power_long_v`, `spike`, `indestructible`, `score`, `bonus` — see [`block-types.js`](block-types.js).
 
 ---
 
@@ -26,43 +26,81 @@ Reference for every block type: durability, scoring, and how each block responds
 
 | Generic name | HP / durability | Points (base) | Normal bounce | Power bounce | Purpose |
 |--------------|-----------------|---------------|---------------|--------------|---------|
-| **Star / Protective Star** | 1 | **0** | Destroyed / collected | Same | Shields spike gutters later — see [Star blocks](#star--protective-star-block) below. |
+| **Star / Protective Star** | 1 | **0** | Destroyed / collected | Same | **Round 4 only** — protective covers for the boss fight; see [Star blocks](#star--protective-star-block). |
 | **Switch / Bonus Trigger** | 1 | Varies (usually low) | Destroyed / collected | Same | **Bonus Chance** — collect all; remaining blocks become **Through** blocks. |
 | **Through** | 1 | 40–160 (size-dependent) | Ball passes through (no ricochet) | Same | Appears when Switch blocks trigger Bonus Chance; no bounce. |
-| **Score / Bonus** | Up to 7 hits | 50 → 100 → 200 → 400 → 800 → 1600 → 3200 | Points rise per hit | Even higher | Optional high-score target; extra reward on final hit in some rulesets. May start invisible. |
+| **Score** | Up to 7 hits | 50 → 100 → 200 → 400 → 800 → 1600 → 3200 | Points rise per hit | Even higher | **2×2** optional target — **not required for level clear**; see [Score block](#score-block). |
+| **Bonus** | 1 (collect) | 100 (placed) / converted value | Pass-through collect | Same | No collision — see [Bonus block](#bonus-block). |
 | **Pinball / Bumper** | ∞ | 20 per hit | Bounce + extra speed/force | Same | Indestructible accelerator; pinball chaos and reach for distant cells. |
 
 ---
 
 ## Star / Protective Star Block
 
-Star blocks are **not** scoring blocks and **not** the same as Switch blocks. They exist to **shield spike gutters** in a later area of the same stage.
+Star blocks are **not items you carry** — they are **level blocks** collected by breaking them. They exist to earn **protective covers** over spike gutters before the **boss round**.
 
 | Property | Details |
 |----------|---------|
-| HP | 1 (one hit to collect) |
-| Points | **0** — no points for hitting them |
-| Look | Small rectangle with a **star** symbol |
-| Placement | Often grouped in a target area **before** a spike-heavy zone |
+| **Not an item** | Collected by hitting the block; nothing is added to inventory |
+| **When** | **Round 4 only** |
+| **HP** | 1 (one hit to collect) |
+| **Points** | **0** — no score for hitting them |
+| **Look** | Small rectangle with a **star** symbol |
+| **Placement** | Grouped in the Round 4 layout, before the boss spike zone |
 
-### Link to spike blocks
+### Boss-round protection
 
-1. Each collected Star Block places a **protective cover** over one **Spike** gutter in the next zone.
-2. More stars collected → more spike sections remain covered (full collection can cover nearly all gutters).
-3. Collecting **all** Star Blocks in the group sometimes triggers a separate stage bonus (implementation-specific).
+1. Each collected Star Block places a **protective cover** over one **Spike** gutter in the boss fight.
+2. More stars collected → more gutters stay covered → **safer boss fight**.
+3. Collecting **all** Star Blocks in Round 4 awards a **1-Up** plus full spike coverage for the boss round.
 
 ### Covers vs spikes
 
-- A cover sits on top of a spike gutter the player “earned” by collecting stars.
+- A cover sits on top of a spike gutter the player earned by collecting stars.
 - When the ball hits a cover, the cover is **removed** and the **Spike** block underneath is active again.
 
 ### Star vs Switch vs Score (easy to confuse)
 
 | Block | Main purpose |
 |-------|----------------|
-| **Star / Protective Star** | Boss spike protection; **0 points** |
+| **Star / Protective Star** | Round 4 boss spike protection; **0 points**; full set → **1-Up** |
 | **Switch / Bonus Trigger** | Triggers **Bonus Chance** (Through blocks) |
-| **Score / Bonus** | Escalating points over up to 7 hits |
+| **Score** | Escalating points over up to 7 hits; optional **1-Up** on 7th hit |
+
+---
+
+## Score Block
+
+Score blocks are **not dropped items** — they are **placed in the level layout** and hit in place.
+
+| Property | Details |
+|----------|---------|
+| **Not an item** | Fixed block in `blocks.cells`; not spawned from enemy drops |
+| **Footprint** | **2×2** play cells (anchor `18` top-left; extensions `19`–`21`) |
+| **Hits** | Up to **7** hits per block |
+| **Points** | Escalates each hit: **50 → 100 → 200 → 400 → 800 → 1600 → 3200** |
+| **7th hit** | Awards the top point tier; with an **active Copy Ability**, the 7th hit can also grant a **1-Up** |
+| **Visibility** | May start invisible until first hit (implementation-specific) |
+| **Level clear** | **Does not count** toward `blocksRemaining` — destroy all required blocks with score blocks left on the field |
+
+Optional high-score targets only — clearing the level never requires destroying score blocks.
+
+---
+
+## Bonus block (Bonus Chance)
+
+During **Bonus Chance**, bonus blocks **collide** with the ball — you must hit them to collect. The ball **does not ricochet**; it keeps its path through the block.
+
+| Property | Details |
+|----------|---------|
+| **Trigger** | Collect the **Bonus Chance** item ([`item_bonus_chance`](item-types.js)) — **2×2** pickup |
+| **Timer** | **30 seconds** (demo) — collect all converted blocks before time runs out |
+| **Placed in editor** | Cell **`22`** (`u`) — gold **1×1** tile; solid until Bonus Chance activates |
+| **Conversion** | Normal, Gray, Power, Spike, Score, placed Bonus, long variants, etc. — all except **Indestructible** |
+| **Collision** | Ball **hits** the block to collect it — **no ricochet** (keeps moving through) |
+| **Success** | Collect every converted block before the timer ends |
+| **Failure** | Uncollected blocks **revert** to their original type (solid, normal rules); also ends if the player **loses a life** |
+| **Indestructible** | Never converted; stays solid |
 
 ---
 
@@ -102,7 +140,9 @@ Star blocks are **not** scoring blocks and **not** the same as Switch blocks. Th
 | **Gray → Normal** | First normal bounce downgrades Gray to Normal; second hit destroys |
 | **Power Bounce** | Required to destroy Power blocks; one-shots Gray |
 | **Switch → Through** | All Switch blocks collected → remaining blocks become Through blocks (Bonus Chance) |
-| **Star → spike cover** | Each Star collected adds a protective cover over one Spike gutter in the next zone |
+| **Bonus Chance item** | Collect item → **30s** timer; blocks become hit-to-collect (no ricochet); uncollected blocks revert when time ends |
+| **Star → spike cover** | Each Star collected (Round 4) adds a protective cover over one boss-round Spike gutter; all stars → **1-Up** + safer fight |
+| **Score** | Layout block; up to 7 hits for escalating points; 7th hit with ability active may grant **1-Up** |
 | **Splitting** | Large block splits into four smaller Normal/Gray pieces |
 | **Required vs optional** | Normal, Gray, Power, Splitting usually required to clear; Star, Score, Pinball often optional |
 
@@ -110,23 +150,20 @@ Star blocks are **not** scoring blocks and **not** the same as Switch blocks. Th
 
 ## Block art (demo)
 
-Sprites are keyed in Phaser as `block_<type>` (see `BLOCK_TYPES` in [`block-types.js`](block-types.js)). PNGs are preloaded in `GameScene.preload()`; anything not loaded is drawn procedurally in `generateTextures()` when the level starts.
+All block, ball, paddle, enemy, and item visuals are **procedural placeholders** drawn at runtime in `generateTextures()` ([`block-ball-demo.html`](block-ball-demo.html)) and [`editor-entity-art.js`](editor-entity-art.js). Texture keys match `BLOCK_TYPES` in [`block-types.js`](block-types.js) (`block_normal`, `block_gray`, `block_power`, `block_power_long_h` / `_v`, `block_spike`, `block_indestructible`).
 
-| Type | Texture key | Asset / source | Sizing |
-|------|-------------|----------------|--------|
-| **Normal** | `block_normal` | [`assets/blocks/normal.png`](assets/blocks/normal.png) — creamy block with hex cutout (RGBA) | `contain` |
-| **Gray** | `block_gray` | [`assets/blocks/gray.png`](assets/blocks/gray.png) — pale blue-grey stone cube (RGBA) | `contain` |
-| **Spike** | `block_spike` | [`assets/blocks/spike.png`](assets/blocks/spike.png) — grey weathered stone triangle (RGBA) | `contain` |
-| **Power** | `block_power` | [`assets/blocks/power.png`](assets/blocks/power.png) — rotated 90°, stretched to cell | Fills cell |
-| **Power long ↔** | `block_power_long_h` | Same PNG, baked 2×1 | Fills footprint |
-| **Power long ↕** | `block_power_long_v` | Same PNG, baked 1×2 (portrait) | Fills footprint |
-| **Indestructible** | `block_indestructible` | Procedural — steel grey + **X** | Fills cell |
-
-**Pipeline for PNG blocks:** [`scripts/process-ball-sprite.py`](scripts/process-ball-sprite.py) (edge flood-fill removes black, crops to content). **Power** uses a dedicated pass: shadow lift + outer-ring background strip only (the art is mostly black crystal, so standard flood-fill would erase the block).
+| Type | Texture key | Source |
+|------|-------------|--------|
+| **Normal** | `block_normal` | Procedural rounded cream block |
+| **Gray** | `block_gray` | Procedural grey stone |
+| **Spike** | `block_spike` | Procedural red triple-spike |
+| **Power** | `block_power` | Procedural dark block + gold trim |
+| **Power long** | `block_power_long_*` | Stretched from `block_power` |
+| **Indestructible** | `block_indestructible` | Procedural steel + **X** |
+| **Score** | `block_score` | Procedural lavender **2×2** tile (50→3200, ×7 hits) |
+| **Bonus** | `block_bonus` | Procedural gold tile — pass-through collectible (100 pts when placed) |
 
 **Destroy VFX:** clay-chunk particles (`clay_debris` atlas); tint sampled from the destroyed block’s texture (see `getBlockDebrisTint` in [`block-ball-demo.html`](block-ball-demo.html)).
-
-**Level editor:** block brush uses the same sprites (`level-editor.html`, `editor-entity-art.js`).
 
 ---
 
@@ -146,18 +183,19 @@ Sprites are keyed in Phaser as `block_<type>` (see `BLOCK_TYPES` in [`block-type
 | `12` + `13` | Gray long ↕ |
 | `14` + `15` | Power long ↔ |
 | `16` + `17` | Power long ↕ |
+| `18` + `19`–`21` | Score **2×2** (anchor `18` top-left) |
+| `22` | Bonus (pass-through collectible) |
 
-String keys: `.` empty, `1` normal, `g` gray, `p` power, `s` spike, `i` indestructible.
+String keys: `.` empty, `1` normal, `g` gray, `p` power, `s` spike, `i` indestructible, `e` score, `u` bonus.
 
 Spike blocks use cell value `4` in `blocks.cells`. Legacy `blocks.spikes` is migrated at load.
 
-Future types (star, switch, through, score, pinball, splitting, ability) will need new cell values when implemented.
+Future types (star, switch, through, pinball, splitting, ability) will need new cell values when implemented.
 
 ---
 
 ## Source of truth in code
 
 - Registry & helpers: [`block-types.js`](block-types.js)
-- Block PNGs: [`assets/blocks/`](assets/blocks/)
-- Texture preload, procedural fallbacks, destroy VFX: [`block-ball-demo.html`](block-ball-demo.html)
+- Texture preload, procedural art, destroy VFX: [`block-ball-demo.html`](block-ball-demo.html)
 - Items (Flip, Crash, food, abilities): [`ITEM_COMPENDIUM.md`](ITEM_COMPENDIUM.md) · [`item-types.js`](item-types.js)

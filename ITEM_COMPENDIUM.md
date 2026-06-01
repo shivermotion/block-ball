@@ -2,18 +2,13 @@
 
 Collectible pickups that appear in the playfield—usually after defeating an enemy. The ball must **touch** an item to collect it. Most items vanish after a few seconds if missed.
 
-**Demo implementation today:** level-placed items can be collected by the ball (overlap). Food items award compendium **points** with an arcade-style floating `+N` label ([`score-popup.js`](score-popup.js)). Art exists for **Apple** and **Warp Star**; other items use placeholders until PNGs are added.
+**Demo implementation today:** level-placed items can be collected by the ball (overlap). **Bonus Chance** converts non-indestructible blocks into pass-through bonus blocks. Food items award compendium **points** with an arcade-style floating `+N` label ([`score-popup.js`](score-popup.js)). All items use **procedural category placeholders** (colored tile + abbreviation).
 
 ---
 
 ## Item art
 
-| Item | ID | Asset |
-|------|-----|-------|
-| **Apple** | `food_apple` | [`assets/items/food_apple.png`](assets/items/food_apple.png) — stylized red clay apple with leaf (RGBA) |
-| **Warp Star** | `warp_star` | [`assets/items/warp_star.png`](assets/items/warp_star.png) — turquoise/orange clay rocket (RGBA) |
-
-**Pipeline:** [`scripts/process-ball-sprite.py`](scripts/process-ball-sprite.py) (black background → transparent). Cache bust: `ITEM_ART_VERSION` in [`item-types.js`](item-types.js).
+Every item uses a procedural icon keyed `item_<id>` — category color + two-letter abbrev ([`editor-entity-art.js`](editor-entity-art.js), `generateItemTextures()` in the demo).
 
 ---
 
@@ -23,7 +18,7 @@ Instant points on collection. Typically despawn after ~4–6 seconds.
 
 | Item | Points | Appearance | Typical source | Notes |
 |------|--------|------------|----------------|-------|
-| **Apple** | 1,000 | Red clay apple with leaf (`food_apple.png`) | Most regular enemies | Most common food drop. |
+| **Apple** | 1,000 | Procedural food tile | Most regular enemies | Most common food drop. |
 | **Candy** | 1,500 | Colorful wrapped candy | Common enemies | Medium value. |
 | **Cake** | 2,000 | Slice of cake | Stronger or rarer enemies | Highest regular food value. |
 | **Big Cake** | 5,000+ | Large fancy cake | Rare / mid-boss drops | Large score spike. |
@@ -42,7 +37,8 @@ Carried or active until used, lost, or the round ends (per item).
 | **Crash** | One-shot bomb: destroys **all Indestructible blocks** on screen | Instant (single use) | Bomb Carrier, Aggro Floater | Required when indestructible mazes block progress. See [Indestructible blocks](BLOCK_COMPENDIUM.md#regular--core-blocks). |
 | **Flip** | Recolors affected blocks (colored normals often **double** point value) | Until round ends | Block Shifter | Major scoring multiplier on block-heavy layouts. |
 | **Changer** | Roulette — grants a **random Copy Ability** | Until replaced | Pinball Bouncer | Reroll when you want a different ability. |
-| **Warp Star** | Warps to a **bonus minigame** (extra lives and points) | Instant | Rare enemy or random spawn | Clay rocket sprite (`warp_star.png`). **2×3 cells** tall (anchor = top-left). High-risk, high-reward side activity. |
+| **Bonus Chance** | Every block except **Indestructible** becomes a **bonus block** (hit to collect, no ricochet) | Instant | Level-placed (demo) | **2×2** pickup; **30s** timer to collect all or blocks revert. |
+| **Warp Star** | Warps to a **bonus minigame** (extra lives and points) | Instant | Rare enemy or random spawn | **2×3 cells** tall (anchor = top-left). High-risk, high-reward side activity. |
 
 ---
 
@@ -65,18 +61,32 @@ Ability blocks in the level often still require an active Copy Ability to destro
 
 | Item | Effect | Rarity | Notes |
 |------|--------|--------|-------|
-| **1-Up** | +1 life (extra ball) | Rare | May drop from high-tier food, perfect Star Block collection, or Score Block final hit (with ability). |
+| **1-Up** | +1 life (extra ball) | Rare | May drop from high-tier food, collecting **all Star Blocks in Round 4**, or **7th hit on a Score block** (with Copy Ability active). |
 
 ---
 
-## Not items (level objects)
+## Not items (level blocks)
 
-These are **blocks** or stage rules, not ball-collected pickups. Documented in [`BLOCK_COMPENDIUM.md`](BLOCK_COMPENDIUM.md).
+These are **blocks in the level layout**, not ball-collected pickups and **not** inventory items. Full rules: [`BLOCK_COMPENDIUM.md`](BLOCK_COMPENDIUM.md).
 
-| Name | What it is |
-|------|------------|
-| **Star / Protective Star block** | Collected by breaking the block; adds spike covers in a later zone — not carried in inventory. |
-| **Score / Bonus block** | Fixed in the layout; hit up to 7 times for escalating points — not a dropped item. |
+### Star / Protective Star block
+
+| | |
+|--|--|
+| **What it is** | A breakable block with a star symbol — **not something you carry** |
+| **When** | **Round 4 only** |
+| **Effect** | Each star collected adds a **protective cover** over one spike gutter in the **boss round** |
+| **Full set** | Collecting **all** stars in Round 4 → **1-Up** + safer boss fight |
+| **Points** | **0** |
+
+### Score block
+
+| | |
+|--|--|
+| **What it is** | A fixed block in the level — **not dropped** by enemies |
+| **Hits** | Up to **7** hits for increasing points (50 → … → 3200) |
+| **7th hit** | Top score tier; with **Copy Ability active**, can also award a **1-Up** |
+| **Placement** | Authored in level layout (`blocks.cells`) |
 
 ---
 
@@ -104,6 +114,7 @@ Reserved `drop` strings on enemies in [`enemy-types.js`](enemy-types.js) map to 
 | `item_crash` | Crash |
 | `item_flip` | Flip |
 | `item_changer`, `ability_roulette` | Changer |
+| `item_bonus_chance` | Bonus Chance |
 | `replica_multiball` | Replica |
 | `ability_spark` | Spark |
 | `ability_burn` | Burn |
@@ -114,6 +125,6 @@ Reserved `drop` strings on enemies in [`enemy-types.js`](enemy-types.js) map to 
 
 ## Source of truth in code
 
-- Item registry & art paths: [`item-types.js`](item-types.js) · [`assets/items/`](assets/items/)
+- Item registry: [`item-types.js`](item-types.js) · procedural icons in [`editor-entity-art.js`](editor-entity-art.js)
 - Enemy drops: [`enemy-types.js`](enemy-types.js) · [`ENEMY_COMPENDIUM.md`](ENEMY_COMPENDIUM.md)
 - Blocks affected by Flip / Crash: [`BLOCK_COMPENDIUM.md`](BLOCK_COMPENDIUM.md)
