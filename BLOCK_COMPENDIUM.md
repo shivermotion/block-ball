@@ -29,7 +29,7 @@ Reference for every block type: durability, scoring, and how each block responds
 | **Star / Protective Star** | 1 | **0** | Destroyed / collected | Same | **Round 4 only** — protective covers for the boss fight; see [Star blocks](#star--protective-star-block). |
 | **Switch / Bonus Trigger** | 1 | Varies (usually low) | Destroyed / collected | Same | **Bonus Chance** — collect all; remaining blocks become **Through** blocks. |
 | **Through** | 1 | 40–160 (size-dependent) | Ball passes through (no ricochet) | Same | Appears when Switch blocks trigger Bonus Chance; no bounce. |
-| **Score** | Up to 7 hits | 50 → 100 → 200 → 400 → 800 → 1600 → 3200 | Points rise per hit | Even higher | **2×2** footprint — see [Score block](#score-block). |
+| **Score** | Up to 7 hits | 50 → 100 → 200 → 400 → 800 → 1600 → 3200 | Points rise per hit | Even higher | **2×2** optional target — **not required for level clear**; see [Score block](#score-block). |
 | **Bonus** | 1 (collect) | 100 (placed) / converted value | Pass-through collect | Same | No collision — see [Bonus block](#bonus-block). |
 | **Pinball / Bumper** | ∞ | 20 per hit | Bounce + extra speed/force | Same | Indestructible accelerator; pinball chaos and reach for distant cells. |
 
@@ -81,8 +81,9 @@ Score blocks are **not dropped items** — they are **placed in the level layout
 | **Points** | Escalates each hit: **50 → 100 → 200 → 400 → 800 → 1600 → 3200** |
 | **7th hit** | Awards the top point tier; with an **active Copy Ability**, the 7th hit can also grant a **1-Up** |
 | **Visibility** | May start invisible until first hit (implementation-specific) |
+| **Level clear** | **Does not count** toward `blocksRemaining` — destroy all required blocks with score blocks left on the field |
 
-Optional high-score targets — not required to clear the round unless the layout demands it.
+Optional high-score targets only — clearing the level never requires destroying score blocks.
 
 ---
 

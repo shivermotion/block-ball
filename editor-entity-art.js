@@ -18,35 +18,55 @@ const BLOCK_PICKER_OPTIONS = [
   { value: 5, label: 'Indestructible', key: '5', procedural: 'indestructible' },
   { value: 18, label: 'Score', key: 'e', procedural: 'score', span: '2x2' },
   { value: 22, label: 'Bonus', key: 'u', procedural: 'bonus' },
+  { value: 23, label: 'Hidden', key: 'h', procedural: 'hidden' },
+  { value: 24, label: 'Hidden 2×2', key: 'x', procedural: 'hidden', span: '2x2' },
+];
+
+/** 1×1 types that can sit behind a hidden panel (editor reveal brush). */
+const HIDDEN_REVEAL_PICKER_OPTIONS = [
+  { value: 1, label: 'Normal', key: '1', procedural: 'normal' },
+  { value: 2, label: 'Gray', key: '2', procedural: 'gray' },
+  { value: 3, label: 'Power', key: '3', procedural: 'power', power: true },
+  { value: 4, label: 'Spike', key: '4', procedural: 'spike' },
+  { value: 5, label: 'Indestructible', key: '5', procedural: 'indestructible' },
+  { value: 22, label: 'Bonus', key: 'u', procedural: 'bonus' },
+];
+
+/** Reveal options when painting 2×2 hidden (includes score). */
+const HIDDEN_2X2_REVEAL_PICKER_OPTIONS = [
+  ...HIDDEN_REVEAL_PICKER_OPTIONS,
+  { value: 18, label: 'Score', key: 'e', procedural: 'score', span: '2x2' },
 ];
 
 const BLOCK_FALLBACK_COLORS = {
-  1: '#fff5e6',
-  2: '#9ca3af',
-  6: '#fff5e6',
-  8: '#fff5e6',
-  10: '#9ca3af',
-  12: '#9ca3af',
-  3: '#6b7280',
-  14: '#6b7280',
-  16: '#6b7280',
-  4: '#ff3366',
-  5: '#6b7c8c',
-  18: '#9b7ede',
-  22: '#ffd54f',
+  1: '#f1d302',
+  2: '#a8c0ff',
+  6: '#f1d302',
+  8: '#f1d302',
+  10: '#a8c0ff',
+  12: '#a8c0ff',
+  3: '#235789',
+  14: '#235789',
+  16: '#235789',
+  4: '#ff2266',
+  5: '#44aaff',
+  18: '#cc66ff',
+  22: '#ffee22',
+  23: '#7a5c48',
+  24: '#7a5c48',
 };
 
 const ENEMY_TIER_COLORS = {
-  mob: '#ff6bcb',
-  midBoss: '#e879f9',
-  boss: '#a855f7',
+  mob: '#ff44dd',
+  midBoss: '#ff66ff',
+  boss: '#cc44ff',
 };
 
 const ITEM_CATEGORY_COLORS = {
-  food: { fill: '#c45c5c', border: '#8b3a3a' },
-  powerUp: { fill: '#3d9a6a', border: '#2a6b4a' },
-  copyAbility: { fill: '#6b8cce', border: '#4a6299' },
-  life: { fill: '#9b7ede', border: '#6b5a9e' },
+  food: { fill: '#ff5566', border: '#cc2244' },
+  powerUp: { fill: '#22ee88', border: '#00aa55' },
+  copyAbility: { fill: '#4488ff', border: '#2244cc' },
+  life: { fill: '#cc66ff', border: '#8822cc' },
 };
 
 function roundRectPath(c, x, y, w, h, r) {
@@ -70,6 +90,13 @@ function fillRoundRect(c, x, y, w, h, r, fill) {
   c.fill();
 }
 
+function strokeRoundRect(c, x, y, w, h, r, stroke, lineWidth = 1) {
+  c.strokeStyle = stroke;
+  c.lineWidth = lineWidth;
+  roundRectPath(c, x, y, w, h, r);
+  c.stroke();
+}
+
 function buildProceduralBlockCanvas(cellW, cellH, type) {
   const canvas = document.createElement('canvas');
   canvas.width = cellW;
@@ -78,47 +105,51 @@ function buildProceduralBlockCanvas(cellW, cellH, type) {
   const pad = 2;
   const innerW = cellW - pad * 2;
   const innerH = cellH - pad * 2;
+  const r = blockProceduralRadii(innerW, innerH);
 
   if (type === 'normal') {
-    fillRoundRect(c, pad, pad, innerW, innerH, 4, '#ffb347');
-    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#fff5e6');
-  } else if (type === 'gray') {
-    fillRoundRect(c, pad, pad, innerW, innerH, 4, '#4b5563');
-    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#9ca3af');
-    c.strokeStyle = 'rgba(107, 114, 128, 0.8)';
-    c.lineWidth = 1;
-    c.strokeRect(pad + innerW * 0.2, pad + innerH * 0.35, innerW * 0.6, innerH * 0.3);
-  } else if (type === 'power') {
-    fillRoundRect(c, pad, pad, innerW, innerH, 4, '#374151');
-    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#6b7280');
-    c.strokeStyle = 'rgba(255, 230, 109, 0.85)';
-    c.lineWidth = 2;
-    roundRectPath(c, pad + 4, pad + 4, innerW - 8, innerH - 8, 3);
-    c.stroke();
-    c.fillStyle = 'rgba(255, 230, 109, 0.35)';
-    c.fillRect(pad + 6, pad + 6, innerW - 12, Math.max(4, innerH * 0.2));
-  } else if (type === 'spike') {
-    fillRoundRect(c, pad, pad, innerW, innerH, 3, '#4a1028');
-    c.fillStyle = '#ff3366';
-    const spikeW = innerW / 3;
-    for (let i = 0; i < 3; i++) {
-      const cx = pad + spikeW * i + spikeW * 0.5;
-      const half = spikeW * 0.38;
-      c.beginPath();
-      c.moveTo(cx - half, pad + innerH);
-      c.lineTo(cx, pad + innerH * 0.12);
-      c.lineTo(cx + half, pad + innerH);
-      c.closePath();
-      c.fill();
+    fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#cdb002');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#f1d302');
+    if (typeof drawDebossedNormalStarCanvas === 'function') {
+      drawDebossedNormalStarCanvas(c, cellW / 2, cellH / 2, normalStarOuterRadius(innerW, innerH));
     }
-    c.strokeStyle = 'rgba(204, 17, 68, 0.7)';
-    c.lineWidth = 2;
-    c.strokeRect(pad + 1, pad + innerH - 2, innerW - 2, 2);
+  } else if (type === 'gray') {
+    fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#4466ff');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#a8c0ff');
+    if (typeof drawMutedGrayStarCanvas === 'function') {
+      drawMutedGrayStarCanvas(c, cellW / 2, cellH / 2, normalStarOuterRadius(innerW, innerH));
+    }
+  } else if (type === 'power') {
+    fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#1a425f');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#235789');
+    strokeRoundRect(
+      c,
+      pad + 4,
+      pad + 4,
+      innerW - 8,
+      innerH - 8,
+      r.detail,
+      'rgba(143, 180, 212, 0.95)',
+      2
+    );
+    fillRoundRect(
+      c,
+      pad + 6,
+      pad + 6,
+      innerW - 12,
+      Math.max(4, innerH * 0.2),
+      r.detail,
+      'rgba(143, 180, 212, 0.45)'
+    );
+  } else if (type === 'spike') {
+    if (typeof drawCuteSpikeCanvas === 'function') {
+      drawCuteSpikeCanvas(c, pad, innerW, innerH);
+    }
   } else if (type === 'indestructible') {
-    fillRoundRect(c, pad, pad, innerW, innerH, 4, '#3d4d5d');
-    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#6b7c8c');
+    fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#0066cc');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#44aaff');
     const lw = Math.max(2, Math.floor(Math.min(innerW, innerH) * 0.08));
-    c.strokeStyle = 'rgba(30, 40, 50, 0.95)';
+    c.strokeStyle = 'rgba(0, 51, 102, 0.95)';
     c.lineWidth = lw;
     c.beginPath();
     c.moveTo(pad + 4, pad + 4);
@@ -127,23 +158,44 @@ function buildProceduralBlockCanvas(cellW, cellH, type) {
     c.lineTo(pad + 4, pad + innerH - 4);
     c.stroke();
   } else if (type === 'score') {
-    fillRoundRect(c, pad, pad, innerW, innerH, 4, '#6b5a9e');
-    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#9b7ede');
-    c.fillStyle = '#ffffff';
-    c.font = `bold ${Math.max(8, Math.floor(innerW * 0.36))}px system-ui, sans-serif`;
+    fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#cc5500');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#ff8800');
+    const starR = Math.min(innerW, innerH) * 0.22;
+    const starCx = pad + innerW / 2;
+    const starCy = pad + innerH / 2;
+    if (typeof drawDebossedNormalStarCanvas === 'function') {
+      drawDebossedNormalStarCanvas(c, starCx, starCy, starR);
+    }
+  } else if (type === 'hidden') {
+    fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#4a382c');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#7a5c48');
+    const plankH = Math.max(3, Math.floor(innerH / 5));
+    for (let i = 1; i < 5; i++) {
+      c.fillStyle = 'rgba(107, 83, 68, 0.55)';
+      c.fillRect(pad + 3, pad + i * plankH, innerW - 6, 1);
+    }
+    strokeRoundRect(c, pad + 4, pad + 4, innerW - 8, innerH - 8, r.detail, 'rgba(61, 46, 36, 0.9)', 2);
+    c.fillStyle = 'rgba(61, 46, 36, 0.85)';
+    c.font = `bold ${Math.max(10, Math.floor(innerW * 0.42))}px system-ui, sans-serif`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillText('50', cellW / 2, cellH * 0.46);
-    c.fillStyle = 'rgba(255, 255, 255, 0.65)';
-    c.font = `${Math.max(6, Math.floor(innerW * 0.18))}px system-ui, sans-serif`;
-    c.fillText('×7', cellW / 2, cellH * 0.72);
+    c.fillText('?', cellW / 2, cellH / 2);
   } else if (type === 'bonus') {
-    fillRoundRect(c, pad, pad, innerW, innerH, 4, '#ffb300');
-    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, 3, '#ffd54f');
+    fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#ff9900');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#ffee22');
     c.fillStyle = 'rgba(255, 255, 255, 0.9)';
     c.beginPath();
     c.arc(cellW / 2, cellH * 0.44, Math.min(innerW, innerH) * 0.14, 0, Math.PI * 2);
     c.fill();
+    strokeRoundRect(
+      c,
+      pad + innerW * 0.28,
+      pad + innerH * 0.62,
+      innerW * 0.44,
+      innerH * 0.18,
+      r.detail,
+      'rgba(255, 255, 255, 0.5)'
+    );
     c.fillStyle = 'rgba(255, 255, 255, 0.75)';
     c.font = `bold ${Math.max(7, Math.floor(innerW * 0.28))}px system-ui, sans-serif`;
     c.textAlign = 'center';
@@ -161,8 +213,8 @@ function buildProceduralPaddleCanvas(width, height) {
   const c = canvas.getContext('2d');
   const pad = 2;
   const innerH = canvas.height - pad - 2;
-  fillRoundRect(c, 0, 2, canvas.width, innerH, 6, '#00a080');
-  fillRoundRect(c, 0, 0, canvas.width, innerH, 6, '#00d4aa');
+  fillRoundRect(c, 0, 2, canvas.width, innerH, 6, '#00ccaa');
+  fillRoundRect(c, 0, 0, canvas.width, innerH, 6, '#00ffcc');
   return canvas;
 }
 
@@ -176,11 +228,11 @@ function buildProceduralEnemyCanvas(cellW, cellH) {
   const innerW = cellW - pad * 2;
   const innerH = cellH - pad * 2;
 
-  c.fillStyle = '#c94d9a';
+  c.fillStyle = '#cc22aa';
   c.beginPath();
   c.ellipse(cellW / 2, cellH * 0.65, innerW * 0.85, innerH * 0.7, 0, 0, Math.PI * 2);
   c.fill();
-  c.fillStyle = '#ff6bcb';
+  c.fillStyle = '#ff44dd';
   c.beginPath();
   c.ellipse(cellW / 2, cellH * 0.58, innerW * 0.8, innerH * 0.65, 0, 0, Math.PI * 2);
   c.fill();
@@ -189,12 +241,12 @@ function buildProceduralEnemyCanvas(cellW, cellH) {
   c.arc(cellW * 0.35, cellH * 0.42, Math.max(3, cellW * 0.1), 0, Math.PI * 2);
   c.arc(cellW * 0.65, cellH * 0.42, Math.max(3, cellW * 0.1), 0, Math.PI * 2);
   c.fill();
-  c.fillStyle = '#1e3a5f';
+  c.fillStyle = '#003366';
   c.beginPath();
   c.arc(cellW * 0.35, cellH * 0.42, Math.max(2, cellW * 0.05), 0, Math.PI * 2);
   c.arc(cellW * 0.65, cellH * 0.42, Math.max(2, cellW * 0.05), 0, Math.PI * 2);
   c.fill();
-  c.fillStyle = 'rgba(30, 58, 95, 0.8)';
+  c.fillStyle = 'rgba(0, 51, 102, 0.85)';
   c.beginPath();
   c.ellipse(cellW / 2, cellH * 0.72, cellW * 0.15, cellH * 0.1, 0, 0, Math.PI * 2);
   c.fill();
@@ -222,12 +274,12 @@ function drawBonusChanceItemArt(c, w, h) {
   const outerR = circleR * 0.55;
   const innerR = outerR * 0.42;
 
-  c.fillStyle = '#3d9a6a';
+  c.fillStyle = '#22ee88';
   c.beginPath();
   c.arc(cx, cy, circleR, 0, Math.PI * 2);
   c.fill();
 
-  c.fillStyle = '#ffe66d';
+  c.fillStyle = '#ffee44';
   drawStar(c, cx, cy, outerR, innerR, 5);
 }
 
@@ -350,7 +402,7 @@ function drawPowerPickerThumb(c, size, sprite, opt) {
   c.clearRect(0, 0, size, size);
   const pad = 2;
   if (!sprite) {
-    c.fillStyle = BLOCK_FALLBACK_COLORS[opt.value] || '#6b7280';
+    c.fillStyle = BLOCK_FALLBACK_COLORS[opt.value] || '#235789';
     if (opt.long === 'h') {
       c.fillRect(pad, pad + size * 0.2, size - pad * 2, size * 0.55);
     } else if (opt.long === 'v') {
@@ -492,6 +544,8 @@ function drawContained(ctx, sprite, x, y, w, h, pad) {
 
 const EditorEntityArt = {
   BLOCK_PICKER_OPTIONS,
+  HIDDEN_REVEAL_PICKER_OPTIONS,
+  HIDDEN_2X2_REVEAL_PICKER_OPTIONS,
   BLOCK_FALLBACK_COLORS,
   getEnemyPickerOptions,
   getItemPickerOptions,

@@ -12,9 +12,9 @@
       --text: #eee;
       --accent: #ffe66d;
       --grid: #4a2c7a;
-      --block: #fff5e6;
+      --block: #f1d302;
       --gray: #9ca3af;
-      --power: #6b7280;
+      --power: #235789;
       --enemy: #ff6bcb;
     }
 
@@ -409,6 +409,17 @@
         </p>
         <div id="block-brush-pane" class="brush-panel-pane">
           <div id="block-brush" class="entity-picker" role="radiogroup" aria-label="Block brush"></div>
+          <p class="brush-selection-wrap" id="hidden-reveal-wrap" hidden>
+            <span class="brush-selection-label">Hidden reveals as</span>
+            <strong class="brush-selection-name" id="hidden-reveal-selection" aria-live="polite">Normal</strong>
+          </p>
+          <div
+            id="hidden-reveal-brush"
+            class="entity-picker"
+            role="radiogroup"
+            aria-label="Hidden block reveal type"
+            hidden
+          ></div>
         </div>
         <div id="enemy-brush-pane" class="brush-panel-pane" hidden>
           <div class="entity-picker-scroll">
@@ -506,6 +517,9 @@
 
     const blockBrushPane = document.getElementById('block-brush-pane');
     const blockBrushRoot = document.getElementById('block-brush');
+    const hiddenRevealWrap = document.getElementById('hidden-reveal-wrap');
+    const hiddenRevealBrushRoot = document.getElementById('hidden-reveal-brush');
+    const hiddenRevealSelectionName = document.getElementById('hidden-reveal-selection');
     const enemyBrushPane = document.getElementById('enemy-brush-pane');
     const enemyBrushRoot = document.getElementById('enemy-brush');
     const itemBrushPane = document.getElementById('item-brush-pane');
@@ -515,9 +529,14 @@
 
     const PICKER_THUMB = 40;
     const BLOCK_OPTS = EditorEntityArt.BLOCK_PICKER_OPTIONS;
+    const HIDDEN_REVEAL_OPTS = EditorEntityArt.HIDDEN_REVEAL_PICKER_OPTIONS;
+    const HIDDEN_2X2_REVEAL_OPTS = EditorEntityArt.HIDDEN_2X2_REVEAL_PICKER_OPTIONS;
     const BLOCK_COLORS = EditorEntityArt.BLOCK_FALLBACK_COLORS;
+    const HIDDEN_CELL = typeof globalThis.HIDDEN_BLOCK_CELL === 'number' ? globalThis.HIDDEN_BLOCK_CELL : 23;
+    const HIDDEN_2X2_CELL = typeof globalThis.HIDDEN_2X2_BLOCK_CELL === 'number' ? globalThis.HIDDEN_2X2_BLOCK_CELL : 24;
 
     let blockBrushValue = 1;
+    let hiddenRevealBrushValue = 1;
     let enemyBrushValue = 'drifter';
     let itemBrushValue = 'food_apple';
     let entityArt = null;
@@ -571,7 +590,65 @@
         btn.classList.toggle('active', on);
         btn.setAttribute('aria-checked', on ? 'true' : 'false');
       });
+      const showReveal = blockBrushValue === HIDDEN_CELL || blockBrushValue === HIDDEN_2X2_CELL;
+      hiddenRevealWrap.hidden = !showReveal;
+      hiddenRevealBrushRoot.hidden = !showReveal;
+      if (showReveal) syncHiddenRevealPicker();
       if (mode === 'blocks' || mode === 'erase') updateBrushSelectionLabel();
+    }
+
+    function getHiddenRevealOpts() {
+      return blockBrushValue === HIDDEN_2X2_CELL ? HIDDEN_2X2_REVEAL_OPTS : HIDDEN_REVEAL_OPTS;
+    }
+
+    function setHiddenRevealBrushValue(val) {
+      hiddenRevealBrushValue = Number(val);
+      hiddenRevealBrushRoot.querySelectorAll('.entity-picker-btn').forEach((btn) => {
+        const on = Number(btn.dataset.value) === hiddenRevealBrushValue;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+      const opt = getHiddenRevealOpts().find((o) => o.value === hiddenRevealBrushValue);
+      hiddenRevealSelectionName.textContent = opt?.label ?? 'Normal';
+    }
+
+    function updateHiddenRevealPickerThumbs() {
+      hiddenRevealBrushRoot.querySelectorAll('.entity-picker-btn').forEach((btn) => {
+        const v = Number(btn.dataset.value);
+        const canvas = btn.querySelector('canvas');
+        if (!canvas) return;
+        const opt = getHiddenRevealOpts().find((o) => o.value === v);
+        if (opt?.power) {
+          const c = canvas.getContext('2d');
+          EditorEntityArt.drawPowerPickerThumb(c, PICKER_THUMB, entityArt?.blocks?.[3], opt);
+        } else if (opt?.span === '2x2') {
+          const c = canvas.getContext('2d');
+          EditorEntityArt.drawSpan2PickerThumb(c, PICKER_THUMB, entityArt?.blocks?.[v], opt);
+        } else {
+          paintPickerThumb(canvas, entityArt?.blocks?.[v], false);
+        }
+      });
+    }
+
+    function syncHiddenRevealPicker() {
+      const opts = getHiddenRevealOpts();
+      if (!opts.some((o) => o.value === hiddenRevealBrushValue)) {
+        hiddenRevealBrushValue = 1;
+      }
+      const prev = hiddenRevealBrushValue;
+      hiddenRevealBrushRoot.innerHTML = '';
+      for (const opt of opts) {
+        hiddenRevealBrushRoot.appendChild(
+          createPickerButton({
+            value: opt.value,
+            label: opt.label,
+            keyHint: opt.key,
+            onPick: () => setHiddenRevealBrushValue(opt.value),
+          })
+        );
+      }
+      setHiddenRevealBrushValue(prev);
+      updateHiddenRevealPickerThumbs();
     }
 
     function getEnemyBrushValue() {
@@ -715,6 +792,10 @@
       setBlockBrushValue(1);
     }
 
+    function initHiddenRevealPicker() {
+      syncHiddenRevealPicker();
+    }
+
     function initEnemyPicker() {
       enemyBrushRoot.innerHTML = '';
       const entries = EditorEntityArt.getEnemyPickerOptions();
@@ -762,6 +843,7 @@
     }
 
     initBlockPicker();
+    initHiddenRevealPicker();
     initEnemyPicker();
     initItemPicker();
 
@@ -775,6 +857,7 @@
       updateBlockPickerThumbs();
       updateEnemyPickerThumbs();
       updateItemPickerThumbs();
+      updateHiddenRevealPickerThumbs();
       editorLog('entity art ready', key);
     }
 
@@ -789,12 +872,29 @@
       return true;
     }
 
-    function drawBlockCell(tl, cellW, cellH, v) {
+    function drawHiddenRevealBadge(tl, cellW, cellH, col, row) {
+      const revealCell =
+        typeof getHiddenRevealCell === 'function'
+          ? getHiddenRevealCell(level, col, row)
+          : ensureLevelHiddenBehind()[row]?.[col] || 1;
+      const thumb = entityArt?.blocks?.[revealCell];
+      if (!thumb) return;
+      const pad = 3;
+      const badge = Math.min(cellW, cellH) * 0.38;
+      const bx = tl.x + cellW - badge - pad;
+      const by = tl.y + pad;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillRect(bx - 1, by - 1, badge + 2, badge + 2);
+      EditorEntityArt.drawStretched(ctx, thumb, bx, by, badge, badge, 1);
+    }
+
+    function drawBlockCell(tl, cellW, cellH, v, col, row) {
       if (v === 0) return;
       if (drawPowerBlock(tl, cellW, cellH, v)) return;
       const sprite = entityArt?.blocks?.[v];
       if (sprite) {
         EditorEntityArt.drawStretched(ctx, sprite, tl.x, tl.y, cellW, cellH, 2);
+        if (v === HIDDEN_CELL) drawHiddenRevealBadge(tl, cellW, cellH, col, row);
         if (v === 4) {
           ctx.strokeStyle = '#cc1144';
           ctx.strokeRect(tl.x + 0.5, tl.y + 0.5, cellW - 1, cellH - 1);
@@ -813,7 +913,7 @@
       ctx.strokeRect(tl.x, tl.y, cellW, cellH);
     }
 
-    function drawBlockSpan(tl, cellW, cellH, anchorValue) {
+    function drawBlockSpan(tl, cellW, cellH, anchorValue, col, row) {
       const typeId = getBlockTypeFromCell(anchorValue);
       if (!typeId) return;
       const { colSpan, rowSpan } = getBlockFootprint(typeId);
@@ -831,6 +931,9 @@
       const sprite = entityArt?.blocks?.[anchorValue] ?? entityArt?.blocks?.[thumbKey];
       if (sprite) {
         EditorEntityArt.drawStretched(ctx, sprite, tl.x, tl.y, w, h, 2);
+        if (anchorValue === HIDDEN_2X2_CELL && col != null && row != null) {
+          drawHiddenRevealBadge(tl, cellW, cellH, col, row);
+        }
         return;
       }
       ctx.fillStyle = BLOCK_COLORS[anchorValue] || '#fff';
@@ -936,6 +1039,7 @@
     }
 
     function syncGrid() {
+      if (!level) return;
       levelGrid = createLevelGrid(level, GAME_H, GAME_W);
       ensurePlayBlockCells(level, levelGrid);
       const g = levelGrid.config;
@@ -963,24 +1067,72 @@
       return { col, row, x, y };
     }
 
+    function ensureLevelHiddenBehind() {
+      if (!level) return [];
+      const { cols, rows } = levelGrid.config;
+      if (typeof ensureHiddenBehindGrid === 'function') {
+        return ensureHiddenBehindGrid(level, cols, rows);
+      }
+      if (!level.blocks) level.blocks = {};
+      if (!level.blocks.hiddenBehind) {
+        level.blocks.hiddenBehind = Array.from({ length: rows }, () => Array(cols).fill(0));
+      }
+      return level.blocks.hiddenBehind;
+    }
+
     function paintBlock(gridCol, gridRow, value) {
       const cells = getPlayCells();
       if (gridRow < 0 || gridRow >= cells.length || gridCol < 0 || gridCol >= cells[0].length) return;
       const { cols, rows } = levelGrid.config;
 
+      const priorAnchor = resolveBlockAnchor(cells, gridCol, gridRow);
       clearBlockFootprint(cells, gridCol, gridRow);
+      if (typeof clearHiddenRevealCell === 'function') {
+        if (priorAnchor?.anchorCell === HIDDEN_2X2_CELL && typeof clearHiddenRevealFootprint === 'function') {
+          clearHiddenRevealFootprint(level, priorAnchor.col, priorAnchor.row);
+        } else {
+          clearHiddenRevealCell(level, gridCol, gridRow);
+        }
+      } else {
+        const hb = ensureLevelHiddenBehind();
+        if (priorAnchor?.anchorCell === HIDDEN_2X2_CELL) {
+          for (const slot of [{ dc: 0, dr: 0 }, { dc: 1, dr: 0 }, { dc: 0, dr: 1 }, { dc: 1, dr: 1 }]) {
+            if (hb[priorAnchor.row + slot.dr]) hb[priorAnchor.row + slot.dr][priorAnchor.col + slot.dc] = 0;
+          }
+        } else if (hb[gridRow]) {
+          hb[gridRow][gridCol] = 0;
+        }
+      }
 
       if (value !== 0) {
         if (isBlockAnchorCell(value)) {
           if (value === 18) {
             if (!canPaintScoreBlock(cells, cols, rows, gridCol, gridRow)) return;
             paintScoreBlockCells(cells, gridCol, gridRow);
+          } else if (value === HIDDEN_2X2_CELL) {
+            if (typeof canPaintHidden2x2Block === 'function' && !canPaintHidden2x2Block(cells, cols, rows, gridCol, gridRow)) {
+              return;
+            }
+            if (typeof paintHidden2x2BlockCells === 'function') {
+              paintHidden2x2BlockCells(cells, gridCol, gridRow);
+            }
+            if (typeof setHiddenRevealFootprint === 'function') {
+              setHiddenRevealFootprint(level, gridCol, gridRow, hiddenRevealBrushValue);
+            }
           } else {
             if (!canPaintLongBlock(cells, cols, rows, gridCol, gridRow, value)) return;
             paintLongBlockCells(cells, gridCol, gridRow, value);
           }
         } else {
           cells[gridRow][gridCol] = value;
+          if (value === HIDDEN_CELL) {
+            if (typeof setHiddenRevealCell === 'function') {
+              setHiddenRevealCell(level, gridCol, gridRow, hiddenRevealBrushValue);
+            } else {
+              const hb = ensureLevelHiddenBehind();
+              hb[gridRow][gridCol] = hiddenRevealBrushValue;
+            }
+          }
         }
       }
 
@@ -1038,7 +1190,29 @@
       }
       const cells = getPlayCells();
       if (row >= 0 && row < cells.length && col >= 0 && col < cells[0].length && cells[row][col]) {
+        const priorAnchor = resolveBlockAnchor(cells, col, row);
         clearBlockFootprint(cells, col, row);
+        const anchor = priorAnchor;
+        if (typeof clearHiddenRevealCell === 'function') {
+          if (anchor?.anchorCell === HIDDEN_2X2_CELL) {
+            if (typeof clearHiddenRevealFootprint === 'function') {
+              clearHiddenRevealFootprint(level, anchor.col, anchor.row);
+            } else {
+              clearHiddenRevealCell(level, anchor.col, anchor.row);
+            }
+          } else {
+            clearHiddenRevealCell(level, col, row);
+          }
+        } else {
+          const hb = ensureLevelHiddenBehind();
+          if (anchor?.anchorCell === HIDDEN_2X2_CELL) {
+            for (const slot of [{ dc: 0, dr: 0 }, { dc: 1, dr: 0 }, { dc: 0, dr: 1 }, { dc: 1, dr: 1 }]) {
+              if (hb[anchor.row + slot.dr]) hb[anchor.row + slot.dr][anchor.col + slot.dc] = 0;
+            }
+          } else if (hb[row]) {
+            hb[row][col] = 0;
+          }
+        }
         draw();
         refreshExport();
         scheduleEditorDraftSave();
@@ -1108,6 +1282,7 @@
     }
 
     function draw(fromFloatLoop = false) {
+      if (!level) return;
       ctx.fillStyle = '#2d1b4e';
       ctx.fillRect(0, 0, GAME_W, GAME_H);
       ctx.strokeStyle = 'rgba(255,230,109,0.35)';
@@ -1141,9 +1316,9 @@
           if (!v || isBlockExtensionCell(v)) continue;
           const tl = levelGrid.cellTopLeft(col, row);
           if (isBlockAnchorCell(v)) {
-            drawBlockSpan(tl, g.cellWidth, g.cellHeight, v);
+            drawBlockSpan(tl, g.cellWidth, g.cellHeight, v, col, row);
           } else {
-            drawBlockCell(tl, g.cellWidth, g.cellHeight, v);
+            drawBlockCell(tl, g.cellWidth, g.cellHeight, v, col, row);
           }
         }
       }
@@ -1182,6 +1357,20 @@
     }
 
     function buildLevelExport() {
+      if (!level) {
+        const { cols, rows } = levelGrid.config;
+        return {
+          version: 1,
+          id: 'editor-preview',
+          name: 'Editor preview',
+          blocks: {
+            cells: Array.from({ length: rows }, () => Array(cols).fill(0)),
+            hiddenBehind: Array.from({ length: rows }, () => Array(cols).fill(0)),
+          },
+          enemies: [],
+          items: [],
+        };
+      }
       return {
         version: level.version ?? 1,
         id: level.id ?? 'editor-preview',
@@ -1192,6 +1381,7 @@
         grid: { ...level.grid },
         blocks: {
           cells: getPlayCells().map((row) => [...row]),
+          hiddenBehind: ensureLevelHiddenBehind().map((row) => [...row]),
         },
         enemies: [...(level.enemies || [])],
         items: [...(level.items || [])],
@@ -1572,6 +1762,8 @@
         d: 16,
         e: 18,
         u: 22,
+        h: 23,
+        x: 24,
       };
       if (map[ev.key] != null) {
         setBlockBrushValue(map[ev.key]);

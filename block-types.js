@@ -99,7 +99,7 @@ const BLOCK_COMPENDIUM = [
     id: 'spike',
     name: 'Spike Block',
     implemented: true,
-    appearance: 'Procedural — red triple-spike hazard',
+    appearance: 'Procedural — single rounded cute black spike on transparent tile',
     points: 0,
     normalHit: 'hazard',
     powerHit: 'hazard_bounce',
@@ -139,11 +139,31 @@ const BLOCK_COMPENDIUM = [
     id: 'score',
     name: 'Score Block',
     implemented: true,
-    appearance: 'Procedural — lavender 2×2 tile with tier label (50→3200)',
+    appearance: '3D orange 2×2 puff with big rotating star; hit = spin then random nudge',
     points: 0,
     normalHit: 'hit_increment',
     powerHit: 'hit_increment_high',
-    notes: 'Up to ~7 hits; escalating points; 1-Ups at max with ability.',
+    notes: 'Up to ~7 hits; escalating points; 1-Ups at max with ability. Optional — does not count toward level clear.',
+  },
+  {
+    id: 'hidden',
+    name: 'Hidden Block',
+    implemented: true,
+    appearance: 'Wooden panel — first hit flips to reveal block behind',
+    points: 0,
+    normalHit: 'reveal',
+    powerHit: 'reveal',
+    notes: 'Editor sets reveal type via blocks.hiddenBehind. Does not count until revealed.',
+  },
+  {
+    id: 'hidden_2x2',
+    name: 'Hidden Block (2×2)',
+    implemented: true,
+    appearance: 'Large wooden panel — spans 2×2; first hit flips to reveal block behind',
+    points: 0,
+    normalHit: 'reveal',
+    powerHit: 'reveal',
+    notes: 'Same as hidden; reveal type stored on all four footprint cells in hiddenBehind.',
   },
   {
     id: 'bonus',
@@ -329,6 +349,28 @@ const BLOCK_TYPES = {
     countsTowardClear: false,
   },
   /** Placed in editor — solid until Bonus Chance; pass-through while timer runs. */
+  hidden: {
+    id: 'hidden',
+    texture: 'block_hidden',
+    points: 0,
+    powerOnly: false,
+    normalHit: 'reveal',
+    powerHit: 'reveal',
+    countsTowardClear: false,
+    invisibleUntilReveal: true,
+  },
+  hidden_2x2: {
+    id: 'hidden_2x2',
+    texture: 'block_hidden_2x2',
+    colSpan: 2,
+    rowSpan: 2,
+    points: 0,
+    powerOnly: false,
+    normalHit: 'reveal',
+    powerHit: 'reveal',
+    countsTowardClear: false,
+    invisibleUntilReveal: true,
+  },
   bonus: {
     id: 'bonus',
     texture: 'block_bonus',
@@ -339,6 +381,21 @@ const BLOCK_TYPES = {
     countsTowardClear: true,
   },
 };
+
+/** Grid cell for hidden-block surface (1×1). */
+const HIDDEN_BLOCK_CELL = 23;
+
+/** Grid anchor for hidden block 2×2 (extensions `25`–`27`). */
+const HIDDEN_2X2_BLOCK_CELL = 24;
+
+/** Allowed `hiddenBehind` values for 1×1 hidden panels. */
+const HIDDEN_REVEAL_CELLS = new Set([1, 2, 3, 4, 5, 22]);
+
+/** Extra reveal types valid only behind a 2×2 hidden panel (e.g. score block). */
+const HIDDEN_2X2_REVEAL_CELLS = new Set([18]);
+
+/** Union stored in level `hiddenBehind` grids. */
+const HIDDEN_BEHIND_CELLS = new Set([...HIDDEN_REVEAL_CELLS, ...HIDDEN_2X2_REVEAL_CELLS]);
 
 /** Level grid cell → block type id (single-cell and long-block anchors only). */
 const BLOCK_CELL_MAP = {
@@ -356,6 +413,8 @@ const BLOCK_CELL_MAP = {
   16: 'power_long_v',
   18: 'score',
   22: 'bonus',
+  23: 'hidden',
+  24: 'hidden_2x2',
 };
 
 /** Long-block extension cells (second half of footprint; not spawned as their own body). */
@@ -369,6 +428,9 @@ const BLOCK_CELL_EXTENSION = {
   19: { anchorCell: 18, dCol: -1, dRow: 0 },
   20: { anchorCell: 18, dCol: 0, dRow: -1 },
   21: { anchorCell: 18, dCol: -1, dRow: -1 },
+  25: { anchorCell: 24, dCol: -1, dRow: 0 },
+  26: { anchorCell: 24, dCol: 0, dRow: -1 },
+  27: { anchorCell: 24, dCol: -1, dRow: -1 },
 };
 
 /** Score block — 2×2 anchor `18` plus extension cells `19`–`21`. */
@@ -377,6 +439,13 @@ const SCORE_BLOCK_CELLS = [
   { dc: 1, dr: 0, v: 19 },
   { dc: 0, dr: 1, v: 20 },
   { dc: 1, dr: 1, v: 21 },
+];
+
+const HIDDEN_2X2_BLOCK_CELLS = [
+  { dc: 0, dr: 0, v: 24 },
+  { dc: 1, dr: 0, v: 25 },
+  { dc: 0, dr: 1, v: 26 },
+  { dc: 1, dr: 1, v: 27 },
 ];
 
 const LONG_BLOCK_PAINT = {
@@ -393,7 +462,9 @@ function isBlockExtensionCell(cell) {
 }
 
 function isBlockAnchorCell(cell) {
-  return Object.prototype.hasOwnProperty.call(LONG_BLOCK_PAINT, cell) || cell === 18;
+  return (
+    Object.prototype.hasOwnProperty.call(LONG_BLOCK_PAINT, cell) || cell === 18 || cell === HIDDEN_2X2_BLOCK_CELL
+  );
 }
 
 function resolveBlockAnchor(cells, col, row) {
@@ -412,6 +483,14 @@ function resolveLongBlockAnchor(cells, col, row) {
 
 function clearScoreFootprint(cells, col, row) {
   for (const slot of SCORE_BLOCK_CELLS) {
+    const r = row + slot.dr;
+    const c = col + slot.dc;
+    if (cells[r]?.[c] != null) cells[r][c] = 0;
+  }
+}
+
+function clearHidden2x2Footprint(cells, col, row) {
+  for (const slot of HIDDEN_2X2_BLOCK_CELLS) {
     const r = row + slot.dr;
     const c = col + slot.dc;
     if (cells[r]?.[c] != null) cells[r][c] = 0;
@@ -439,6 +518,60 @@ function paintScoreBlockCells(cells, col, row) {
     cells[row + slot.dr][col + slot.dc] = slot.v;
   }
   return true;
+}
+
+function canPaintHidden2x2Block(cells, cols, rows, col, row) {
+  for (const slot of HIDDEN_2X2_BLOCK_CELLS) {
+    const c = col + slot.dc;
+    const r = row + slot.dr;
+    if (c < 0 || r < 0 || c >= cols || r >= rows) return false;
+    const v = cells[r][c];
+    if (!v) continue;
+    const existing = resolveBlockAnchor(cells, c, r);
+    if (
+      existing &&
+      existing.col === col &&
+      existing.row === row &&
+      existing.anchorCell === HIDDEN_2X2_BLOCK_CELL
+    ) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+function paintHidden2x2BlockCells(cells, col, row) {
+  for (const slot of HIDDEN_2X2_BLOCK_CELLS) {
+    cells[row + slot.dr][col + slot.dc] = slot.v;
+  }
+  return true;
+}
+
+function migrateHidden2x2Footprints(cells, cols, rows) {
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (cells[row][col] !== HIDDEN_2X2_BLOCK_CELL) continue;
+      const complete =
+        cells[row][col + 1] === 25 &&
+        cells[row + 1]?.[col] === 26 &&
+        cells[row + 1]?.[col + 1] === 27;
+      if (complete) continue;
+      if (canPaintHidden2x2Block(cells, cols, rows, col, row)) {
+        paintHidden2x2BlockCells(cells, col, row);
+      } else {
+        clearHidden2x2Footprint(cells, col, row);
+      }
+    }
+  }
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const v = cells[row][col];
+      if (v !== 25 && v !== 26 && v !== 27) continue;
+      const anchor = resolveBlockAnchor(cells, col, row);
+      if (!anchor || anchor.anchorCell !== HIDDEN_2X2_BLOCK_CELL) cells[row][col] = 0;
+    }
+  }
 }
 
 function migrateScoreFootprints(cells, cols, rows) {
@@ -471,6 +604,10 @@ function clearBlockFootprint(cells, col, row) {
   const anchor = resolveBlockAnchor(cells, col, row);
   if (anchor?.anchorCell === 18) {
     clearScoreFootprint(cells, anchor.col, anchor.row);
+    return;
+  }
+  if (anchor?.anchorCell === HIDDEN_2X2_BLOCK_CELL) {
+    clearHidden2x2Footprint(cells, anchor.col, anchor.row);
     return;
   }
   if (anchor && LONG_BLOCK_PAINT[anchor.anchorCell]) {
@@ -546,6 +683,85 @@ function getBlockDef(typeId) {
   return BLOCK_TYPES[typeId] || BLOCK_TYPES.normal;
 }
 
+/** Whether destroying this block type can complete the level (score/spike/indestructible: false). */
+function blockCountsTowardLevelClear(typeId) {
+  if (!typeId || typeId === 'score' || typeId === 'hidden' || typeId === 'hidden_2x2') return false;
+  return getBlockDef(typeId).countsTowardClear === true;
+}
+
+/** Gameplay: hidden panels are collidable but not drawn until first hit. */
+function isUnrevealedHiddenBlock(block) {
+  if (!block?.getData) return false;
+  if (block.getData('hiddenRevealed')) return false;
+  const typeId = block.getData('typeId');
+  return typeId === 'hidden' || typeId === 'hidden_2x2';
+}
+
+function normalizeHiddenRevealCell(cell) {
+  return HIDDEN_BEHIND_CELLS.has(cell) ? cell : 1;
+}
+
+function normalizeHiddenRevealCellForSurface(surfaceCell, revealCell) {
+  const v = normalizeHiddenRevealCell(revealCell);
+  if (surfaceCell === HIDDEN_2X2_BLOCK_CELL) return v;
+  if (HIDDEN_2X2_REVEAL_CELLS.has(v)) return 1;
+  return v;
+}
+
+function ensureHiddenBehindGrid(level, cols, rows) {
+  if (!level) return Array.from({ length: rows }, () => Array(cols).fill(0));
+  if (!level.blocks) level.blocks = {};
+  const raw = level.blocks.hiddenBehind;
+  const grid = Array.from({ length: rows }, (_, row) => {
+    const src = raw?.[row];
+    return Array.from({ length: cols }, (_, col) => {
+      const v = Number(src?.[col]) || 0;
+      return v && HIDDEN_BEHIND_CELLS.has(v) ? v : 0;
+    });
+  });
+  level.blocks.hiddenBehind = grid;
+  return grid;
+}
+
+function hiddenSurfaceAnchorCell(level, col, row, surfaceCell) {
+  if (surfaceCell != null) return surfaceCell;
+  const cells = level?.blocks?.cells;
+  if (!cells) return null;
+  const anchor = resolveBlockAnchor(cells, col, row);
+  return anchor?.anchorCell ?? cells[row]?.[col] ?? null;
+}
+
+function getHiddenRevealCell(level, col, row, surfaceCell) {
+  const v = level?.blocks?.hiddenBehind?.[row]?.[col];
+  const surface = hiddenSurfaceAnchorCell(level, col, row, surfaceCell);
+  return normalizeHiddenRevealCellForSurface(surface, v || 1);
+}
+
+function setHiddenRevealCell(level, col, row, revealCell, surfaceCell) {
+  if (!level.blocks) level.blocks = {};
+  const grid = level.blocks.hiddenBehind;
+  if (!grid?.[row]) return;
+  const surface = hiddenSurfaceAnchorCell(level, col, row, surfaceCell);
+  grid[row][col] = normalizeHiddenRevealCellForSurface(surface, revealCell);
+}
+
+function clearHiddenRevealCell(level, col, row) {
+  const grid = level?.blocks?.hiddenBehind;
+  if (grid?.[row]) grid[row][col] = 0;
+}
+
+function setHiddenRevealFootprint(level, col, row, revealCell) {
+  for (const slot of HIDDEN_2X2_BLOCK_CELLS) {
+    setHiddenRevealCell(level, col + slot.dc, row + slot.dr, revealCell);
+  }
+}
+
+function clearHiddenRevealFootprint(level, col, row) {
+  for (const slot of HIDDEN_2X2_BLOCK_CELLS) {
+    clearHiddenRevealCell(level, col + slot.dc, row + slot.dr);
+  }
+}
+
 function getCompendiumEntry(typeId) {
   return BLOCK_COMPENDIUM.find((b) => b.id === typeId);
 }
@@ -564,6 +780,9 @@ function resolveBlockHit(typeId, isPowered) {
   if (def.normalHit === 'damage_to_normal' && def.downgradeTo) {
     return { action: 'downgrade', toType: def.downgradeTo, points: 0 };
   }
+  if (def.normalHit === 'reveal' || typeId === 'hidden' || typeId === 'hidden_2x2') {
+    return { action: 'reveal' };
+  }
   if (def.normalHit === 'hit_increment' || def.powerHit === 'hit_increment_high') {
     return { action: 'score_hit', powered: isPowered };
   }
@@ -572,4 +791,26 @@ function resolveBlockHit(typeId, isPowered) {
   }
   if (def.normalHit === 'destroy') return { action: 'destroy', points: def.points };
   return { action: 'immune', points: 0 };
+}
+
+if (typeof globalThis !== 'undefined') {
+  globalThis.blockCountsTowardLevelClear = blockCountsTowardLevelClear;
+  globalThis.isUnrevealedHiddenBlock = isUnrevealedHiddenBlock;
+  globalThis.HIDDEN_BLOCK_CELL = HIDDEN_BLOCK_CELL;
+  globalThis.HIDDEN_2X2_BLOCK_CELL = HIDDEN_2X2_BLOCK_CELL;
+  globalThis.HIDDEN_REVEAL_CELLS = HIDDEN_REVEAL_CELLS;
+  globalThis.HIDDEN_2X2_REVEAL_CELLS = HIDDEN_2X2_REVEAL_CELLS;
+  globalThis.HIDDEN_BEHIND_CELLS = HIDDEN_BEHIND_CELLS;
+  globalThis.normalizeHiddenRevealCellForSurface = normalizeHiddenRevealCellForSurface;
+  globalThis.canPaintHidden2x2Block = canPaintHidden2x2Block;
+  globalThis.paintHidden2x2BlockCells = paintHidden2x2BlockCells;
+  globalThis.setHiddenRevealFootprint = setHiddenRevealFootprint;
+  globalThis.clearHiddenRevealFootprint = clearHiddenRevealFootprint;
+  globalThis.clearHidden2x2Footprint = clearHidden2x2Footprint;
+  globalThis.paintScoreBlockCells = paintScoreBlockCells;
+  globalThis.ensureHiddenBehindGrid = ensureHiddenBehindGrid;
+  globalThis.getHiddenRevealCell = getHiddenRevealCell;
+  globalThis.setHiddenRevealCell = setHiddenRevealCell;
+  globalThis.clearHiddenRevealCell = clearHiddenRevealCell;
+  globalThis.normalizeHiddenRevealCell = normalizeHiddenRevealCell;
 }

@@ -19,46 +19,53 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #1a1a2e;
+      background: #e8e8e8;
       touch-action: none;
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
     }
 
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
     #game-container {
+      flex: 1;
+      min-height: 0;
       width: 100%;
-      height: 100%;
+      position: relative;
+      overflow: hidden;
     }
 
     #level-bar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
+      position: relative;
+      flex-shrink: 0;
       z-index: 1000;
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
       padding: 6px 10px;
-      background: rgba(26, 26, 46, 0.92);
-      border-bottom: 1px solid #444;
+      background: rgba(74, 32, 136, 0.95);
+      border-bottom: 2px solid #ffe066;
       font-family: system-ui, -apple-system, sans-serif;
-      font-size: 13px;
-      color: #eee;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
     }
 
     #level-bar label {
-      color: #aaa;
+      color: #ffe066;
     }
 
     #level-bar select,
     #level-bar button,
     #level-bar a {
-      background: #252545;
-      color: #eee;
-      border: 1px solid #555;
+      background: #6b30c0;
+      color: #fff;
+      border: 2px solid #ffee44;
       border-radius: 6px;
       padding: 4px 10px;
       font-size: 13px;
@@ -75,8 +82,8 @@
     }
 
     #campaign-label {
-      font-weight: 600;
-      color: #ffe66d;
+      font-weight: 700;
+      color: #ffee44;
       margin-right: 4px;
     }
 
@@ -86,19 +93,162 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #1a1a2e;
+      background: #e8e8e8;
       color: #aaa;
       font-family: system-ui, sans-serif;
       z-index: 999;
     }
 
     #boot-status.error {
-      color: #ff6b6b;
+      color: #ff5566;
       padding: 24px;
       text-align: center;
       max-width: 420px;
     }
+
+    #game-container canvas {
+      display: block;
+    }
+
+    #three-overlay {
+      position: absolute;
+      margin: 0;
+      padding: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    #game-fx-overlay {
+      position: absolute;
+      margin: 0;
+      padding: 0;
+      pointer-events: none;
+      z-index: 3;
+      overflow: visible;
+    }
+
+    #game-modal-overlay {
+      position: absolute;
+      margin: 0;
+      padding: 0;
+      z-index: 20;
+      pointer-events: none;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    #game-modal-overlay:not([hidden]) {
+      pointer-events: auto;
+    }
+
+    .game-modal-dim {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+    }
+
+    .game-modal-panel {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: calc(100% - 48px);
+      max-width: 342px;
+      padding: 28px 24px 24px;
+      border: 4px solid #ffee44;
+      border-radius: 8px;
+      background: rgba(74, 24, 160, 0.96);
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    .game-modal-title {
+      margin: 0 0 12px;
+      font-size: 28px;
+      font-weight: 700;
+      color: #ffee44;
+    }
+
+    .game-modal-subtitle {
+      margin: 0 0 24px;
+      font-size: 18px;
+      line-height: 1.35;
+      color: #ffffff;
+      white-space: pre-line;
+    }
+
+    .game-modal-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .game-modal-btn {
+      min-width: 200px;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 6px;
+      background: #00ffcc;
+      color: #1a1a2e;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .game-modal-btn--secondary {
+      background: #444466;
+      color: #ffffff;
+    }
+
+    .game-modal-btn:hover {
+      filter: brightness(1.08);
+    }
+
+    .score-float-label {
+      position: absolute;
+      transform: translate(-50%, -100%) scale(0.65);
+      font-family: system-ui, -apple-system, sans-serif;
+      font-weight: 800;
+      color: #ffee44;
+      -webkit-text-stroke: 3px #3a0080;
+      paint-order: stroke fill;
+      white-space: nowrap;
+      will-change: transform, opacity;
+    }
+
+    .score-float-label--animate {
+      animation-name: score-float-rise;
+      animation-timing-function: cubic-bezier(0.33, 1, 0.68, 1);
+      animation-fill-mode: forwards;
+    }
+
+    @keyframes score-float-rise {
+      0% {
+        transform: translate(-50%, -100%) scale(0.65);
+        opacity: 1;
+      }
+
+      12% {
+        transform: translate(-50%, -100%) scale(1);
+        opacity: 1;
+      }
+
+      100% {
+        transform: translate(-50%, calc(-100% - var(--rise))) scale(1);
+        opacity: 0;
+      }
+    }
   </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 
 <body>
@@ -131,6 +281,8 @@ MOBILE CONTROLS
   • Chain Power Bounces on returns to keep momentum through hard sections.
   • No release timing → normal bounce; spikes cost a life when not powered.
 
+  3D overlay (experimental): add ?3d=1 — diorama-tilted Three.js meshes synced to ball + blocks.
+
 PACKAGING FOR REAL MOBILE APPS
 ------------------------------
   Capacitor (recommended):
@@ -159,6 +311,8 @@ PACKAGING FOR REAL MOBILE APPS
     <span id="campaign-label" hidden></span>
     <label for="level-select" id="level-select-label">Level</label>
     <select id="level-select" aria-label="Select level"></select>
+    <button type="button" id="toggle-3d">3D: off</button>
+    <button type="button" id="toggle-dev-borders">Borders: on</button>
     <button type="button" id="level-restart">Restart</button>
     <a href="campaign-menu.html" id="nav-campaign-menu">Campaign</a>
     <a href="campaign-editor.html" id="nav-campaign-planner">Planner</a>
@@ -168,29 +322,139 @@ PACKAGING FOR REAL MOBILE APPS
 
   <script src="block-types.js"></script>
   <script src="block-power-art.js"></script>
+  <script src="ball-art.js"></script>
   <script src="enemy-types.js"></script>
   <script src="item-types.js"></script>
   <script src="score-popup.js"></script>
   <script src="level-grid.js"></script>
   <script src="hud-avatar.js"></script>
+  <script src="parallax-grid-bg.js"></script>
+  <script src="game-haptics.js"></script>
   <script src="levels/campaign.js"></script>
   <script src="levels/registry.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
   <script>
-    /* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, canBlockBecomeBonus, getBonusCollectPoints, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemEffect, getItemTextureKey, getItemFootprint, ITEM_CATEGORY, spawnFloatingScore, spawnFloatingHint, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, fitEntityToCell, fitEntityToCellSpan, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES, markStageCompleted, getNextStage, campaignPlayUrl, campaignMenuUrl */
+    /* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, blockCountsTowardLevelClear, getHiddenRevealCell, canBlockBecomeBonus, getBonusCollectPoints, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemEffect, getItemTextureKey, getItemFootprint, ITEM_CATEGORY, spawnFloatingScore, spawnFloatingHint, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, fitEntityToCell, fitEntityToCellSpan, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES, markStageCompleted, getNextStage, campaignPlayUrl, campaignMenuUrl, createParallaxGridBackground, updateParallaxGridBackground, setGameHapticsEnabled, gameHaptic, hapticLaunchChargeStart, hapticLaunchChargeTick, hapticLaunchRelease */
 
     let ACTIVE_LEVEL = null;
     /** @type {{ campaign: object, worldId: string, worldName: string, worldIndex: number, stageIndex: number, stageNumber: number } | null} */
     let ACTIVE_CAMPAIGN_CTX = null;
     const URL_PARAMS = new URLSearchParams(window.location.search);
+    if (typeof setGameHapticsEnabled === 'function') {
+      let hapticsOn = URL_PARAMS.get('haptics') !== '0';
+      try {
+        if (localStorage.getItem('blockBall.haptics') === '0') hapticsOn = false;
+      } catch (_) {
+        /* private mode */
+      }
+      setGameHapticsEnabled(hapticsOn);
+    }
+    const USE_3D_OVERLAY =
+      URL_PARAMS.get('3d') === '1' ||
+      (URL_PARAMS.get('3d') !== '0' && localStorage.getItem('blockBall.use3d') === '1');
     const SHOW_LEVEL_GRID = URL_PARAMS.has('debugGrid');
-    /** Full game / HUD / play outlines. Disable with ?devBorders=0 */
-    const DEV_BORDERS = URL_PARAMS.get('devBorders') !== '0';
+    /** Full game / HUD / play outlines. Toggle in level bar or ?devBorders=0 */
+    const DEV_BORDERS =
+      URL_PARAMS.get('devBorders') === '1' ||
+      (URL_PARAMS.get('devBorders') !== '0' && localStorage.getItem('blockBall.devBorders') !== '0');
+
+    function syncGameModalOverlayLayout(scene) {
+      const parent = document.getElementById('game-container');
+      const canvas = scene?.game?.canvas;
+      if (!parent || !canvas) return null;
+
+      scene.scale?.updateBounds?.();
+      let modal = document.getElementById('game-modal-overlay');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'game-modal-overlay';
+        modal.hidden = true;
+        parent.appendChild(modal);
+      }
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
+      modal.style.left = `${canvasRect.left - parentRect.left}px`;
+      modal.style.top = `${canvasRect.top - parentRect.top}px`;
+      modal.style.width = `${canvasRect.width}px`;
+      modal.style.height = `${canvasRect.height}px`;
+      return modal;
+    }
+
+    function hideGameModalOverlay() {
+      const modal = document.getElementById('game-modal-overlay');
+      if (!modal) return;
+      modal.hidden = true;
+      modal.innerHTML = '';
+    }
+
+    function showGameModalOverlay(scene, { title, subtitle, buttons }) {
+      const modal = syncGameModalOverlayLayout(scene);
+      if (!modal) return null;
+
+      modal.hidden = false;
+      modal.innerHTML = '';
+
+      const dim = document.createElement('div');
+      dim.className = 'game-modal-dim';
+
+      const panel = document.createElement('div');
+      panel.className = 'game-modal-panel';
+
+      const titleEl = document.createElement('h2');
+      titleEl.className = 'game-modal-title';
+      titleEl.textContent = title;
+
+      const subEl = document.createElement('p');
+      subEl.className = 'game-modal-subtitle';
+      subEl.textContent = subtitle;
+
+      const btnRow = document.createElement('div');
+      btnRow.className = 'game-modal-buttons';
+
+      for (const btn of buttons) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className =
+          btn.primary === false ? 'game-modal-btn game-modal-btn--secondary' : 'game-modal-btn';
+        button.textContent = btn.label;
+        button.addEventListener('click', () => {
+          hideGameModalOverlay();
+          btn.onClick();
+        });
+        btnRow.appendChild(button);
+      }
+
+      panel.append(titleEl, subEl, btnRow);
+      modal.append(dim, panel);
+      return modal;
+    }
+
+    /** Full game / HUD / play outlines. Toggle in level bar or ?devBorders=0 */
 
     const DEBUG_LOG = true;
+    /** Verbose power-block resist / bounce tracing (?powerDebug=0 to disable). */
+    const POWER_BLOCK_DEBUG =
+      DEBUG_LOG && URL_PARAMS.get('powerDebug') !== '0';
 
     function bbLog(...args) {
       if (DEBUG_LOG) console.log('[BlockBall]', ...args);
+    }
+
+    const _powerBlockLogLast = new Map();
+
+    function bbPowerLog(key, payload, minIntervalMs = 120) {
+      if (!POWER_BLOCK_DEBUG) return;
+      const now = performance.now();
+      const last = _powerBlockLogLast.get(key) ?? 0;
+      if (now - last < minIntervalMs) return;
+      _powerBlockLogLast.set(key, now);
+      console.log('[BlockBall:PowerBlock]', key, payload);
+    }
+
+    function bbPowerLogAlways(key, payload) {
+      if (!POWER_BLOCK_DEBUG) return;
+      console.log('[BlockBall:PowerBlock]', key, payload);
     }
 
     function bbError(context, err) {
@@ -215,34 +479,37 @@ PACKAGING FOR REAL MOBILE APPS
     const COLORS = {
       bg: 0x2d1b4e,
       bgLight: 0x4a2c7a,
-      paddle: 0x00d4aa,
-      paddleDark: 0x00a080,
-      ball: 0x4da6ff,
-      ballHighlight: 0x8ec8ff,
-      blockNormal: 0xfff5e6,
-      blockNormalBorder: 0xffb347,
-      blockGray: 0x9ca3af,
-      blockGrayBorder: 0x4b5563,
-      blockPower: 0x6b7280,
-      blockPowerBorder: 0x374151,
-      blockPowerGlow: 0xffe66d,
-      spike: 0xff3366,
-      enemy: 0xff6bcb,
-      enemyDark: 0xc94d9a,
+      paddle: 0x00ffcc,
+      paddleDark: 0x00ccaa,
+      ball: 0x44ddff,
+      ballHighlight: 0xccffff,
+      blockNormal: 0xf1d302,
+      blockNormalBorder: 0xcdb002,
+      blockGray: 0xa8c0ff,
+      blockGrayBorder: 0x4466ff,
+      blockHidden: 0x7a5c48,
+      blockHiddenBorder: 0x4a382c,
+      blockPower: 0x235789,
+      blockPowerBorder: 0x1a425f,
+      blockPowerGlow: 0x8fb4d4,
+      spike: 0xff2266,
+      enemy: 0xff44dd,
+      enemyDark: 0xcc22aa,
       text: '#ffffff',
-      accent: '#ffe66d',
-      danger: '#ff3366',
+      accent: '#ffee44',
+      danger: '#ff2266',
     };
 
     /** Fallback debris tint if texture sampling fails. */
     const CLAY_DEBRIS_TINT_FALLBACK = {
-      normal: 0xe8dcc8,
-      gray: 0xb8b0a8,
-      power: 0xc9c4b0,
-      spike: 0xd4a8a8,
-  indestructible: 0x9aa8b0,
-  score: 0xb8a8d8,
-};
+      normal: 0xf1d302,
+      gray: 0xa8c0ff,
+      hidden: 0x7a5c48,
+      power: 0x235789,
+      spike: 0x3a3048,
+      indestructible: 0x88ccff,
+      score: 0xff9922,
+    };
 
     const PHYSICS = {
       ballSpeed: 380,
@@ -252,8 +519,15 @@ PACKAGING FOR REAL MOBILE APPS
       powerBounceSpeed: 680,
       powerAngleAmp: 1.38,
       paddleBounceFactor: 1.05,
-      /** Rolling spin: rotation rate ≈ speed / radius (rad/s). */
-      ballSpin: 0.15,
+    };
+
+    /** Prevent near-horizontal side-wall ping-pong (stall). */
+    const BALL_ANTI_STALL = {
+      minVyFrac: 0.3,
+      minVyFracPower: 0.26,
+      maxHorizRatio: 0.92,
+      sideWallVyKick: 72,
+      sideWallVxDamp: 0.96,
     };
 
     /** Level-placed pickups bob in place (classic Kirby-style float). */
@@ -265,21 +539,22 @@ PACKAGING FOR REAL MOBILE APPS
     };
 
     const BALL_TRAIL = {
-      /** Must match speed_line texture size in generateTextures(). */
-      texWidth: 24,
-      texHeight: 6,
-      frequency: 20,
-      frequencyPower: 14,
-      lifespan: 140,
-      lifespanPower: 170,
-      tint: 0xc8eed4,
-      tintPower: 0xfff0b0,
-      /** Thickness vs ball diameter (1 = full ball width; original ≈ 0.1). */
-      widthMul: 0.5,
-      widthMulPower: 0.58,
-      /** Streak length vs ball diameter. */
-      lengthMul: 1.1,
-      lengthMulPower: 1.28,
+      /** Ms between slime drops (higher = slower drip). */
+      frequency: 62,
+      frequencyPower: 42,
+      lifespan: 1800,
+      lifespanPower: 2200,
+      tint: 0x3399ee,
+      tintPower: 0x66ddff,
+      /** Blob size vs ball diameter. */
+      scaleMul: 0.28,
+      scaleMulPower: 0.34,
+      /** High cap so emission never stalls while the ball keeps moving. */
+      maxParticles: 2048,
+      minSpeed: 24,
+      /** Downward pull on trail blobs (Phaser y-down; lower = floatier). */
+      gravityY: 3,
+      gravityYPower: 4,
     };
 
     /** Aim while ball on paddle: left 45° → straight up → right 45° (screen coords, y down). */
@@ -290,8 +565,41 @@ PACKAGING FOR REAL MOBILE APPS
       { vx: 1 / Math.SQRT2, vy: -1 / Math.SQRT2 },
     ];
 
+    /** Hold on paddle: slow squash charge; release: stretch + elastic settle. */
+    const LAUNCH_BALL = {
+      chargeScaleX: 1.36,
+      chargeScaleY: 0.46,
+      chargeMs: 950,
+      minSpeedMul: 0.72,
+      stretch: 0.4,
+      pinch: 0.16,
+      stretchMs: 100,
+      settleMs: 500,
+    };
+
     const SCORE = {
       powerMultiplier: 1.5,
+    };
+
+    /** Tight horizontal shake when the ball hits a score block (2D sprite + 3D follow). */
+    const SCORE_BLOCK_JITTER = {
+      ampFrac: 0.052,
+      minAmp: 4,
+      stepMs: 30,
+      steps: 9,
+    };
+
+    /** Star escapes when the score block is destroyed (2D fallback). */
+    const SCORE_STAR_LIBERATION = {
+      spinMs: 400,
+      spinDeg: 990,
+      towardMs: 380,
+      towardScale: 1.9,
+      liftMs: 620,
+      liftY: 52,
+      awayMs: 560,
+      awayY: 78,
+      awayScale: 0.22,
     };
 
     const BONUS_CHANCE = {
@@ -299,17 +607,33 @@ PACKAGING FOR REAL MOBILE APPS
     };
 
     /** Neutral hit on power blocks — “needs Power Bounce” feedback (not indestructible). */
+    /** Gray → normal first hit — springy squash (2D tween + 3D mesh sync). */
+    const GRAY_DOWNGRADE_FX = {
+      squashScaleX: 1.14,
+      squashScaleY: 0.78,
+      squashMs: 52,
+      settleMs: 420,
+    };
+
+    const HIDDEN_BLOCK_FX = {
+      flipHalfMs: 130,
+    };
+
     const POWER_BLOCK_RESIST = {
       squashScaleX: 1.07,
       squashScaleY: 0.86,
       squashInMs: 42,
+      /** Min ms between resist FX on the same block (collider fires every overlap frame) */
+      cooldownMs: 180,
       ballSpeedMul: 0.9,
       cameraShakeMs: 48,
       cameraShakeIntensity: 0.0022,
       godRayAngleDeg: -36,
       godRaySweepMs: 360,
-      godRayCoreScale: 0.3,
-      godRayHaloScale: 0.62,
+      godRayCoreScale: 0.18,
+      godRayHaloScale: 0.36,
+      godRayLengthScale: 0.92,
+      godRayTravelScale: 1.05,
       godRayCoreAlpha: 0.9,
       godRayHaloAlpha: 0.38,
     };
@@ -334,13 +658,20 @@ PACKAGING FOR REAL MOBILE APPS
       durationMs: 2800,
       cooldownMs: 500,
       scale: 1.24,
+      coolRingBurstMs: 110,
+      coolRingBurstCount: 10,
+      coolRingLifespan: 420,
+      coolRingTintWarm: 0xffee66,
+      coolRingTintCool: 0x66ddff,
     };
 
-    /** Procedural ball textures (generateTextures). */
+    /** Player ball face PNGs — neutral smile + power surprise. */
     const BALL_TEXTURE = {
       neutral: 'ball',
       determined: 'ball_determined',
     };
+    const BALL_FACE_ASSET = 'assets/ball/face.png?v=1';
+    const BALL_POWER_FACE_ASSET = 'assets/ball/power.png?v=1';
 
     /** Matches procedural paddle texture size (see generateTextures). */
     const PADDLE_PAD = 2;
@@ -405,91 +736,118 @@ PACKAGING FOR REAL MOBILE APPS
       g.generateTexture('paddle', paddleW, paddleTexH);
 
       function drawBlockTexture(key, fill, border, extra) {
+        const r = blockProceduralRadii(innerW, innerH);
         g.clear();
         g.fillStyle(border, 1);
-        g.fillRoundedRect(0, 0, innerW, innerH, 4);
+        g.fillRoundedRect(pad, pad, innerW, innerH, r.outer);
         g.fillStyle(fill, 1);
-        g.fillRoundedRect(2, 2, innerW - 4, innerH - 4, 3);
-        if (extra) extra(g, innerW, innerH);
+        g.fillRoundedRect(pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner);
+        if (extra) extra(g, pad, innerW, innerH, r);
         g.generateTexture(key, cellW, cellH);
       }
 
       drawBlockTexture('block_normal', COLORS.blockNormal, COLORS.blockNormalBorder);
-      drawBlockTexture('block_gray', COLORS.blockGray, COLORS.blockGrayBorder, (gfx, w, h) => {
-        gfx.lineStyle(1, 0x6b7280, 0.8);
-        gfx.strokeRect(w * 0.2, h * 0.35, w * 0.6, h * 0.3);
+      drawBlockTexture('block_gray', COLORS.blockGray, COLORS.blockGrayBorder, (gfx, px, w, h) => {
+        const starR = normalStarOuterRadius(w, h);
+        if (typeof drawMutedGrayStarPhaser === 'function') {
+          drawMutedGrayStarPhaser(gfx, px + w / 2, px + h / 2, starR);
+        }
       });
       bakePowerBlockTextures(scene, cellW, cellH, g);
 
-      g.clear();
-      g.fillStyle(0x4a1028, 1);
-      g.fillRoundedRect(0, 0, innerW, innerH, 3);
-      g.fillStyle(COLORS.spike, 1);
-      const spikeW = innerW / 3;
-      for (let i = 0; i < 3; i++) {
-        const cx = spikeW * i + spikeW * 0.5;
-        const half = spikeW * 0.38;
-        g.fillTriangle(cx - half, innerH, cx, innerH * 0.12, cx + half, innerH);
-      }
-      g.lineStyle(2, 0xcc1144, 0.7);
-      g.strokeRect(1, innerH - 2, innerW - 2, 2);
-      g.generateTexture('block_spike', cellW, cellH);
-
-      // Indestructible (steel + X; never breaks)
-      drawBlockTexture('block_indestructible', 0x6b7c8c, 0x3d4d5d, (gfx, w, h) => {
-        gfx.lineStyle(Math.max(2, Math.floor(Math.min(w, h) * 0.08)), 0x1e2832, 0.95);
-        gfx.lineBetween(4, 4, w - 4, h - 4);
-        gfx.lineBetween(w - 4, 4, 4, h - 4);
+      drawBlockTexture('block_hidden', COLORS.blockHidden, COLORS.blockHiddenBorder, (gfx, px, w, h, r) => {
+        if (typeof drawHiddenPanelPhaser === 'function') {
+          drawHiddenPanelPhaser(gfx, px, w, h, r);
+        }
       });
 
-      // Score block — 2×2 footprint
+      {
+        const hiddenW = 2 * cellW - pad;
+        const hiddenH = 2 * cellH - pad;
+        const hiddenInnerW = hiddenW - pad * 2;
+        const hiddenInnerH = hiddenH - pad * 2;
+        const r = blockProceduralRadii(hiddenInnerW, hiddenInnerH);
+        g.clear();
+        if (typeof drawHiddenPanelPhaser === 'function') {
+          drawHiddenPanelPhaser(g, pad, hiddenInnerW, hiddenInnerH, r);
+        } else {
+          g.fillStyle(COLORS.blockHidden, 1);
+          g.fillRoundedRect(pad, pad, hiddenInnerW, hiddenInnerH, r.outer);
+        }
+        g.generateTexture('block_hidden_2x2', hiddenW, hiddenH);
+      }
+
+      {
+        g.clear();
+        drawCuteSpikePhaser(g, pad, innerW, innerH);
+        g.generateTexture('block_spike', cellW, cellH);
+      }
+
+      // Indestructible (steel + X; never breaks)
+      drawBlockTexture('block_indestructible', 0x44aaff, 0x0066cc, (gfx, px, w, h) => {
+        gfx.lineStyle(Math.max(2, Math.floor(Math.min(w, h) * 0.08)), 0x003366, 0.95);
+        gfx.lineBetween(px + 4, px + 4, px + w - 4, px + h - 4);
+        gfx.lineBetween(px + w - 4, px + 4, px + 4, px + h - 4);
+      });
+
+      // Score block — 2×2 footprint (3D overlay replaces with orange puff + star)
       {
         const scoreW = 2 * cellW - pad;
         const scoreH = 2 * cellH - pad;
         const scoreInnerW = scoreW - pad * 2;
         const scoreInnerH = scoreH - pad * 2;
+        const r = blockProceduralRadii(scoreInnerW, scoreInnerH);
         g.clear();
-        g.fillStyle(0x6b5a9e, 1);
-        g.fillRoundedRect(0, 0, scoreInnerW, scoreInnerH, 4);
-        g.fillStyle(0x9b7ede, 1);
-        g.fillRoundedRect(2, 2, scoreInnerW - 4, scoreInnerH - 4, 3);
-        g.lineStyle(2, 0xffffff, 0.85);
-        g.strokeRect(scoreInnerW * 0.22, scoreInnerH * 0.22, scoreInnerW * 0.56, scoreInnerH * 0.56);
-        g.fillStyle(0xffffff, 0.75);
-        g.fillCircle(scoreInnerW / 2, scoreInnerH / 2, Math.min(scoreInnerW, scoreInnerH) * 0.12);
+        g.fillStyle(0xcc5500, 1);
+        g.fillRoundedRect(pad, pad, scoreInnerW, scoreInnerH, r.outer);
+        g.fillStyle(0xff8800, 1);
+        g.fillRoundedRect(pad + 2, pad + 2, scoreInnerW - 4, scoreInnerH - 4, r.inner);
+        const starR = Math.min(scoreInnerW, scoreInnerH) * 0.22;
+        const starCx = pad + scoreInnerW / 2;
+        const starCy = pad + scoreInnerH / 2;
+        if (typeof drawDebossedNormalStarPhaser === 'function') {
+          drawDebossedNormalStarPhaser(g, starCx, starCy, starR);
+        } else {
+          g.fillStyle(0xffee44, 0.9);
+          g.fillCircle(starCx, starCy, starR * 0.55);
+        }
         g.generateTexture('block_score', scoreW, scoreH);
       }
 
-      drawBlockTexture('block_bonus', 0xffd54f, 0xffb300, (gfx, w, h) => {
-        gfx.fillStyle(0xffffff, 0.9);
-        gfx.fillCircle(w / 2, h * 0.44, Math.min(w, h) * 0.14);
-        gfx.fillStyle(0xffffff, 0.75);
+      drawBlockTexture('block_bonus', 0xffee22, 0xff9900, (gfx, px, w, h, r) => {
+        gfx.fillStyle(0xffffff, 0.95);
+        gfx.fillCircle(px + w / 2, px + h * 0.44, Math.min(w, h) * 0.14);
         gfx.lineStyle(1, 0xffffff, 0.5);
-        gfx.strokeRect(w * 0.28, h * 0.62, w * 0.44, h * 0.18);
+        gfx.strokeRoundedRect(px + w * 0.28, px + h * 0.62, w * 0.44, h * 0.18, r.detail);
       });
 
-      // Life icon + ball (procedural)
+      // Life icon (procedural); ball face loaded in preload()
       g.clear();
       g.fillStyle(COLORS.ball, 1);
       g.fillCircle(8, 8, 8);
       g.generateTexture('life_icon', 16, 16);
 
-      const ballSize = 64;
-      g.clear();
-      g.fillStyle(COLORS.ball, 1);
-      g.fillCircle(ballSize / 2, ballSize / 2, ballSize / 2 - 2);
-      g.fillStyle(COLORS.ballHighlight, 0.55);
-      g.fillCircle(ballSize * 0.35, ballSize * 0.35, ballSize * 0.12);
-      g.generateTexture(BALL_TEXTURE.neutral, ballSize, ballSize);
+      if (!scene.textures.exists(BALL_TEXTURE.neutral)) {
+        const ballSize = 64;
+        g.clear();
+        g.fillStyle(COLORS.ball, 1);
+        g.fillCircle(ballSize / 2, ballSize / 2, ballSize / 2 - 2);
+        g.fillStyle(COLORS.ballHighlight, 0.55);
+        g.fillCircle(ballSize * 0.35, ballSize * 0.35, ballSize * 0.12);
+        g.generateTexture(BALL_TEXTURE.neutral, ballSize, ballSize);
+      }
 
-      g.clear();
-      g.fillStyle(0xffaa00, 1);
-      g.fillCircle(ballSize / 2, ballSize / 2, ballSize / 2 - 2);
-      g.fillStyle(COLORS.accent, 0.65);
-      g.fillCircle(ballSize * 0.35, ballSize * 0.35, ballSize * 0.12);
-      g.lineStyle(2, 0x1a1028, 0.45);
-      g.strokeCircle(ballSize / 2, ballSize / 2, ballSize / 2 - 3);
-      g.generateTexture(BALL_TEXTURE.determined, ballSize, ballSize);
+      if (!scene.textures.exists(BALL_TEXTURE.determined)) {
+        const ballSize = 64;
+        g.clear();
+        g.fillStyle(0xff8800, 1);
+        g.fillCircle(ballSize / 2, ballSize / 2, ballSize / 2 - 2);
+        g.fillStyle(COLORS.accent, 0.85);
+        g.fillCircle(ballSize * 0.35, ballSize * 0.35, ballSize * 0.12);
+        g.lineStyle(2, 0x3a0080, 0.55);
+        g.strokeCircle(ballSize / 2, ballSize / 2, ballSize / 2 - 3);
+        g.generateTexture(BALL_TEXTURE.determined, ballSize, ballSize);
+      }
 
       generateHudAvatarTextures(scene, 48);
 
@@ -502,10 +860,10 @@ PACKAGING FOR REAL MOBILE APPS
       g.fillStyle(0xffffff, 1);
       g.fillCircle(cellW * 0.35, cellH * 0.42, Math.max(3, cellW * 0.1));
       g.fillCircle(cellW * 0.65, cellH * 0.42, Math.max(3, cellW * 0.1));
-      g.fillStyle(0x1e3a5f, 1);
+      g.fillStyle(0x003366, 1);
       g.fillCircle(cellW * 0.35, cellH * 0.42, Math.max(2, cellW * 0.05));
       g.fillCircle(cellW * 0.65, cellH * 0.42, Math.max(2, cellW * 0.05));
-      g.fillStyle(0x1e3a5f, 0.8);
+      g.fillStyle(0x003366, 0.85);
       g.fillEllipse(cellW / 2, cellH * 0.72, cellW * 0.15, cellH * 0.1);
       g.generateTexture('enemy', cellW, cellH);
 
@@ -552,26 +910,73 @@ PACKAGING FOR REAL MOBILE APPS
         clayTex.add(f.name, 0, f.x, oy, f.w, f.h);
       }
 
-      // Speed line (horizontal streak; rotated per velocity in updateBallTrail)
-      const lineW = BALL_TRAIL.texWidth;
-      const lineH = BALL_TRAIL.texHeight;
-      g.clear();
-      for (let i = 0; i < lineW; i++) {
-        const t = i / (lineW - 1);
-        const a = Math.min(1, t * 3, (1 - t) * 3) * 0.95;
-        g.fillStyle(0xffffff, a);
-        g.fillRect(i, 0, 1, lineH);
+      // Blue slime blobs (ball trail — lingers on the playfield)
+      const slimeAtlasH = 16;
+      const slimeFrames = [
+        { name: 'slime_a', x: 0, w: 14, h: 14 },
+        { name: 'slime_b', x: 16, w: 12, h: 13 },
+        { name: 'slime_c', x: 30, w: 15, h: 11 },
+        { name: 'slime_d', x: 47, w: 10, h: 10 },
+        { name: 'slime_e', x: 59, w: 8, h: 8 },
+      ];
+      const slimeAtlasW = 68;
+
+      function drawSlimeBlobAt(ox, oy, w, h) {
+        const cx = ox + w / 2;
+        const cy = oy + h / 2;
+        const m = Math.min(w, h);
+        g.fillStyle(0x1155aa, 0.55);
+        g.fillCircle(cx + 1, cy + 2, m * 0.46);
+        g.fillStyle(0x2288dd, 1);
+        g.fillCircle(cx, cy, m * 0.42);
+        g.fillCircle(cx - w * 0.2, cy + h * 0.1, m * 0.3);
+        g.fillCircle(cx + w * 0.18, cy - h * 0.08, m * 0.27);
+        g.fillCircle(cx + w * 0.06, cy + h * 0.2, m * 0.22);
+        g.fillStyle(0x55bbff, 0.75);
+        g.fillCircle(cx - w * 0.14, cy - h * 0.16, m * 0.14);
+        g.fillStyle(0xaaddff, 0.45);
+        g.fillCircle(cx - w * 0.1, cy - h * 0.2, m * 0.07);
       }
-      g.generateTexture('speed_line', lineW, lineH);
+
+      g.clear();
+      for (const f of slimeFrames) {
+        const oy = Math.floor((slimeAtlasH - f.h) / 2);
+        drawSlimeBlobAt(f.x, oy, f.w, f.h);
+      }
+      g.generateTexture('slime_trail', slimeAtlasW, slimeAtlasH);
+      const slimeTex = scene.textures.get('slime_trail');
+      for (const f of slimeFrames) {
+        const oy = Math.floor((slimeAtlasH - f.h) / 2);
+        slimeTex.add(f.name, 0, f.x, oy, f.w, f.h);
+      }
+
+      // Soft ring bloom for power → normal ball cooldown
+      if (!scene.textures.exists('power_cool_ring')) {
+        const ringSize = 40;
+        const ringTex = scene.textures.createCanvas('power_cool_ring', ringSize, ringSize);
+        const rctx = ringTex.getContext();
+        const rc = ringSize / 2;
+        const outer = rc - 1;
+        const grad = rctx.createRadialGradient(rc, rc, rc * 0.42, rc, rc, outer);
+        grad.addColorStop(0, 'rgba(255,255,255,0)');
+        grad.addColorStop(0.5, 'rgba(255,255,240,0.92)');
+        grad.addColorStop(0.78, 'rgba(255,220,120,0.45)');
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        rctx.fillStyle = grad;
+        rctx.beginPath();
+        rctx.arc(rc, rc, outer, 0, Math.PI * 2);
+        rctx.fill();
+        ringTex.refresh();
+      }
 
       g.destroy();
     }
 
     const ITEM_CATEGORY_COLORS = {
-      [ITEM_CATEGORY.food]: { fill: 0xc45c5c, border: 0x8b3a3a },
-      [ITEM_CATEGORY.powerUp]: { fill: 0x3d9a6a, border: 0x2a6b4a },
-      [ITEM_CATEGORY.copyAbility]: { fill: 0x6b8cce, border: 0x4a6299 },
-      [ITEM_CATEGORY.life]: { fill: 0x9b7ede, border: 0x6b5a9e },
+      [ITEM_CATEGORY.food]: { fill: 0xff5566, border: 0xcc2244 },
+      [ITEM_CATEGORY.powerUp]: { fill: 0x22ee88, border: 0x00aa55 },
+      [ITEM_CATEGORY.copyAbility]: { fill: 0x4488ff, border: 0x2244cc },
+      [ITEM_CATEGORY.life]: { fill: 0xcc66ff, border: 0x8822cc },
     };
 
     function uniqueLevelItemIds() {
@@ -615,9 +1020,9 @@ PACKAGING FOR REAL MOBILE APPS
           const cx = texW * 0.5;
           const cy = texH * 0.5;
           const circleR = Math.min(texW, texH) * 0.42;
-          g.fillStyle(0x3d9a6a, 1);
+          g.fillStyle(0x22ee88, 1);
           g.fillCircle(cx, cy, circleR);
-          g.fillStyle(0xffe66d, 1);
+          g.fillStyle(0xffee44, 1);
           fillStar(g, cx, cy, circleR * 0.55, circleR * 0.55 * 0.42, 5);
         } else {
           const size = Math.max(8, Math.min(texW, texH) - 4);
@@ -641,14 +1046,16 @@ PACKAGING FOR REAL MOBILE APPS
         super({ key: 'GameScene' });
       }
 
-      /** All art is procedural — generated in create() via generateTextures(). */
+      preload() {
+        this.load.image(BALL_TEXTURE.neutral, BALL_FACE_ASSET);
+        this.load.image(BALL_TEXTURE.determined, BALL_POWER_FACE_ASSET);
+      }
 
       /** Match inscribed cell ball size (setTexture resets to native image dimensions). */
       syncBallDisplaySize(worldRadius) {
         if (!this.ball || this.ballRadius == null) return;
         const diameter = this.ballRadius * 2;
         this.ball.setDisplaySize(diameter, diameter);
-        // setDisplaySize adjusts scaleX/Y (~0.07 for 420px art); store for power tweens.
         this.ballBaseScale = this.ball.scaleX;
         this.syncBallPhysicsBody(worldRadius);
       }
@@ -677,12 +1084,12 @@ PACKAGING FOR REAL MOBILE APPS
         const r = this.ball.displayWidth * 0.5;
         if (r <= 0) return;
 
-        const omega = (speed / r) * PHYSICS.ballSpin;
-        const spinSign = vx === 0 ? (vy > 0 ? 1 : -1) : Math.sign(vx);
-        this.ball.rotation += spinSign * omega * (delta / 1000);
+        const omega = ballRollAngularSpeed(speed, r);
+        const rollSign = ballRollSign(vx, vy);
+        this.ball.rotation += rollSign * omega * (delta / 1000);
       }
 
-      /** Neutral face by default; determined face while power mode is active. */
+      /** Neutral smile by default; surprise face in power mode. */
       applyBallTexture() {
         if (!this.ball?.active) return;
         const key = this.ballPowerMode ? BALL_TEXTURE.determined : BALL_TEXTURE.neutral;
@@ -690,6 +1097,7 @@ PACKAGING FOR REAL MOBILE APPS
           this.ball.setTexture(key);
         }
         this.syncBallDisplaySize();
+        this.ball.setAlpha(1);
         this.ball.clearTint();
       }
 
@@ -746,6 +1154,8 @@ PACKAGING FOR REAL MOBILE APPS
         this.ballPowerMode = false;
         this.ballPowerCooling = false;
         this.powerBallTimer = null;
+        this.powerCoolRingEvent = null;
+        this.powerCoolTintTween = null;
         this.blocksRemaining = 0;
         this.dragging = false;
         this.pointerWasDragging = false;
@@ -763,25 +1173,30 @@ PACKAGING FOR REAL MOBILE APPS
         this.launchAimDirection = 1;
         this.launchAimTickEvent = null;
         this.aimArrowGfx = null;
+        this.launchChargeActive = false;
+        this.launchChargeTween = null;
         this.blockDebrisTintCache = new Map();
+        this.threeOverlay = null;
 
         const { width, height } = this.scale;
         this.level = ACTIVE_LEVEL;
         this.levelGrid = createLevelGrid(this.level, height, width);
         this.lives = this.level.meta?.lives ?? 3;
 
-        // Background gradient bands
-        this.add.rectangle(width / 2, height / 2, width, height, COLORS.bg);
-        this.add.rectangle(width / 2, height * 0.35, width, height * 0.5, COLORS.bgLight, 0.35);
+        // Parallax black-lined grid background
+        createParallaxGridBackground(this, width, height);
 
-        // Arcade frame lines
-        const frame = this.add.graphics();
-        frame.lineStyle(3, 0xffe66d, 0.5);
-        frame.strokeRect(8, 8, width - 16, height - 16);
+        if (DEV_BORDERS) {
+          const frame = this.add.graphics();
+          frame.lineStyle(4, 0xffee44, 0.75);
+          frame.strokeRect(8, 8, width - 16, height - 16);
+        }
 
         generateTextures(this, this.levelGrid.config.cellWidth, this.levelGrid.config.cellHeight);
         this.ballRadius = ballRadiusForCell(this.levelGrid);
         this.gridCellH = this.levelGrid.config.cellHeight;
+
+        this.initThreeOverlay();
 
         // Physics world — only the playfield (below HUD), not the full frame
         const playBounds = this.levelGrid.getPlayBounds();
@@ -797,6 +1212,13 @@ PACKAGING FOR REAL MOBILE APPS
         this.createUI();
         this.setupInput();
 
+        this.scale.on('resize', () => {
+          if (!document.getElementById('game-modal-overlay')?.hidden) {
+            syncGameModalOverlayLayout(this);
+          }
+        });
+        this.events.once('shutdown', hideGameModalOverlay);
+
         if (SHOW_LEVEL_GRID) {
           drawLevelGridDebug(this, this.levelGrid, this.level);
         }
@@ -807,6 +1229,135 @@ PACKAGING FOR REAL MOBILE APPS
 
         this.updateUI();
         bbLog('create() complete', { blocks: this.blocksRemaining, lives: this.lives });
+      }
+
+      initThreeOverlay() {
+        if (!USE_3D_OVERLAY || typeof window.__blockBallThreeOverlay !== 'function') return;
+        this.threeOverlay = window.__blockBallThreeOverlay({
+          width: this.scale.width,
+          height: this.scale.height,
+          parent: document.getElementById('game-container'),
+          getPhaserCanvas: () => this.game.canvas,
+          getLayout: () => {
+            const s = this.scale;
+            const phaserCanvas = this.game.canvas;
+            const parentEl = document.getElementById('game-container');
+            if (!phaserCanvas || !parentEl) return null;
+            s.updateBounds?.();
+            const canvasRect = phaserCanvas.getBoundingClientRect();
+            const parentRect = parentEl.getBoundingClientRect();
+            return {
+              gameW: s.gameSize.width,
+              gameH: s.gameSize.height,
+              displayW: canvasRect.width,
+              displayH: canvasRect.height,
+              offsetLeft: canvasRect.left - parentRect.left,
+              offsetTop: canvasRect.top - parentRect.top,
+            };
+          },
+          getCamera: () => {
+            const cam = this.cameras?.main;
+            if (!cam) return null;
+            return {
+              scrollX: cam.scrollX,
+              scrollY: cam.scrollY,
+              zoom: cam.zoom,
+              rotation: cam.rotation,
+              shakeX: cam._shakeOffsetX ?? cam.shakeOffsetX ?? 0,
+              shakeY: cam._shakeOffsetY ?? cam.shakeOffsetY ?? 0,
+            };
+          },
+        });
+        this.threeOverlay.bindPhaserScene(this);
+        this.threeOverlay.start();
+        this.scale.on('resize', () => this.threeOverlay?.syncLayout());
+        bbLog('3D overlay enabled');
+      }
+
+      registerThreeBlock(block) {
+        if (this.threeOverlay?.registerBlock(block)) return;
+        this.attachNormalBlockStar(block);
+        this.attachGrayBlockStar(block);
+      }
+
+      attachNormalBlockStar(block) {
+        if (!block?.active || !isNormalBlockType(block.getData('typeId'))) return;
+        if (block.getData('starGfx')?.active) return;
+
+        const col = block.getData('gridCol') ?? 0;
+        const row = block.getData('gridRow') ?? 0;
+        block.setData('starPhase', normalStarTickerPhase(col, row));
+
+        const gfx = this.add.graphics();
+        gfx.setDepth((block.depth ?? 5) + 0.2);
+        block.setData('starGfx', gfx);
+        this.redrawNormalBlockStarGfx(block);
+        block.once('destroy', () => {
+          const g = block.getData('starGfx');
+          if (g?.active) g.destroy();
+          block.setData('starGfx', null);
+        });
+      }
+
+      redrawNormalBlockStarGfx(block) {
+        const gfx = block.getData('starGfx');
+        if (!gfx?.active) return;
+        gfx.clear();
+        const pad = 4;
+        const outerR = normalStarOuterRadius(
+          Math.max(8, block.displayWidth - pad),
+          Math.max(8, block.displayHeight - pad)
+        );
+        drawDebossedNormalStarPhaser(gfx, 0, 0, outerR);
+      }
+
+      attachGrayBlockStar(block) {
+        if (!block?.active || !isGrayBlockType(block.getData('typeId'))) return;
+        if (block.getData('grayStarGfx')?.active) return;
+
+        const gfx = this.add.graphics();
+        gfx.setDepth((block.depth ?? 5) + 0.2);
+        block.setData('grayStarGfx', gfx);
+        this.redrawGrayBlockStarGfx(block);
+        block.once('destroy', () => {
+          const g = block.getData('grayStarGfx');
+          if (g?.active) g.destroy();
+          block.setData('grayStarGfx', null);
+        });
+      }
+
+      redrawGrayBlockStarGfx(block) {
+        const gfx = block.getData('grayStarGfx');
+        if (!gfx?.active) return;
+        gfx.clear();
+        const pad = 4;
+        const outerR = normalStarOuterRadius(
+          Math.max(8, block.displayWidth - pad),
+          Math.max(8, block.displayHeight - pad)
+        );
+        if (typeof drawMutedGrayStarPhaser === 'function') {
+          drawMutedGrayStarPhaser(gfx, 0, 0, outerR);
+        }
+      }
+
+      updateNormalBlockStars(time) {
+        if (!this.blocks) return;
+        for (const block of this.blocks.getChildren()) {
+          const gfx = block.getData('starGfx');
+          if (!gfx?.active || !block.active) continue;
+          gfx.setPosition(block.x, block.y);
+          const phase = block.getData('starPhase') || 0;
+          gfx.setRotation(normalStarTickerAngle(time, NORMAL_STAR_TICK_MS, phase));
+        }
+      }
+
+      updateGrayBlockStars() {
+        if (!this.blocks) return;
+        for (const block of this.blocks.getChildren()) {
+          const gfx = block.getData('grayStarGfx');
+          if (!gfx?.active || !block.active) continue;
+          gfx.setPosition(block.x, block.y);
+        }
       }
 
       // ---------------------------------------------------------------------------
@@ -847,9 +1398,16 @@ PACKAGING FOR REAL MOBILE APPS
           block.setData('gridRow', gridRow);
           block.setData('colSpan', colSpan);
           block.setData('rowSpan', rowSpan);
-          block.setData('countsTowardClear', def.countsTowardClear !== false);
+          const countsClear = blockCountsTowardLevelClear(typeId);
+          block.setData('countsTowardClear', countsClear);
           if (typeId === 'score') block.setData('scoreHits', 0);
-          if (def.countsTowardClear !== false) this.blocksRemaining++;
+          if (typeId === 'hidden' || typeId === 'hidden_2x2') {
+            block.setData('hiddenRevealCell', getHiddenRevealCell(this.level, gridCol, gridRow));
+            block.setData('hiddenRevealed', false);
+            block.setAlpha(0);
+          }
+          if (countsClear) this.blocksRemaining++;
+          this.registerThreeBlock(block);
         };
 
         for (let row = 0; row < cells.length; row++) {
@@ -1001,53 +1559,37 @@ PACKAGING FOR REAL MOBILE APPS
 
         this.createBallTrail();
         this.attachBallToPaddle(false);
+        this.threeOverlay?.registerBall(this.ball);
       }
 
       createBallTrail() {
-        this.ballTrail = this.add.particles(0, 0, 'speed_line', {
+        this.ballTrail = this.add.particles(0, 0, 'slime_trail', {
           ...this.ballTrailBaseConfig(false),
           emitting: false,
         });
-        this.ballTrail.setDepth(10);
+        this.ballTrail.setDepth(8);
         this.ballTrail.startFollow(this.ball);
         this._ballTrailPowered = false;
       }
 
-      /** Streak angle: opposite travel direction (degrees, Phaser rotation). */
-      ballTrailRotateDeg() {
-        const vx = this.ball.body.velocity.x;
-        const vy = this.ball.body.velocity.y;
-        return Phaser.Math.RadToDeg(Math.atan2(vy, vx)) + 180;
-      }
-
-      syncBallTrailRotate() {
-        if (!this.ballTrail) return;
-        const deg = this.ballTrailRotateDeg();
-        const rot = { min: deg, max: deg };
-        if (this.ballTrail.setParticleRotate) {
-          this.ballTrail.setParticleRotate(rot);
-        } else if (this.ballTrail.ops?.rotate) {
-          this.ballTrail.ops.rotate.loadConfig({ rotate: rot });
-        }
-      }
-
       ballTrailBaseConfig(powered) {
         const diam = this.ball?.active ? this.ball.displayWidth : this.ballRadius * 2;
-        const lengthMul = powered ? BALL_TRAIL.lengthMulPower : BALL_TRAIL.lengthMul;
-        const widthMul = powered ? BALL_TRAIL.widthMulPower : BALL_TRAIL.widthMul;
-        const scaleY = (diam / BALL_TRAIL.texHeight) * widthMul;
-        const scaleX = (diam * lengthMul) / BALL_TRAIL.texWidth;
+        const scaleMul = powered ? BALL_TRAIL.scaleMulPower : BALL_TRAIL.scaleMul;
+        const base = Math.max(0.12, (diam / 16) * scaleMul);
         return {
+          frame: ['slime_a', 'slime_b', 'slime_c', 'slime_d', 'slime_e'],
           lifespan: powered ? BALL_TRAIL.lifespanPower : BALL_TRAIL.lifespan,
-          scaleX: { start: scaleX, end: scaleX * 0.2 },
-          scaleY: { start: scaleY, end: scaleY * 0.35 },
-          alpha: { start: 0.7, end: 0 },
-          speed: 0,
-          rotate: { min: 0, max: 0 },
+          scale: { start: base * 0.85, end: base * 1.12, random: true },
+          alpha: { start: 0.9, end: 0.38 },
+          speed: { min: 0, max: 14 },
+          angle: { min: 0, max: 360 },
+          rotate: { min: 0, max: 360 },
+          gravityY: powered ? BALL_TRAIL.gravityYPower : BALL_TRAIL.gravityY,
           tint: powered ? BALL_TRAIL.tintPower : BALL_TRAIL.tint,
-          blendMode: 'ADD',
+          blendMode: 'NORMAL',
           frequency: powered ? BALL_TRAIL.frequencyPower : BALL_TRAIL.frequency,
           quantity: 1,
+          maxParticles: BALL_TRAIL.maxParticles,
         };
       }
 
@@ -1062,7 +1604,6 @@ PACKAGING FOR REAL MOBILE APPS
           this.ballTrail.startFollow(this.ball);
           if (wasEmitting) this.ballTrail.start();
         }
-        this.syncBallTrailRotate();
       }
 
       startBallTrail() {
@@ -1078,7 +1619,7 @@ PACKAGING FOR REAL MOBILE APPS
       updateBallTrail() {
         if (!this.ballTrail || !this.ball?.active || this.ballOnPaddle) return;
         const speed = Math.hypot(this.ball.body.velocity.x, this.ball.body.velocity.y);
-        if (speed < 50) {
+        if (speed < BALL_TRAIL.minSpeed) {
           this.stopBallTrail();
           return;
         }
@@ -1095,7 +1636,13 @@ PACKAGING FOR REAL MOBILE APPS
         this.clearBallPowerState();
         this.stopBallTrail();
         this.finishPaddleSpring();
+        this.tweens.killTweensOf(this.ball);
+        this.stopLaunchCharge(true);
         this.ball.rotation = 0;
+        if (this.ballBaseScale != null) {
+          this.ball.setScale(this.ballBaseScale);
+          this.syncBallPhysicsBody(this.ballRadius);
+        }
         this.syncBallToPaddle();
         this.launchAimIndex = 0;
         this.launchAimDirection = 1;
@@ -1154,13 +1701,13 @@ PACKAGING FOR REAL MOBILE APPS
         const hw = 7;
 
         this.aimArrowGfx.clear();
-        this.aimArrowGfx.lineStyle(4, 0xffe66d, 0.95);
+        this.aimArrowGfx.lineStyle(4, 0xffee44, 1);
         this.aimArrowGfx.beginPath();
         this.aimArrowGfx.moveTo(bx + d.vx * (this.ballRadius + 4), by + d.vy * (this.ballRadius + 4));
         this.aimArrowGfx.lineTo(tipX, tipY);
         this.aimArrowGfx.strokePath();
 
-        this.aimArrowGfx.fillStyle(0xffe66d, 0.95);
+        this.aimArrowGfx.fillStyle(0xffee44, 1);
         this.aimArrowGfx.fillTriangle(
           tipX,
           tipY,
@@ -1184,11 +1731,103 @@ PACKAGING FOR REAL MOBILE APPS
         if (!this.ballOnPaddle || this.gameState !== 'playing' || this.isLosingBall) return;
         this.stopLaunchAimCycle();
         const d = LAUNCH_AIM_DIRS[this.launchAimIndex];
+        const charge = this.getLaunchChargeProgress();
+        this.stopLaunchCharge(false);
         this.ballOnPaddle = false;
         this.ballLaunched = true;
         this.ball.body.moves = true;
-        this.ball.setVelocity(d.vx * PHYSICS.launchSpeed, d.vy * PHYSICS.launchSpeed);
+        const speed = PHYSICS.launchSpeed * Phaser.Math.Linear(LAUNCH_BALL.minSpeedMul, 1, charge);
+        this.ball.setVelocity(d.vx * speed, d.vy * speed);
+        hapticLaunchRelease();
+        this.playBallLaunchElastic(d, charge);
         this.startBallTrail();
+      }
+
+      startLaunchCharge() {
+        if (!this.ball?.active || !this.ballOnPaddle || this.isLosingBall || this.launchChargeActive) return;
+
+        this.launchChargeActive = true;
+        this.tweens.killTweensOf(this.ball);
+
+        const base = this.ballBaseScale ?? this.ball.scaleX ?? 1;
+        const { chargeScaleX, chargeScaleY, chargeMs } = LAUNCH_BALL;
+
+        this.launchChargeTween = this.tweens.add({
+          targets: this.ball,
+          scaleX: base * chargeScaleX,
+          scaleY: base * chargeScaleY,
+          duration: chargeMs,
+          ease: 'Sine.easeIn',
+          onUpdate: () => {
+            this.syncBallPhysicsBody(this.ballRadius);
+            hapticLaunchChargeTick(this.getLaunchChargeProgress());
+          },
+        });
+        hapticLaunchChargeStart();
+      }
+
+      stopLaunchCharge(reset = false) {
+        this.launchChargeActive = false;
+        this.safeStopTween(this.launchChargeTween);
+        this.launchChargeTween = null;
+        if (reset && this.ballOnPaddle && this.ballBaseScale != null) {
+          this.ball.setScale(this.ballBaseScale);
+          this.syncBallPhysicsBody(this.ballRadius);
+        }
+      }
+
+      getLaunchChargeProgress() {
+        if (!this.ball?.active) return 0;
+        const base = this.ballBaseScale ?? 1;
+        const { chargeScaleX, chargeScaleY } = LAUNCH_BALL;
+        const maxX = base * chargeScaleX;
+        const maxY = base * chargeScaleY;
+        const dx = maxX - base;
+        const dy = base - maxY;
+        const tX = dx > 1e-6 ? Phaser.Math.Clamp((this.ball.scaleX - base) / dx, 0, 1) : 1;
+        const tY = dy > 1e-6 ? Phaser.Math.Clamp((base - this.ball.scaleY) / dy, 0, 1) : 1;
+        return (tX + tY) * 0.5;
+      }
+
+      /** Stretch along aim from current charge squash → elastic round. */
+      playBallLaunchElastic(aimDir, chargeProgress = 1) {
+        if (!this.ball?.active) return;
+
+        this.tweens.killTweensOf(this.ball);
+        const base = this.ballBaseScale ?? this.ball.scaleX ?? 1;
+        const len = Math.hypot(aimDir.vx, aimDir.vy) || 1;
+        const nx = aimDir.vx / len;
+        const ny = aimDir.vy / len;
+        const { stretch, pinch, stretchMs, settleMs } = LAUNCH_BALL;
+        const charge = Phaser.Math.Clamp(chargeProgress, 0, 1);
+
+        const worldR = this.ballRadius * (this.ballPowerMode ? POWER_BALL.scale : 1);
+        const syncBody = () => this.syncBallPhysicsBody(worldR);
+
+        const stretchScaleX = base * (1 - pinch * Math.abs(ny) + stretch * Math.abs(nx));
+        const stretchScaleY = base * (1 - pinch * Math.abs(nx) + stretch * Math.abs(ny));
+        const popMs = Math.max(40, stretchMs * Phaser.Math.Linear(0.5, 1, charge));
+
+        this.tweens.add({
+          targets: this.ball,
+          scaleX: stretchScaleX,
+          scaleY: stretchScaleY,
+          duration: popMs,
+          ease: 'Quad.easeOut',
+          onUpdate: syncBody,
+          onComplete: () => {
+            if (!this.isSceneActive() || !this.ball?.active || this.ballOnPaddle) return;
+            this.tweens.add({
+              targets: this.ball,
+              scaleX: base,
+              scaleY: base,
+              duration: settleMs,
+              ease: 'Elastic.easeOut',
+              onUpdate: syncBody,
+              onComplete: syncBody,
+            });
+          },
+        });
       }
 
       // ---------------------------------------------------------------------------
@@ -1201,9 +1840,15 @@ PACKAGING FOR REAL MOBILE APPS
         this.physics.add.collider(this.ball, this.enemies, this.onBallEnemy, null, this);
         this.physics.add.overlap(this.ball, this.levelItems, this.onBallItem, null, this);
         this.physics.add.collider(this.enemies, this.blocks);
-        this.physics.world.on('worldbounds', (body) => {
-          if (body.gameObject === this.ball && body.blocked.down === false) {
-            // Top/side bounces handled by physics; bottom = lose ball
+        this.physics.world.on('worldbounds', (body, up, down, left, right) => {
+          if (body.gameObject !== this.ball || this.ballOnPaddle) return;
+          if (left || right) {
+            const v = body.velocity;
+            this.ball.setVelocity(
+              v.x * BALL_ANTI_STALL.sideWallVxDamp,
+              v.y + BALL_ANTI_STALL.sideWallVyKick
+            );
+            this.clampBallSpeed();
           }
         });
       }
@@ -1222,9 +1867,29 @@ PACKAGING FOR REAL MOBILE APPS
         if (result.action === 'immune') {
           const def = getBlockDef(typeId);
           if (def.powerOnly) {
-            this.onPowerBlockResist(ball, block);
+            bbPowerLog(
+              `collider:${block.getData('gridCol')},${block.getData('gridRow')}`,
+              {
+                typeId,
+                ball: { x: ball.x, y: ball.y },
+                block: { x: block.x, y: block.y },
+                vel: ball.body
+                  ? { x: ball.body.velocity.x, y: ball.body.velocity.y }
+                  : null,
+                powered: !!(this.powerBounceActive || this.ballPowerMode),
+                has3dMesh: !!this.threeOverlay?.hasBlockMesh?.(block),
+              },
+              80
+            );
+            try {
+              this.bounceBallOffPowerBlock(ball, block);
+              this.onPowerBlockResist(ball, block);
+            } catch (err) {
+              bbError('onBallBlock power resist', err);
+            }
           } else {
             this.flashBlock(block, 0xaaaaaa);
+            gameHaptic('blockImmune');
           }
           return;
         }
@@ -1236,7 +1901,13 @@ PACKAGING FOR REAL MOBILE APPS
 
         if (result.action === 'downgrade') {
           this.downgradeBlock(block, result.toType);
+          gameHaptic('blockDowngrade');
           this.clampBallSpeed();
+          return;
+        }
+
+        if (result.action === 'reveal') {
+          this.revealHiddenBlock(block);
           return;
         }
 
@@ -1256,6 +1927,49 @@ PACKAGING FOR REAL MOBILE APPS
         }
       }
 
+      playScoreBlockJitter(block) {
+        if (!block?.active) return;
+
+        const prevBase = block.getData('scoreJitterBaseX');
+        if (prevBase != null) block.x = prevBase;
+        block.getData('scoreJitterEvent')?.destroy();
+
+        const baseX = block.x;
+        block.setData('scoreJitterBaseX', baseX);
+
+        const amp = Math.max(
+          SCORE_BLOCK_JITTER.minAmp,
+          block.displayWidth * SCORE_BLOCK_JITTER.ampFrac
+        );
+        const syncBody = () => {
+          if (block.body) block.body.reset(block.x, block.y);
+        };
+
+        let step = 0;
+        const ev = this.time.addEvent({
+          delay: SCORE_BLOCK_JITTER.stepMs,
+          repeat: SCORE_BLOCK_JITTER.steps - 1,
+          callback: () => {
+            if (!block.active) {
+              ev.destroy();
+              return;
+            }
+            const decay = 1 - step / SCORE_BLOCK_JITTER.steps;
+            const sign = step % 2 === 0 ? 1 : -1;
+            block.x = baseX + sign * amp * decay;
+            syncBody();
+            step += 1;
+            if (step >= SCORE_BLOCK_JITTER.steps) {
+              block.x = baseX;
+              block.setData('scoreJitterBaseX', null);
+              block.setData('scoreJitterEvent', null);
+              syncBody();
+            }
+          },
+        });
+        block.setData('scoreJitterEvent', ev);
+      }
+
       onScoreBlockHit(ball, block, powered) {
         const typeId = block.getData('typeId') || 'score';
         const def = getBlockDef(typeId);
@@ -1266,13 +1980,264 @@ PACKAGING FOR REAL MOBILE APPS
         if (powered && this.powerBounceMultiplier) {
           points = Math.floor(points * SCORE.powerMultiplier);
         }
+        this.playScoreBlockJitter(block);
         this.awardDestroyPoints(points, block.x, block.y);
         block.setData('scoreHits', hits);
-        this.flashBlock(block, 0xffe66d);
+        this.flashBlock(block, 0xffaa44);
+        gameHaptic('blockHit');
         this.clampBallSpeed();
         if (hits >= (def.maxHits ?? tiers.length)) {
-          this.destroyBlock(block);
+          this.destroyScoreBlock(block);
+        } else {
+          this.threeOverlay?.triggerScoreBlockHit?.(block);
         }
+      }
+
+      playScoreStarLiberation2D(x, y, displayWidth, displayHeight) {
+        const outerR = Math.min(displayWidth, displayHeight) * 0.2;
+
+        const gfx = this.add.graphics({ x, y });
+        gfx.setDepth(14);
+        const drawStar = () => {
+          gfx.clear();
+          if (typeof drawDebossedNormalStarPhaser === 'function') {
+            drawDebossedNormalStarPhaser(gfx, 0, 0, outerR);
+          } else {
+            gfx.fillStyle(0xffee44, 1);
+            gfx.fillCircle(0, 0, outerR * 0.55);
+          }
+        };
+        drawStar();
+
+        const lib = SCORE_STAR_LIBERATION;
+        const towardDelay = Math.floor(lib.spinMs * 0.2);
+        const liftDelay = towardDelay + lib.towardMs;
+        const awayDelay = liftDelay + lib.liftMs;
+        const liftY = y - lib.liftY;
+        const awayY = liftY - lib.awayY;
+
+        this.tweens.add({
+          targets: gfx,
+          angle: lib.spinDeg,
+          duration: lib.spinMs,
+          ease: 'Quad.easeIn',
+        });
+        this.tweens.add({
+          targets: gfx,
+          scaleX: lib.towardScale,
+          scaleY: lib.towardScale,
+          duration: lib.towardMs,
+          delay: towardDelay,
+          ease: 'Quad.easeOut',
+          onUpdate: drawStar,
+        });
+        this.tweens.add({
+          targets: gfx,
+          y: liftY,
+          duration: lib.liftMs,
+          delay: liftDelay,
+          ease: 'Cubic.easeOut',
+          onUpdate: drawStar,
+        });
+        this.tweens.add({
+          targets: gfx,
+          y: awayY,
+          scaleX: lib.awayScale,
+          scaleY: lib.awayScale,
+          alpha: 0,
+          duration: lib.awayMs,
+          delay: awayDelay,
+          ease: 'Cubic.easeIn',
+          onUpdate: drawStar,
+          onComplete: () => {
+            if (gfx.active) gfx.destroy();
+          },
+        });
+      }
+
+      destroyScoreBlock(block) {
+        if (!block?.active) return;
+
+        block.getData('scoreJitterEvent')?.destroy();
+        block.setData('scoreJitterBaseX', null);
+        if (block.body) block.body.checkCollision.none = true;
+
+        const bx = block.x;
+        const by = block.y;
+        const tint = this.getBlockDebrisTint(block);
+        const dw = block.displayWidth;
+        const dh = block.displayHeight;
+
+        const teardownBlock = () => {
+          if (!block.active) return;
+          gameHaptic('blockDestroy');
+          this.spawnBlockClayDebris(bx, by, tint);
+          this.threeOverlay?.unregisterBlock(block);
+          block.destroy();
+        };
+
+        if (this.threeOverlay?.releaseScoreBlockStar?.(block)) {
+          block.setVisible(false);
+          teardownBlock();
+          return;
+        }
+
+        block.setVisible(false);
+        teardownBlock();
+        this.playScoreStarLiberation2D(bx, by, dw, dh);
+      }
+
+      applyHiddenReveal(block, options = {}) {
+        const { syncThree = true } = options;
+        let revealCell = block.getData('hiddenRevealCell') ?? 1;
+        if (revealCell === 18 && block.getData('typeId') !== 'hidden_2x2') {
+          revealCell = 1;
+        }
+        const toTypeId = getBlockTypeFromCell(revealCell) || 'normal';
+        const def = getBlockDef(toTypeId);
+        const col = block.getData('gridCol');
+        const row = block.getData('gridRow');
+        const { colSpan: revColSpan, rowSpan: revRowSpan } = getBlockFootprint(toTypeId);
+        const prevColSpan = block.getData('colSpan') ?? 1;
+        const prevRowSpan = block.getData('rowSpan') ?? 1;
+
+        block.setData('typeId', toTypeId);
+        block.setData('hiddenRevealed', true);
+        block.setData('points', def.points);
+        block.setData('isPower', def.powerOnly);
+        block.setData('isHazard', Boolean(def.isHazard));
+        block.setData('colSpan', revColSpan);
+        block.setData('rowSpan', revRowSpan);
+        block.setTexture(def.texture);
+        block.clearTint();
+        block.setAlpha(1);
+
+        const pos =
+          revColSpan > 1 || revRowSpan > 1
+            ? this.levelGrid.cellSpanCenter(col, row, revColSpan, revRowSpan)
+            : this.levelGrid.cellCenter(col, row);
+        block.setPosition(pos.x, pos.y);
+        if (toTypeId === 'score' || revColSpan > 1 || revRowSpan > 1 || isPowerBlockType(toTypeId)) {
+          fitEntityToCellSpan(block, this.levelGrid, revColSpan, revRowSpan);
+        } else if (revColSpan !== prevColSpan || revRowSpan !== prevRowSpan) {
+          fitEntityToCell(block, this.levelGrid);
+        }
+
+        const countsClear = blockCountsTowardLevelClear(toTypeId);
+        block.setData('countsTowardClear', countsClear);
+        if (countsClear) this.blocksRemaining++;
+
+        if (toTypeId === 'score') block.setData('scoreHits', 0);
+
+        if (isNormalBlockType(toTypeId)) {
+          block.setData('starPhase', normalStarTickerPhase(col ?? 0, row ?? 0));
+          if (!this.threeOverlay?.hasBlockMesh?.(block)) {
+            this.attachNormalBlockStar(block);
+          }
+        } else if (isGrayBlockType(toTypeId)) {
+          if (!this.threeOverlay?.hasBlockMesh?.(block)) {
+            this.attachGrayBlockStar(block);
+          }
+        }
+
+        if (block.body) {
+          block.body.checkCollision.none = false;
+          block.refreshBody();
+        }
+
+        this.syncLevelCellsAfterHiddenReveal(block, toTypeId, revealCell);
+
+        if (syncThree) this.threeOverlay?.updateBlock(block);
+        gameHaptic('blockHit');
+        this.clampBallSpeed();
+        bbLog('hidden block revealed', { to: toTypeId, revealCell });
+      }
+
+      /** Keep playfield cells aligned with revealed block (score 2×2 footprint). */
+      syncLevelCellsAfterHiddenReveal(block, toTypeId, revealCell) {
+        const cells = this.level?.blocks?.cells;
+        if (!cells) return;
+        const col = block.getData('gridCol');
+        const row = block.getData('gridRow');
+        if (col == null || row == null) return;
+
+        const anchor = resolveBlockAnchor(cells, col, row);
+        const ac = anchor?.col ?? col;
+        const ar = anchor?.row ?? row;
+        const hidden2x2Cell =
+          typeof globalThis.HIDDEN_2X2_BLOCK_CELL === 'number' ? globalThis.HIDDEN_2X2_BLOCK_CELL : 24;
+        const hidden1Cell =
+          typeof globalThis.HIDDEN_BLOCK_CELL === 'number' ? globalThis.HIDDEN_BLOCK_CELL : 23;
+
+        if (anchor?.anchorCell === hidden2x2Cell) {
+          if (typeof clearHidden2x2Footprint === 'function') {
+            clearHidden2x2Footprint(cells, ac, ar);
+          }
+          if (typeof clearHiddenRevealFootprint === 'function') {
+            clearHiddenRevealFootprint(this.level, ac, ar);
+          }
+        } else if (anchor?.anchorCell === hidden1Cell) {
+          cells[ar][ac] = 0;
+          if (typeof clearHiddenRevealCell === 'function') {
+            clearHiddenRevealCell(this.level, ac, ar);
+          }
+        }
+
+        if (toTypeId === 'score' && typeof paintScoreBlockCells === 'function') {
+          paintScoreBlockCells(cells, ac, ar);
+        } else if (anchor?.anchorCell === hidden2x2Cell) {
+          const cell = revealCell || 1;
+          cells[ar][ac] = cell;
+        } else {
+          const cell = revealCell || 1;
+          cells[ar][ac] = cell;
+        }
+      }
+
+      revealHiddenBlock(block) {
+        if (!block?.active || block.getData('hiddenRevealed') || block.getData('hiddenRevealing')) {
+          return;
+        }
+        block.setData('hiddenRevealing', true);
+        block.setAlpha(1);
+
+        const onMidpoint = () => {
+          this.applyHiddenReveal(block, { syncThree: false });
+          this.threeOverlay?.updateBlock(block);
+        };
+        const onDone = () => {
+          block.setData('hiddenRevealing', false);
+          block.setData('hiddenRevealFlipFx', null);
+          this.threeOverlay?.updateBlock(block);
+        };
+
+        if (this.threeOverlay?.startHiddenBlockReveal?.(block, onMidpoint, onDone)) {
+          return;
+        }
+
+        const baseSx = block.scaleX;
+        const baseSy = block.scaleY;
+        this.tweens.add({
+          targets: block,
+          scaleX: 0.04,
+          duration: HIDDEN_BLOCK_FX.flipHalfMs,
+          ease: 'Quad.easeIn',
+          onComplete: () => {
+            onMidpoint();
+            block.scaleX = 0.04;
+            block.scaleY = baseSy;
+            this.tweens.add({
+              targets: block,
+              scaleX: baseSx,
+              duration: HIDDEN_BLOCK_FX.flipHalfMs,
+              ease: 'Quad.easeOut',
+              onComplete: () => {
+                block.setData('hiddenRevealFlipFx', null);
+                onDone();
+              },
+            });
+          },
+        });
       }
 
       downgradeBlock(block, toTypeId) {
@@ -1300,8 +2265,61 @@ PACKAGING FOR REAL MOBILE APPS
           fitEntityToCell(block, this.levelGrid);
         }
         block.refreshBody();
+        this.threeOverlay?.updateBlock(block);
+        const grayGfx = block.getData('grayStarGfx');
+        if (grayGfx?.active) {
+          grayGfx.destroy();
+          block.setData('grayStarGfx', null);
+        }
+        if (isNormalBlockType(toTypeId)) {
+          const col = block.getData('gridCol') ?? 0;
+          const row = block.getData('gridRow') ?? 0;
+          if (block.getData('starPhase') == null) {
+            block.setData('starPhase', normalStarTickerPhase(col, row));
+          }
+          if (!this.threeOverlay?.hasBlockMesh?.(block)) {
+            this.attachNormalBlockStar(block);
+          }
+        }
+        this.playGrayDowngradeSpring(block);
         this.flashBlock(block, 0xdddddd);
         bbLog('block downgraded', { to: toTypeId });
+      }
+
+      /** Spring reaction when gray downgrades to normal (Phaser sprite or 3D mesh). */
+      playGrayDowngradeSpring(block) {
+        if (!block?.active) return;
+
+        this.tweens.killTweensOf(block);
+        block.setData('grayDowngradeFxStart', this.time.now);
+
+        if (this.threeOverlay?.hasBlockMesh?.(block)) return;
+
+        const baseX = block.scaleX;
+        const baseY = block.scaleY;
+        const { squashScaleX, squashScaleY, squashMs, settleMs } = GRAY_DOWNGRADE_FX;
+
+        this.tweens.add({
+          targets: block,
+          scaleX: baseX * squashScaleX,
+          scaleY: baseY * squashScaleY,
+          duration: squashMs,
+          ease: 'Quad.easeOut',
+          onComplete: () => {
+            if (!block.active) return;
+            this.tweens.add({
+              targets: block,
+              scaleX: baseX,
+              scaleY: baseY,
+              duration: settleMs,
+              ease: 'Elastic.easeOut',
+              onComplete: () => {
+                if (!block.active) return;
+                block.setData('grayDowngradeFxStart', null);
+              },
+            });
+          },
+        });
       }
 
       onBallPaddle(ball, paddle) {
@@ -1380,6 +2398,7 @@ PACKAGING FOR REAL MOBILE APPS
         if (points > 0) {
           this.spawnDestroyParticles(x, y, 0xff9de2);
         }
+        gameHaptic('itemCollect');
         item.destroy();
 
         if (def?.effect === 'bonus_chance') {
@@ -1541,11 +2560,13 @@ PACKAGING FOR REAL MOBILE APPS
         block.setData('points', revert?.points ?? def.points);
         block.setData('isPower', def.powerOnly);
         block.setData('isHazard', Boolean(def.isHazard));
+        block.setData('countsTowardClear', blockCountsTowardLevelClear(typeId));
 
         if (block.body) {
           block.body.checkCollision.none = false;
           block.refreshBody();
         }
+        this.threeOverlay?.updateBlock(block);
       }
 
       /** Bonus Chance block — collides to collect; ball keeps moving (no ricochet). */
@@ -1571,6 +2592,7 @@ PACKAGING FOR REAL MOBILE APPS
         } else {
           block.setAlpha(0.88);
         }
+        this.threeOverlay?.updateBlock(block);
       }
 
       collectBonusBlock(ball, block) {
@@ -1587,6 +2609,7 @@ PACKAGING FOR REAL MOBILE APPS
         }
 
         this.awardDestroyPoints(points, block.x, block.y, { color: '#ffe66d' });
+        gameHaptic('bonusCollect', { force: true });
         this.destroyBlock(block);
         this.checkBonusChanceProgress();
 
@@ -1606,6 +2629,7 @@ PACKAGING FOR REAL MOBILE APPS
 
         if (hp > 0) {
           this.flashEnemyHit(enemy);
+          gameHaptic('enemyHit');
           this.clampBallSpeed();
           bbLog('enemy damaged', { typeId, hp, damage });
           return;
@@ -1618,6 +2642,7 @@ PACKAGING FOR REAL MOBILE APPS
         const { x, y } = enemy;
         this.awardDestroyPoints(points, x, y);
         this.spawnDestroyParticles(x, y, COLORS.enemy);
+        gameHaptic('enemyKill');
         enemy.destroy();
         this.clampBallSpeed();
         bbLog('enemy defeated', { typeId, points });
@@ -1651,6 +2676,7 @@ PACKAGING FOR REAL MOBILE APPS
           return;
         }
 
+        gameHaptic('spike', { force: true });
         this.loseBall();
       }
 
@@ -1709,9 +2735,13 @@ PACKAGING FOR REAL MOBILE APPS
       }
 
       destroyBlock(block) {
+        if (!block.getData('bonusCollecting')) {
+          gameHaptic('blockDestroy');
+        }
         const tint = this.getBlockDebrisTint(block);
         this.spawnBlockClayDebris(block.x, block.y, tint);
-        const counted = block.getData('countsTowardClear') !== false;
+        const counted = blockCountsTowardLevelClear(block.getData('typeId'));
+        this.threeOverlay?.unregisterBlock(block);
         block.destroy();
         if (counted) {
           this.blocksRemaining--;
@@ -1722,6 +2752,9 @@ PACKAGING FOR REAL MOBILE APPS
       }
 
       flashBlock(block, color) {
+        if (typeof isUnrevealedHiddenBlock === 'function' && isUnrevealedHiddenBlock(block)) {
+          return;
+        }
         this.tweens.add({
           targets: block,
           alpha: 0.5,
@@ -1731,15 +2764,35 @@ PACKAGING FOR REAL MOBILE APPS
       }
 
       onPowerBlockResist(ball, block) {
-        if (!block?.active) return;
+        if (!block?.active || !ball?.body) {
+          bbPowerLogAlways('resist:skip-inactive', {
+            blockActive: block?.active,
+            hasBallBody: !!ball?.body,
+          });
+          return;
+        }
+
+        const last = block.getData('lastPowerResistAt') || 0;
+        const since = this.time.now - last;
+        if (since < POWER_BLOCK_RESIST.cooldownMs) {
+          bbPowerLog(
+            `resist:cooldown:${block.getData('gridCol')},${block.getData('gridRow')}`,
+            { sinceMs: Math.round(since), cooldownMs: POWER_BLOCK_RESIST.cooldownMs },
+            200
+          );
+          return;
+        }
+        block.setData('lastPowerResistAt', this.time.now);
+
+        bbPowerLogAlways('resist:fx', {
+          typeId: block.getData('typeId'),
+          col: block.getData('gridCol'),
+          row: block.getData('gridRow'),
+          has3dMesh: !!this.threeOverlay?.hasBlockMesh?.(block),
+        });
 
         this.playPowerBlockResistFx(block);
-
-        const body = ball?.body;
-        if (body) {
-          body.velocity.x *= POWER_BLOCK_RESIST.ballSpeedMul;
-          body.velocity.y *= POWER_BLOCK_RESIST.ballSpeedMul;
-        }
+        gameHaptic('powerResist');
 
         this.cameras.main.shake(
           POWER_BLOCK_RESIST.cameraShakeMs,
@@ -1747,8 +2800,169 @@ PACKAGING FOR REAL MOBILE APPS
         );
       }
 
+      /**
+       * Push the ball out of a power block and reflect velocity.
+       * Runs every collider frame — FX/shake are debounced separately.
+       */
+      bounceBallOffPowerBlock(ball, block) {
+        const body = ball.body;
+        const blockBody = block.body;
+        if (!body?.enable || !blockBody) {
+          bbPowerLogAlways('bounce:skip-no-body', {
+            bodyEnable: body?.enable,
+            hasBlockBody: !!blockBody,
+            typeId: block.getData('typeId'),
+          });
+          return;
+        }
+
+        const ballR = body.halfWidth;
+        const bx = blockBody.center.x;
+        const by = blockBody.center.y;
+        const hw = blockBody.halfWidth;
+        const hh = blockBody.halfHeight;
+
+        const closestX = Phaser.Math.Clamp(ball.x, bx - hw, bx + hw);
+        const closestY = Phaser.Math.Clamp(ball.y, by - hh, by + hh);
+        let nx = ball.x - closestX;
+        let ny = ball.y - closestY;
+        let dist = Math.hypot(nx, ny);
+
+        if (dist < 0.001) {
+          nx = ball.x - bx;
+          ny = ball.y - by;
+          dist = Math.hypot(nx, ny);
+          if (dist < 0.001) {
+            nx = 0;
+            ny = -1;
+            dist = 1;
+          }
+        }
+
+        nx /= dist;
+        ny /= dist;
+
+        const overlap = ballR - dist;
+        const velIn = { x: body.velocity.x, y: body.velocity.y };
+        const speedIn = Math.hypot(velIn.x, velIn.y);
+
+        if (overlap > 0) {
+          ball.x += nx * (overlap + 2);
+          ball.y += ny * (overlap + 2);
+        }
+
+        const incoming = speedIn;
+        const minSpeed = PHYSICS.ballSpeed * 0.75;
+        const speed = Math.max(minSpeed, incoming * POWER_BLOCK_RESIST.ballSpeedMul);
+
+        let vx = body.velocity.x;
+        let vy = body.velocity.y;
+        const dot = vx * nx + vy * ny;
+        if (dot < 0) {
+          vx -= 2 * dot * nx;
+          vy -= 2 * dot * ny;
+        }
+
+        const outSpeed = Math.hypot(vx, vy);
+        let bounceMode = 'reflect';
+        if (outSpeed < minSpeed * 0.5) {
+          bounceMode = 'min-speed-kick';
+          vx = nx * speed;
+          vy = ny * speed;
+        } else if (outSpeed < minSpeed) {
+          bounceMode = 'speed-boost';
+          const scale = minSpeed / outSpeed;
+          vx *= scale;
+          vy *= scale;
+        }
+
+        ball.setVelocity(vx, vy);
+        this.clampBallSpeed();
+
+        const velOut = { x: body.velocity.x, y: body.velocity.y };
+        const logKey = `bounce:${block.getData('gridCol')},${block.getData('gridRow')}`;
+        bbPowerLog(logKey, {
+          typeId: block.getData('typeId'),
+          ballR,
+          blockHalf: { hw, hh },
+          blockCenter: { bx, by },
+          closest: { x: closestX, y: closestY },
+          normal: { nx, ny },
+          overlap: Math.round(overlap * 100) / 100,
+          dist: Math.round(dist * 100) / 100,
+          bounceMode,
+          velIn,
+          velOut,
+          speedIn: Math.round(speedIn),
+          speedOut: Math.round(Math.hypot(velOut.x, velOut.y)),
+          touching: {
+            up: body.touching.up,
+            down: body.touching.down,
+            left: body.touching.left,
+            right: body.touching.right,
+          },
+          blocked: {
+            up: body.blocked.up,
+            down: body.blocked.down,
+            left: body.blocked.left,
+            right: body.blocked.right,
+          },
+          ballPosAfter: { x: ball.x, y: ball.y },
+        }, overlap > 0 || speedIn < 60 ? 80 : 200);
+      }
+
+      /** Detect ball resting inside a power block without collider firing. */
+      debugPowerBlockOverlap() {
+        if (!POWER_BLOCK_DEBUG || !this.ball?.body || this.ballOnPaddle) return;
+
+        const body = this.ball.body;
+        const ballR = body.halfWidth;
+        const speed = Math.hypot(body.velocity.x, body.velocity.y);
+
+        this.blocks?.getChildren().forEach((block) => {
+          if (!block.active || !isPowerBlockType(block.getData('typeId'))) return;
+          const bb = block.body;
+          if (!bb) return;
+
+          const bx = bb.center.x;
+          const by = bb.center.y;
+          const hw = bb.halfWidth;
+          const hh = bb.halfHeight;
+          const closestX = Phaser.Math.Clamp(this.ball.x, bx - hw, bx + hw);
+          const closestY = Phaser.Math.Clamp(this.ball.y, by - hh, by + hh);
+          const dist = Math.hypot(this.ball.x - closestX, this.ball.y - closestY);
+          const overlap = ballR - dist;
+
+          if (overlap > 1) {
+            bbPowerLog(
+              `stuck:${block.getData('gridCol')},${block.getData('gridRow')}`,
+              {
+                overlap: Math.round(overlap * 100) / 100,
+                speed: Math.round(speed),
+                vel: { x: body.velocity.x, y: body.velocity.y },
+                ball: { x: this.ball.x, y: this.ball.y },
+                block: { x: block.x, y: block.y },
+                colliderOverlap: this.physics.overlap(this.ball, block),
+              },
+              250
+            );
+          }
+        });
+      }
+
       playPowerBlockResistFx(block) {
         this.tweens.killTweensOf(block);
+        block.setData('powerResistFxStart', this.time.now);
+
+        if (this.threeOverlay?.hasBlockMesh?.(block)) {
+          bbPowerLogAlways('fx:3d-skip-phaser-tween', {
+            typeId: block.getData('typeId'),
+            col: block.getData('gridCol'),
+            row: block.getData('gridRow'),
+          });
+          return;
+        }
+
         this.playPowerBlockGodRay(block);
 
         const baseX = block.scaleX;
@@ -1783,7 +2997,7 @@ PACKAGING FOR REAL MOBILE APPS
         const mover = this.add.container(0, 0);
         root.add(mover);
 
-        const rayH = span * 1.4;
+        const rayH = span * POWER_BLOCK_RESIST.godRayLengthScale;
         const halo = this.add.image(0, 0, 'power_godray');
         halo.setBlendMode(Phaser.BlendModes.ADD);
         halo.setDisplaySize(span * POWER_BLOCK_RESIST.godRayHaloScale, rayH);
@@ -1800,7 +3014,7 @@ PACKAGING FOR REAL MOBILE APPS
           root.setMask(block.createBitmapMask());
         }
 
-        const travel = span * 1.4;
+        const travel = span * POWER_BLOCK_RESIST.godRayTravelScale;
         mover.x = -travel;
         this.tweens.add({
           targets: mover,
@@ -1823,6 +3037,7 @@ PACKAGING FOR REAL MOBILE APPS
         this.endBonusChanceActive();
         this.isLosingBall = true;
         this.lives--;
+        gameHaptic('lifeLost', { force: true });
         this.updateUI();
         this.stopBallTrail();
         this.spawnDestroyParticles(this.ball.x, this.ball.y, COLORS.ball);
@@ -1855,6 +3070,59 @@ PACKAGING FOR REAL MOBILE APPS
           const scale = 220 / speed;
           this.ball.setVelocity(v.x * scale, v.y * scale);
         }
+        this.antiStallBallVelocity();
+      }
+
+      /** Keep |vy| and departure angle away from pure horizontal ping-pong. */
+      antiStallBallVelocity() {
+        if (!this.ball?.body || this.ballOnPaddle || !this.ballLaunched) return;
+
+        let vx = this.ball.body.velocity.x;
+        let vy = this.ball.body.velocity.y;
+        let speed = Math.hypot(vx, vy);
+        if (speed < 80) return;
+
+        const base = this.ballPowerMode ? PHYSICS.powerBallMaxSpeed : PHYSICS.ballSpeed;
+        const minVy =
+          base *
+          (this.ballPowerMode ? BALL_ANTI_STALL.minVyFracPower : BALL_ANTI_STALL.minVyFrac);
+        const maxHoriz = BALL_ANTI_STALL.maxHorizRatio;
+        let changed = false;
+
+        const horizRatio = Math.abs(vx) / speed;
+        if (horizRatio > maxHoriz) {
+          const signX = Math.sign(vx) || 1;
+          let signY = Math.sign(vy);
+          if (signY === 0) {
+            const b = this.physics.world.bounds;
+            const midY = b.y + b.height * 0.5;
+            signY = this.ball.y < midY ? 1 : -1;
+          }
+          vx = signX * speed * maxHoriz;
+          const vert = Math.sqrt(Math.max(0, speed * speed - vx * vx));
+          vy = signY * Math.max(minVy, vert);
+          changed = true;
+          speed = Math.hypot(vx, vy);
+        }
+
+        if (Math.abs(vy) < minVy) {
+          if (Math.abs(vy) < minVy * 0.12) {
+            vy = minVy;
+          } else {
+            vy = (vy >= 0 ? 1 : -1) * minVy;
+          }
+          changed = true;
+        }
+
+        if (!changed) return;
+
+        const newSpeed = Math.hypot(vx, vy);
+        if (newSpeed > 1 && Math.abs(newSpeed - speed) > 1) {
+          const scale = speed / newSpeed;
+          vx *= scale;
+          vy *= scale;
+        }
+        this.ball.setVelocity(vx, vy);
       }
 
       // ---------------------------------------------------------------------------
@@ -1918,6 +3186,7 @@ PACKAGING FOR REAL MOBILE APPS
             if (bottomHalf) {
               this.dragging = true;
               this.movePaddleToPointer(pointer);
+              this.startLaunchCharge();
             }
             return;
           }
@@ -1943,6 +3212,8 @@ PACKAGING FOR REAL MOBILE APPS
 
           if (this.gameState === 'playing' && ballOnPaddleAtStart && !this.isLosingBall) {
             this.launchBall();
+          } else if (this.launchChargeActive) {
+            this.stopLaunchCharge(true);
           }
 
           if (this.gameState === 'playing' && wasPaddleTouch && !ballOnPaddleAtStart && !this.ballOnPaddle) {
@@ -1960,6 +3231,12 @@ PACKAGING FOR REAL MOBILE APPS
           this.dragging = false;
           this.pointerWasDragging = false;
           this.bottomHalfTouchThisStroke = false;
+        });
+
+        this.input.on('pointerupoutside', () => {
+          if (this.launchChargeActive && this.ballOnPaddle) {
+            this.stopLaunchCharge(true);
+          }
         });
       }
 
@@ -1979,8 +3256,11 @@ PACKAGING FOR REAL MOBILE APPS
         const maxLives = this.level.meta?.lives ?? 3;
         const textStyle = {
           fontFamily: 'system-ui, -apple-system, sans-serif',
-          fontSize: '18px',
+          fontSize: '20px',
+          fontStyle: 'bold',
           color: COLORS.text,
+          stroke: '#3a0080',
+          strokeThickness: 4,
         };
 
         if (!hud) {
@@ -1991,13 +3271,15 @@ PACKAGING FOR REAL MOBILE APPS
         const { x, y, width, height } = hud.bounds;
         this.hudContainer = this.add.container(x, y).setDepth(200).setScrollFactor(0);
 
-        const hudBg = this.add.rectangle(width / 2, height / 2, width, height, 0x16082a, 0.94);
+        const hudBg = this.add.rectangle(width / 2, height / 2, width, height, 0x4a18a0, 0.96);
         this.hudContainer.add(hudBg);
 
-        const hudFrame = this.add.graphics();
-        hudFrame.lineStyle(2, 0xffe66d, 0.4);
-        hudFrame.strokeRect(0, 0, width, height);
-        this.hudContainer.add(hudFrame);
+        if (DEV_BORDERS) {
+          const hudFrame = this.add.graphics();
+          hudFrame.lineStyle(3, 0xffee44, 0.85);
+          hudFrame.strokeRect(0, 0, width, height);
+          this.hudContainer.add(hudFrame);
+        }
 
         const pos = resolveHudLayout(this.level, { width, height }, { maxLives });
         const hudLayout = { ...DEFAULT_HUD_LAYOUT, ...(this.level.hudLayout || {}) };
@@ -2031,9 +3313,12 @@ PACKAGING FOR REAL MOBILE APPS
           this.updateHudAvatar();
         }
 
-        this.playAreaDivider = this.add.graphics().setDepth(199).setScrollFactor(0);
-        this.playAreaDivider.lineStyle(2, 0xffe66d, 0.35);
-        this.playAreaDivider.lineBetween(x, y + height, x + width, y + height);
+        this.playAreaDivider = null;
+        if (DEV_BORDERS) {
+          this.playAreaDivider = this.add.graphics().setDepth(199).setScrollFactor(0);
+          this.playAreaDivider.lineStyle(3, 0xffee44, 0.65);
+          this.playAreaDivider.lineBetween(x, y + height, x + width, y + height);
+        }
 
         this.bonusChanceTimerText = null;
       }
@@ -2065,7 +3350,7 @@ PACKAGING FOR REAL MOBILE APPS
         this.scoreText.setText(`Score: ${this.score}`);
         this.lifeIcons.forEach((icon, i) => {
           icon.setAlpha(i < this.lives ? 1 : 0.25);
-          icon.setTint(i < this.lives ? 0xffffff : 0x666666);
+          icon.setTint(i < this.lives ? 0xffffff : 0x8844aa);
         });
         this.updateHudAvatar();
       }
@@ -2105,7 +3390,7 @@ PACKAGING FOR REAL MOBILE APPS
         this.preparePaddleForCharge();
         bbLog('paddle charge start');
         this.paddleCharging = true;
-        this.paddle.setTint(0xb8ffec);
+        this.paddle.setTint(0xccffff);
 
         this.paddleChargeScaleTween = this.tweens.add({
           targets: this.paddle,
@@ -2179,6 +3464,7 @@ PACKAGING FOR REAL MOBILE APPS
           this.powerBallTimer.remove(false);
           this.powerBallTimer = null;
         }
+        this.stopBallPowerCoolRings();
         this.tweens.killTweensOf(this.ball);
         this.ballPowerMode = false;
         this.ballPowerCooling = false;
@@ -2199,12 +3485,14 @@ PACKAGING FOR REAL MOBILE APPS
 
         if (this.powerBallTimer) this.powerBallTimer.remove(false);
         if (!chaining) this.tweens.killTweensOf(this.ball);
+        this.stopBallPowerCoolRings();
 
         this.ballPowerMode = true;
         this.ballPowerCooling = false;
         this.powerBounceActive = true;
         this.powerBounceMultiplier = true;
 
+        if (!chaining) gameHaptic('powerMode', { force: true });
         this.applyBallTexture();
         const powerScale = this.ballPowerScale();
         const powerWorldR = this.ballRadius * POWER_BALL.scale;
@@ -2233,6 +3521,7 @@ PACKAGING FOR REAL MOBILE APPS
         this.powerBounceActive = false;
         this.powerBounceMultiplier = false;
         this.applyBallTexture();
+        this.startBallPowerCoolRings();
 
         this.tweens.killTweensOf(this.ball);
         const normalScale = this.ballBaseScale;
@@ -2246,6 +3535,7 @@ PACKAGING FOR REAL MOBILE APPS
           onComplete: () => {
             syncNormalBody();
             this.ballPowerCooling = false;
+            this.stopBallPowerCoolRings();
           },
         });
 
@@ -2253,8 +3543,80 @@ PACKAGING FOR REAL MOBILE APPS
           this.powerBallTimer = null;
           if (!this.ballPowerMode) {
             this.ballPowerCooling = false;
+            this.stopBallPowerCoolRings();
           }
         });
+      }
+
+      startBallPowerCoolRings() {
+        this.stopBallPowerCoolRings();
+        if (!this.ball?.active || !this.textures.exists('power_cool_ring')) return;
+
+        this._powerCoolRingTint = POWER_BALL.coolRingTintWarm;
+        const warm = Phaser.Display.Color.ValueToColor(POWER_BALL.coolRingTintWarm);
+        const cool = Phaser.Display.Color.ValueToColor(POWER_BALL.coolRingTintCool);
+
+        const spawnRingBurst = () => {
+          if (!this.ballPowerCooling || !this.ball?.active) return;
+
+          const radius = Math.max(10, this.ball.displayWidth * 0.48);
+          const circle = new Phaser.Geom.Circle(0, 0, radius);
+          const emitter = this.add.particles(this.ball.x, this.ball.y, 'power_cool_ring', {
+            blendMode: 'ADD',
+            emitting: false,
+            lifespan: POWER_BALL.coolRingLifespan,
+            scale: { start: 0.28, end: 1.28 },
+            alpha: { start: 0.82, end: 0 },
+            speed: { min: 22, max: 38 },
+            angle: { min: 0, max: 360 },
+            tint: this._powerCoolRingTint ?? POWER_BALL.coolRingTintWarm,
+            emitZone: {
+              type: 'edge',
+              source: circle,
+              quantity: POWER_BALL.coolRingBurstCount,
+              seamless: true,
+            },
+          });
+          emitter.setDepth(10);
+          emitter.explode(POWER_BALL.coolRingBurstCount);
+          this.time.delayedCall(POWER_BALL.coolRingLifespan + 40, () => {
+            if (emitter?.active) emitter.destroy();
+          });
+        };
+
+        spawnRingBurst();
+        const repeats = Math.max(0, Math.ceil(POWER_BALL.cooldownMs / POWER_BALL.coolRingBurstMs) - 1);
+        this.powerCoolRingEvent = this.time.addEvent({
+          delay: POWER_BALL.coolRingBurstMs,
+          repeat: repeats,
+          callback: spawnRingBurst,
+        });
+
+        this.powerCoolTintTween = this.tweens.addCounter({
+          from: 0,
+          to: 1,
+          duration: POWER_BALL.cooldownMs,
+          ease: 'Sine.easeInOut',
+          onUpdate: (tw) => {
+            const t = tw.getValue();
+            const r = Phaser.Math.Linear(warm.red, cool.red, t);
+            const g = Phaser.Math.Linear(warm.green, cool.green, t);
+            const b = Phaser.Math.Linear(warm.blue, cool.blue, t);
+            this._powerCoolRingTint = Phaser.Display.Color.GetColor(r, g, b);
+          },
+        });
+      }
+
+      stopBallPowerCoolRings() {
+        if (this.powerCoolTintTween) {
+          this.powerCoolTintTween.stop();
+          this.powerCoolTintTween = null;
+        }
+        if (this.powerCoolRingEvent) {
+          this.powerCoolRingEvent.destroy();
+          this.powerCoolRingEvent = null;
+        }
+        this._powerCoolRingTint = null;
       }
 
       // ---------------------------------------------------------------------------
@@ -2275,7 +3637,7 @@ PACKAGING FOR REAL MOBILE APPS
         const coilScaleY = armed ? 0.5 : 0.64;
 
         if (armed) {
-          this.paddle.setTint(0xd4fff0);
+          this.paddle.setTint(0xffffff);
         } else {
           this.paddle.clearTint();
         }
@@ -2367,6 +3729,7 @@ PACKAGING FOR REAL MOBILE APPS
       /** Subtle trampoline tap on a normal bounce */
       doPaddleNormalTap() {
         if (this.paddleCharging) return;
+        gameHaptic('paddleTap');
         this.paddleSpringing = true;
         this.killPaddleTweens();
         this.tweens.add({
@@ -2393,9 +3756,7 @@ PACKAGING FOR REAL MOBILE APPS
       }
 
       triggerPerfectTimingFeedback() {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-          navigator.vibrate(12);
-        }
+        gameHaptic('perfectTiming', { force: true });
 
         const overlay = this.add.rectangle(
           this.scale.width / 2,
@@ -2460,99 +3821,15 @@ PACKAGING FOR REAL MOBILE APPS
       // ---------------------------------------------------------------------------
 
       showOverlay(title, subtitle, buttonLabel, onRestart) {
-        const { width, height } = this.scale;
-        const overlay = this.add.container(0, 0).setDepth(250);
-
-        const dim = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75);
-        const panel = this.add.rectangle(width / 2, height / 2, width - 48, 220, 0x1a1a2e, 0.95);
-        panel.setStrokeStyle(3, 0xffe66d);
-
-        const titleText = this.add
-          .text(width / 2, height / 2 - 50, title, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '28px',
-            color: COLORS.accent,
-            fontStyle: 'bold',
-          })
-          .setOrigin(0.5);
-
-        const subText = this.add
-          .text(width / 2, height / 2, subtitle, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '18px',
-            color: COLORS.text,
-          })
-          .setOrigin(0.5);
-
-        const btnBg = this.add.rectangle(width / 2, height / 2 + 60, 180, 44, COLORS.paddle).setInteractive({ useHandCursor: true });
-        const btnLabel = this.add
-          .text(width / 2, height / 2 + 60, buttonLabel, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '18px',
-            color: '#1a1a2e',
-            fontStyle: 'bold',
-          })
-          .setOrigin(0.5);
-
-        btnBg.on('pointerdown', () => {
-          overlay.destroy();
-          onRestart();
+        showGameModalOverlay(this, {
+          title,
+          subtitle,
+          buttons: [{ label: buttonLabel, primary: true, onClick: onRestart }],
         });
-
-        overlay.add([dim, panel, titleText, subText, btnBg, btnLabel]);
-        return overlay;
       }
 
       showMultiButtonOverlay(title, subtitle, buttons) {
-        const { width, height } = this.scale;
-        const overlay = this.add.container(0, 0).setDepth(250);
-        const panelHeight = 180 + buttons.length * 52;
-
-        const dim = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.75);
-        const panel = this.add.rectangle(width / 2, height / 2, width - 48, panelHeight, 0x1a1a2e, 0.95);
-        panel.setStrokeStyle(3, 0xffe66d);
-
-        const titleText = this.add
-          .text(width / 2, height / 2 - 70, title, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '28px',
-            color: COLORS.accent,
-            fontStyle: 'bold',
-          })
-          .setOrigin(0.5);
-
-        const subText = this.add
-          .text(width / 2, height / 2 - 20, subtitle, {
-            fontFamily: 'system-ui, sans-serif',
-            fontSize: '18px',
-            color: COLORS.text,
-          })
-          .setOrigin(0.5);
-
-        const nodes = [dim, panel, titleText, subText];
-        const startY = height / 2 + 20;
-        buttons.forEach((btn, i) => {
-          const y = startY + i * 52;
-          const fill = btn.primary === false ? 0x444466 : COLORS.paddle;
-          const labelColor = btn.primary === false ? COLORS.text : '#1a1a2e';
-          const btnBg = this.add.rectangle(width / 2, y, 200, 44, fill).setInteractive({ useHandCursor: true });
-          const btnLabel = this.add
-            .text(width / 2, y, btn.label, {
-              fontFamily: 'system-ui, sans-serif',
-              fontSize: '18px',
-              color: labelColor,
-              fontStyle: 'bold',
-            })
-            .setOrigin(0.5);
-          btnBg.on('pointerdown', () => {
-            overlay.destroy();
-            btn.onClick();
-          });
-          nodes.push(btnBg, btnLabel);
-        });
-
-        overlay.add(nodes);
-        return overlay;
+        showGameModalOverlay(this, { title, subtitle, buttons });
       }
 
       updateBonusChanceTimer() {
@@ -2573,6 +3850,8 @@ PACKAGING FOR REAL MOBILE APPS
         this.hideBonusChanceTimer();
         this.gameState = 'levelClear';
         this.stopLaunchAimCycle();
+        this.stopLaunchCharge(true);
+        gameHaptic('levelClear', { force: true });
         this.ball.body.setVelocity(0, 0);
         this.ball.body.moves = false;
 
@@ -2622,6 +3901,8 @@ PACKAGING FOR REAL MOBILE APPS
         this.bonusChanceEndsAt = 0;
         this.hideBonusChanceTimer();
         this.gameState = 'gameOver';
+        gameHaptic('gameOver', { force: true });
+        this.stopLaunchCharge(true);
         this.stopLaunchAimCycle();
         this.showOverlay('Game Over', `Score: ${this.score}`, 'Try Again', () => this.scene.restart());
       }
@@ -2649,11 +3930,17 @@ PACKAGING FOR REAL MOBILE APPS
             this.clampBallSpeed();
             this.updateBallSpin(delta);
             this.updateBallTrail();
+            this.debugPowerBlockOverlap();
           }
 
           this.updatePaddleCharge();
           this.updateHudAvatar();
           this.updateBonusChanceTimer();
+
+          updateParallaxGridBackground(this, delta);
+
+          this.updateNormalBlockStars(time);
+          this.updateGrayBlockStars();
 
           // Expire stale power bounce queue
           if (this.powerBounceQueued && time - this.powerBounceQueuedAt > POWER_BOUNCE.queueWindowMs) {
@@ -2685,7 +3972,7 @@ PACKAGING FOR REAL MOBILE APPS
       parent: 'game-container',
       width: GAME_WIDTH,
       height: GAME_HEIGHT,
-      backgroundColor: '#1a1a2e',
+      backgroundColor: '#f6f6f6',
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -2705,7 +3992,7 @@ PACKAGING FOR REAL MOBILE APPS
       },
     };
 
-    bbLog('boot Phaser', { width: GAME_WIDTH, height: GAME_HEIGHT });
+    bbLog('boot Phaser', { width: GAME_WIDTH, height: GAME_HEIGHT, powerBlockDebug: POWER_BLOCK_DEBUG });
 
     function initLevelBar(activeEntry, campaignCtx) {
       const bar = document.getElementById('level-bar');
@@ -2745,6 +4032,44 @@ PACKAGING FOR REAL MOBILE APPS
       document.getElementById('level-restart').addEventListener('click', () => {
         window.location.reload();
       });
+
+      const btn3d = document.getElementById('toggle-3d');
+      if (btn3d) {
+        btn3d.textContent = USE_3D_OVERLAY ? '3D: on' : '3D: off';
+        btn3d.addEventListener('click', () => {
+          try {
+            if (USE_3D_OVERLAY) {
+              localStorage.removeItem('blockBall.use3d');
+            } else {
+              localStorage.setItem('blockBall.use3d', '1');
+            }
+          } catch (_) {
+            /* private mode */
+          }
+          const url = new URL(window.location.href);
+          url.searchParams.set('3d', USE_3D_OVERLAY ? '0' : '1');
+          window.location.href = url.pathname + url.search;
+        });
+      }
+
+      const btnDevBorders = document.getElementById('toggle-dev-borders');
+      if (btnDevBorders) {
+        btnDevBorders.textContent = DEV_BORDERS ? 'Borders: on' : 'Borders: off';
+        btnDevBorders.addEventListener('click', () => {
+          try {
+            if (DEV_BORDERS) {
+              localStorage.setItem('blockBall.devBorders', '0');
+            } else {
+              localStorage.removeItem('blockBall.devBorders');
+            }
+          } catch (_) {
+            /* private mode */
+          }
+          const url = new URL(window.location.href);
+          url.searchParams.set('devBorders', DEV_BORDERS ? '0' : '1');
+          window.location.href = url.pathname + url.search;
+        });
+      }
     }
 
     async function bootGame() {
@@ -2771,9 +4096,15 @@ PACKAGING FOR REAL MOBILE APPS
           enemies: level.enemies?.length ?? 0,
           items: level.items?.length ?? 0,
         });
+        if (USE_3D_OVERLAY) {
+          const mod = await import('./three-overlay.js');
+          window.__blockBallThreeOverlay = mod.createThreeOverlay;
+          await mod.loadBallFaceTexture();
+          bbLog('3D overlay module loaded');
+        }
         status.remove();
         initLevelBar(entry, campaignCtx || null);
-        new Phaser.Game(config);
+        window.__blockBallGame = new Phaser.Game(config);
         bbLog('Phaser.Game created');
       } catch (err) {
         bbError('bootGame failed', err);

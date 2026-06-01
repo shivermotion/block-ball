@@ -30,6 +30,11 @@ function sendJson(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
+function sendRedirect(res, location) {
+  res.writeHead(301, { Location: location });
+  res.end();
+}
+
 createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://127.0.0.1:${PORT}`);
 
@@ -81,6 +86,11 @@ createServer(async (req, res) => {
       console.error('[dev-server] delete failed', err);
       sendJson(res, 400, { ok: false, error: err.message || String(err) });
     }
+    return;
+  }
+
+  if (url.pathname.endsWith('.html')) {
+    sendRedirect(res, url.pathname.slice(0, -5) + url.search);
     return;
   }
 
