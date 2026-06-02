@@ -322,8 +322,12 @@ PACKAGING FOR REAL MOBILE APPS
 
   <script src="block-types.js"></script>
   <script src="block-power-art.js"></script>
+  <script src="block-ability-art.js"></script>
   <script src="ball-art.js"></script>
   <script src="enemy-types.js"></script>
+  <script src="enemy-ground-walker-art.js"></script>
+  <script src="enemy-drifter-art.js"></script>
+  <script src="enemy-saucer-art.js"></script>
   <script src="item-types.js"></script>
   <script src="score-popup.js"></script>
   <script src="level-grid.js"></script>
@@ -334,7 +338,7 @@ PACKAGING FOR REAL MOBILE APPS
   <script src="levels/registry.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
   <script>
-    /* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, blockCountsTowardLevelClear, getHiddenRevealCell, canBlockBecomeBonus, getBonusCollectPoints, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemEffect, getItemTextureKey, getItemFootprint, ITEM_CATEGORY, spawnFloatingScore, spawnFloatingHint, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, drawGameFrameBezelFill, fitEntityToCell, fitEntityToCellSpan, fitSpikeToCellBottom, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES, markStageCompleted, getNextStage, campaignPlayUrl, campaignMenuUrl, createParallaxGridBackground, updateParallaxGridBackground, setGameHapticsEnabled, gameHaptic, hapticLaunchChargeStart, hapticLaunchChargeTick, hapticLaunchRelease */
+    /* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, blockCountsTowardLevelClear, getHiddenRevealCell, canBlockBecomeBonus, getBonusCollectPoints, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemEffect, getItemTextureKey, getItemFootprint, ITEM_CATEGORY, spawnFloatingScore, spawnFloatingHint, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, drawGameFrameBezelFill, fitEntityToCell, fitEntityToCellSpan, fitSpikeToCellBottom, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES, markStageCompleted, getNextStage, campaignPlayUrl, campaignMenuUrl, createParallaxGridBackground, updateParallaxGridBackground, setGameHapticsEnabled, gameHaptic, hapticLaunchChargeStart, hapticLaunchChargeTick, hapticLaunchRelease, isPowerBlockType, isAbilityBlockType, bakeAbilityBlockTextures */
 
     let ACTIVE_LEVEL = null;
     /** @type {{ campaign: object, worldId: string, worldName: string, worldIndex: number, stageIndex: number, stageNumber: number } | null} */
@@ -638,6 +642,13 @@ PACKAGING FOR REAL MOBILE APPS
       godRayHaloAlpha: 0.38,
     };
 
+    const ABILITY_BLOCK_HIT_FX = {
+      durationMs: 560,
+      teeterCycles: 2.75,
+      teeterMaxDeg: 12,
+      cooldownMs: POWER_BLOCK_RESIST.cooldownMs,
+    };
+
     const POWER_BOUNCE = {
       /** Release arms power; paddle hit must occur within this window (ms) */
       queueWindowMs: 1100,
@@ -754,6 +765,7 @@ PACKAGING FOR REAL MOBILE APPS
         }
       });
       bakePowerBlockTextures(scene, cellW, cellH, g);
+      bakeAbilityBlockTextures(scene, cellW, cellH, g);
 
       drawBlockTexture('block_hidden', COLORS.blockHidden, COLORS.blockHiddenBorder, (gfx, px, w, h, r) => {
         if (typeof drawHiddenPanelPhaser === 'function') {
@@ -870,6 +882,54 @@ PACKAGING FOR REAL MOBILE APPS
       g.fillStyle(0x003366, 0.85);
       g.fillEllipse(cellW / 2, cellH * 0.72, cellW * 0.15, cellH * 0.1);
       g.generateTexture('enemy', cellW, cellH);
+
+      if (!scene.textures.exists('enemy_ground_walker')) {
+        const mobW = cellW * 2;
+        const mobH = cellH * 2;
+        if (typeof buildGroundWalkerCanvas === 'function') {
+          const gwCanvas = buildGroundWalkerCanvas(mobW, mobH);
+          scene.textures.addCanvas('enemy_ground_walker', gwCanvas);
+        } else {
+          g.clear();
+          g.fillStyle(COLORS.enemyDark, 1);
+          g.fillEllipse(mobW / 2, mobH * 0.65, (mobW - 4) * 0.85, (mobH - 4) * 0.7);
+          g.fillStyle(COLORS.enemy, 1);
+          g.fillEllipse(mobW / 2, mobH * 0.58, (mobW - 4) * 0.8, (mobH - 4) * 0.65);
+          g.generateTexture('enemy_ground_walker', mobW, mobH);
+        }
+      }
+
+      if (!scene.textures.exists('enemy_drifter')) {
+        const mobW = cellW * 2;
+        const mobH = cellH * 2;
+        if (typeof buildDrifterCanvas === 'function') {
+          const drCanvas = buildDrifterCanvas(mobW, mobH);
+          scene.textures.addCanvas('enemy_drifter', drCanvas);
+        } else {
+          g.clear();
+          g.fillStyle(COLORS.enemyDark, 1);
+          g.fillEllipse(mobW / 2, mobH * 0.65, (mobW - 4) * 0.85, (mobH - 4) * 0.7);
+          g.fillStyle(COLORS.enemy, 1);
+          g.fillEllipse(mobW / 2, mobH * 0.58, (mobW - 4) * 0.8, (mobH - 4) * 0.65);
+          g.generateTexture('enemy_drifter', mobW, mobH);
+        }
+      }
+
+      if (!scene.textures.exists('enemy_saucer')) {
+        const mobW = cellW * 2;
+        const mobH = cellH * 2;
+        if (typeof buildSaucerCanvas === 'function') {
+          const scCanvas = buildSaucerCanvas(mobW, mobH);
+          scene.textures.addCanvas('enemy_saucer', scCanvas);
+        } else {
+          g.clear();
+          g.fillStyle(COLORS.enemyDark, 1);
+          g.fillEllipse(mobW / 2, mobH * 0.65, (mobW - 4) * 0.85, (mobH - 4) * 0.7);
+          g.fillStyle(COLORS.enemy, 1);
+          g.fillEllipse(mobW / 2, mobH * 0.58, (mobW - 4) * 0.8, (mobH - 4) * 0.65);
+          g.generateTexture('enemy_saucer', mobW, mobH);
+        }
+      }
 
       generateItemTextures(scene, cellW, cellH, g);
 
@@ -1181,6 +1241,7 @@ PACKAGING FOR REAL MOBILE APPS
         this.launchChargeTween = null;
         this.blockDebrisTintCache = new Map();
         this.threeOverlay = null;
+        this.activeCopyAbility = URL_PARAMS.get('ability') === '1' ? 'debug' : null;
 
         const { width, height } = this.scale;
         this.level = ACTIVE_LEVEL;
@@ -1401,7 +1462,8 @@ PACKAGING FOR REAL MOBILE APPS
 
           const block = this.blocks.create(x, y, def.texture);
           const isPower = isPowerBlockType(typeId);
-          if (isLong || isPower) {
+          const isAbility = isAbilityBlockType(typeId);
+          if (isLong || isPower || isAbility) {
             fitEntityToCellSpan(block, this.levelGrid, colSpan, rowSpan);
           } else if (def.isHazard) {
             fitSpikeToCellBottom(block, this.levelGrid, gridCol, gridRow);
@@ -1428,6 +1490,7 @@ PACKAGING FOR REAL MOBILE APPS
           }
           if (countsClear) this.blocksRemaining++;
           this.registerThreeBlock(block);
+          if (isAbility) this.attachAbilityBlockOverlays(block);
         };
 
         for (let row = 0; row < cells.length; row++) {
@@ -1444,8 +1507,14 @@ PACKAGING FOR REAL MOBILE APPS
 
         this.enemies = this.physics.add.group();
         spawns.forEach((spawn, i) => {
-          const { x, y } = this.levelGrid.cellCenter(spawn.col, spawn.row);
-          this.spawnEnemy(spawn.type, x, y, i);
+          const foot = getEnemyFootprint(spawn.type);
+          const { x, y } = this.levelGrid.cellSpanCenter(
+            spawn.col,
+            spawn.row,
+            foot.colSpan,
+            foot.rowSpan
+          );
+          this.spawnEnemy(spawn.type, x, y, i, spawn.col, spawn.row, foot);
         });
       }
 
@@ -1503,28 +1572,91 @@ PACKAGING FOR REAL MOBILE APPS
         bbLog('createItems', { count: this.levelItems.getLength() });
       }
 
-      spawnEnemy(typeId, x, y, index) {
+      spawnEnemy(typeId, x, y, index, gridCol, gridRow, foot) {
         const def = getEnemyDef(typeId);
+        const span = foot ?? getEnemyFootprint(typeId);
         const enemy = this.enemies.create(x, y, def.texture);
-        fitEntityToCell(enemy, this.levelGrid, { circle: true });
+        fitEntityToCellSpan(enemy, this.levelGrid, span.colSpan, span.rowSpan, {
+          contain: true,
+          circle: true,
+        });
         enemy.setBounce(1);
         enemy.setCollideWorldBounds(true);
         enemy.setImmovable(true);
         enemy.body.allowGravity = false;
         enemy.setDepth(7);
         enemy.setData('typeId', typeId);
+        enemy.setData('gridCol', gridCol);
+        enemy.setData('gridRow', gridRow);
+        enemy.setData('colSpan', span.colSpan);
+        enemy.setData('rowSpan', span.rowSpan);
         enemy.setData('hp', def.hp);
         enemy.setData('maxHp', def.maxHp);
         enemy.setData('points', def.points);
         enemy.setData('drop', def.drop);
 
         this.applyEnemyMovement(enemy, def, index, x, y);
+        this.threeOverlay?.registerEnemy(enemy);
         return enemy;
       }
 
       applyEnemyMovement(enemy, def, index, startX, startY) {
+        const { cellWidth, cellHeight } = this.levelGrid.config;
         switch (def.movement) {
-          case 'erratic_float':
+          case 'slow_horizontal': {
+            const travel = cellWidth * 0.42;
+            this.tweens.add({
+              targets: enemy,
+              x: startX + (index % 2 === 0 ? travel : -travel),
+              duration: 5200 + index * 350,
+              yoyo: true,
+              repeat: -1,
+              ease: 'Sine.easeInOut',
+            });
+            this.tweens.add({
+              targets: enemy,
+              y: startY - cellHeight * 0.05,
+              duration: 3400 + index * 250,
+              yoyo: true,
+              repeat: -1,
+              ease: 'Sine.easeInOut',
+            });
+            break;
+          }
+          case 'erratic_float': {
+            const wander = () => {
+              if (!enemy.active) return;
+              const angle = Math.random() * Math.PI * 2;
+              const dist = cellWidth * (0.28 + Math.random() * 0.62);
+              const tx = startX + Math.cos(angle) * dist;
+              const ty = startY + Math.sin(angle) * dist * 0.72;
+              this.tweens.add({
+                targets: enemy,
+                x: tx,
+                y: ty,
+                duration: 2600 + Math.random() * 2400,
+                ease: 'Sine.easeInOut',
+                onComplete: wander,
+              });
+            };
+            wander();
+            break;
+          }
+          case 'circle_figure8': {
+            enemy.setData('saucerMove', {
+              startX,
+              startY,
+              rx: cellWidth * 0.36,
+              ry: cellHeight * 0.26,
+              t: index * 0.7,
+              mode: 'circle',
+              modeTimer: 0,
+              dartFrom: { x: startX, y: startY },
+              dartTo: { x: startX, y: startY },
+              dartProgress: 0,
+            });
+            break;
+          }
           default:
             this.tweens.add({
               targets: enemy,
@@ -1537,6 +1669,7 @@ PACKAGING FOR REAL MOBILE APPS
             break;
         }
         enemy.setData('baseX', startX);
+        enemy.setData('baseY', startY);
       }
 
       createPaddle() {
@@ -1884,11 +2017,16 @@ PACKAGING FOR REAL MOBILE APPS
         }
 
         const typeId = block.getData('typeId') || 'normal';
-        const result = resolveBlockHit(typeId, this.powerBounceActive || this.ballPowerMode);
+        const result = resolveBlockHit(typeId, this.powerBounceActive || this.ballPowerMode, {
+          hasCopyAbility: Boolean(this.activeCopyAbility),
+        });
 
         if (result.action === 'immune') {
           const def = getBlockDef(typeId);
-          if (def.powerOnly) {
+          if (def.abilityGated) {
+            this.bounceBallOffPowerBlock(ball, block);
+            this.onAbilityBlockResist(ball, block);
+          } else if (def.powerOnly) {
             bbPowerLog(
               `collider:${block.getData('gridCol')},${block.getData('gridRow')}`,
               {
@@ -2139,7 +2277,7 @@ PACKAGING FOR REAL MOBILE APPS
             ? this.levelGrid.cellSpanCenter(col, row, revColSpan, revRowSpan)
             : this.levelGrid.cellCenter(col, row);
         block.setPosition(pos.x, pos.y);
-        if (toTypeId === 'score' || revColSpan > 1 || revRowSpan > 1 || isPowerBlockType(toTypeId)) {
+        if (toTypeId === 'score' || revColSpan > 1 || revRowSpan > 1 || isPowerBlockType(toTypeId) || isAbilityBlockType(toTypeId)) {
           fitEntityToCellSpan(block, this.levelGrid, revColSpan, revRowSpan);
         } else if (revColSpan !== prevColSpan || revRowSpan !== prevRowSpan) {
           fitEntityToCell(block, this.levelGrid);
@@ -2275,7 +2413,8 @@ PACKAGING FOR REAL MOBILE APPS
         block.setData('rowSpan', rowSpan);
         const isLong = colSpan > 1 || rowSpan > 1;
         const isPower = isPowerBlockType(toTypeId);
-        if (isLong || isPower) {
+        const isAbility = isAbilityBlockType(toTypeId);
+        if (isLong || isPower || isAbility) {
           const { x, y } = isLong
             ? this.levelGrid.cellSpanCenter(col, row, colSpan, rowSpan)
             : this.levelGrid.cellCenter(col, row);
@@ -2427,6 +2566,9 @@ PACKAGING FOR REAL MOBILE APPS
 
         if (def?.effect === 'bonus_chance') {
           this.activateBonusChance();
+        } else if (def?.category === ITEM_CATEGORY.copyAbility) {
+          this.activeCopyAbility = typeId;
+          spawnFloatingHint('Copy Ability!', x, y - 14);
         }
 
         this.clampBallSpeed();
@@ -2667,12 +2809,14 @@ PACKAGING FOR REAL MOBILE APPS
         this.awardDestroyPoints(points, x, y);
         this.spawnDestroyParticles(x, y, COLORS.enemy);
         gameHaptic('enemyKill');
+        this.threeOverlay?.unregisterEnemy(enemy);
         enemy.destroy();
         this.clampBallSpeed();
         bbLog('enemy defeated', { typeId, points });
       }
 
       flashEnemyHit(enemy) {
+        this.threeOverlay?.triggerEnemyHit?.(enemy);
         enemy.setTint(0xffffff);
         this.tweens.add({
           targets: enemy,
@@ -2758,6 +2902,90 @@ PACKAGING FOR REAL MOBILE APPS
         return tint;
       }
 
+      destroyAbilityBlockOverlays(block) {
+        const icon = block.getData('abilityIconOverlay');
+        const flame = block.getData('abilityFlameEmitter');
+        if (icon?.active) icon.destroy();
+        if (flame?.active) flame.destroy();
+        block.setData('abilityIconOverlay', null);
+        block.setData('abilityFlameEmitter', null);
+      }
+
+      attachAbilityBlockOverlays(block) {
+        if (USE_3D_OVERLAY) return;
+        if (!this.textures.exists('block_ability_mob_icon')) return;
+        const scale = globalThis.ABILITY_MOB_ICON_SCALE ?? 0.98;
+        const iconSize = Math.min(block.displayWidth, block.displayHeight) * scale;
+        const icon = this.add.image(block.x, block.y, 'block_ability_mob_icon');
+        icon.setDisplaySize(iconSize, iconSize);
+        icon.setDepth(block.depth + 1);
+
+        const flame = this.add.particles(block.x, block.y + iconSize * 0.06, 'particle', {
+          speed: { min: 10, max: 26 },
+          angle: { min: 250, max: 290 },
+          scale: { start: 0.32, end: 0 },
+          alpha: { start: 0.7, end: 0 },
+          lifespan: { min: 200, max: 360 },
+          tint: [0xff6622, 0xffaa44, 0xff4400],
+          blendMode: 'ADD',
+          emitting: false,
+          frequency: 50,
+          quantity: 2,
+        });
+        flame.setDepth(block.depth + 0.5);
+
+        block.setData('abilityIconOverlay', icon);
+        block.setData('abilityFlameEmitter', flame);
+      }
+
+      playAbilityBlockHitFx2d(block) {
+        const icon = block.getData('abilityIconOverlay');
+        const flame = block.getData('abilityFlameEmitter');
+        const targets = icon ? [block, icon] : [block];
+        const fx = ABILITY_BLOCK_HIT_FX;
+        const state = { p: 0 };
+
+        this.tweens.killTweensOf(targets);
+        block.setData('abilityHitFxStart', this.time.now);
+
+        if (flame?.active) {
+          flame.setPosition(block.x, block.y + (icon?.displayHeight ?? 0) * 0.06);
+          flame.start();
+          this.time.delayedCall(fx.durationMs, () => {
+            if (flame.active) flame.stop();
+          });
+        }
+
+        this.tweens.add({
+          targets: state,
+          p: 1,
+          duration: fx.durationMs,
+          onUpdate: () => {
+            if (!block.active) return;
+            const p = state.p;
+            const decay = 1 - p;
+            const angle = Math.sin(p * Math.PI * 2 * fx.teeterCycles) * fx.teeterMaxDeg * decay;
+            for (const tr of targets) {
+              if (tr?.active) tr.setAngle(angle);
+            }
+            if (icon?.active) {
+              const whiteBlend = Math.sin(Math.min(1, p * 2.2) * Math.PI) * decay;
+              icon.setTexture(
+                whiteBlend > 0.45 && this.textures.exists('block_ability_mob_icon_white')
+                  ? 'block_ability_mob_icon_white'
+                  : 'block_ability_mob_icon'
+              );
+            }
+          },
+          onComplete: () => {
+            for (const tr of targets) {
+              if (tr?.active) tr.setAngle(0);
+            }
+            if (icon?.active) icon.setTexture('block_ability_mob_icon');
+          },
+        });
+      }
+
       destroyBlock(block) {
         if (!block.getData('bonusCollecting')) {
           gameHaptic('blockDestroy');
@@ -2765,6 +2993,7 @@ PACKAGING FOR REAL MOBILE APPS
         const tint = this.getBlockDebrisTint(block);
         this.spawnBlockClayDebris(block.x, block.y, tint);
         const counted = blockCountsTowardLevelClear(block.getData('typeId'));
+        this.destroyAbilityBlockOverlays(block);
         this.threeOverlay?.unregisterBlock(block);
         block.destroy();
         if (counted) {
@@ -2822,6 +3051,19 @@ PACKAGING FOR REAL MOBILE APPS
           POWER_BLOCK_RESIST.cameraShakeMs,
           POWER_BLOCK_RESIST.cameraShakeIntensity
         );
+      }
+
+      onAbilityBlockResist(ball, block) {
+        if (!block?.active || !ball?.body) return;
+
+        const last = block.getData('lastAbilityResistAt') || 0;
+        if (this.time.now - last < ABILITY_BLOCK_HIT_FX.cooldownMs) return;
+        block.setData('lastAbilityResistAt', this.time.now);
+
+        block.setData('abilityHitFxStart', this.time.now);
+        if (!USE_3D_OVERLAY) this.playAbilityBlockHitFx2d(block);
+        gameHaptic('blockImmune');
+        spawnFloatingHint('Need Copy Ability', block.x, block.y - 18);
       }
 
       /**
@@ -3928,6 +4170,66 @@ PACKAGING FOR REAL MOBILE APPS
         this.showOverlay('Game Over', `Score: ${this.score}`, 'Try Again', () => this.scene.restart());
       }
 
+      updateSaucerMovement(delta) {
+        const dt = delta / 1000;
+        this.enemies?.getChildren().forEach((enemy) => {
+          const move = enemy.getData('saucerMove');
+          if (!move || !enemy.active) return;
+
+          move.modeTimer += delta;
+
+          if (move.mode === 'circle') {
+            move.t += dt * 1.45;
+            enemy.x = move.startX + move.rx * Math.cos(move.t);
+            enemy.y = move.startY + move.ry * Math.sin(move.t);
+            if (move.modeTimer > 4000) {
+              move.mode = 'figure8';
+              move.modeTimer = 0;
+              move.t = 0;
+            }
+            return;
+          }
+
+          if (move.mode === 'figure8') {
+            move.t += dt * 1.65;
+            enemy.x = move.startX + move.rx * Math.sin(move.t);
+            enemy.y = move.startY + move.ry * Math.sin(move.t * 2);
+            if (move.modeTimer > 4600) {
+              move.mode = 'dart';
+              move.modeTimer = 0;
+              move.dartProgress = 0;
+              move.dartFrom = { x: enemy.x, y: enemy.y };
+              const angle = Math.random() * Math.PI * 2;
+              const dist = move.rx * (1.55 + Math.random() * 0.85);
+              move.dartTo = {
+                x: move.startX + Math.cos(angle) * dist,
+                y: move.startY + Math.sin(angle) * dist * 0.78,
+              };
+            }
+            return;
+          }
+
+          move.dartProgress += dt * 2.35;
+          const p = Math.min(1, move.dartProgress);
+          if (p < 0.42) {
+            const t = p / 0.42;
+            const ease = t * t;
+            enemy.x = move.dartFrom.x + (move.dartTo.x - move.dartFrom.x) * ease;
+            enemy.y = move.dartFrom.y + (move.dartTo.y - move.dartFrom.y) * ease;
+          } else {
+            const t = (p - 0.42) / 0.58;
+            const ease = 1 - (1 - t) * (1 - t);
+            enemy.x = move.dartTo.x + (move.startX - move.dartTo.x) * ease;
+            enemy.y = move.dartTo.y + (move.startY - move.dartTo.y) * ease;
+          }
+          if (p >= 1) {
+            move.mode = 'circle';
+            move.modeTimer = 0;
+            move.t = 0;
+          }
+        });
+      }
+
       // ---------------------------------------------------------------------------
       // Update loop
       // ---------------------------------------------------------------------------
@@ -3959,6 +4261,7 @@ PACKAGING FOR REAL MOBILE APPS
 
           this.updateNormalBlockStars(time);
           this.updateGrayBlockStars();
+          this.updateSaucerMovement(delta);
 
           // Expire stale power bounce queue
           if (this.powerBounceQueued && time - this.powerBounceQueuedAt > POWER_BOUNCE.queueWindowMs) {
@@ -3973,6 +4276,15 @@ PACKAGING FOR REAL MOBILE APPS
           this.enemies?.getChildren().forEach((enemy) => {
             if (enemy.active && enemy.body) {
               enemy.body.reset(enemy.x, enemy.y);
+              if (enemy.getData('saucerMove')) {
+                const prev = enemy.getData('saucerPrev');
+                const dt = Math.max(1, delta) / 1000;
+                if (prev) {
+                  enemy.body.velocity.x = (enemy.x - prev.x) / dt;
+                  enemy.body.velocity.y = (enemy.y - prev.y) / dt;
+                }
+                enemy.setData('saucerPrev', { x: enemy.x, y: enemy.y });
+              }
             }
           });
         } catch (err) {
@@ -4117,8 +4429,17 @@ PACKAGING FOR REAL MOBILE APPS
         if (USE_3D_OVERLAY) {
           const mod = await import('./three-overlay.js');
           window.__blockBallThreeOverlay = mod.createThreeOverlay;
+          const enemyModels = await import('./enemy-models.js');
+          await enemyModels.loadEnemyModels();
           await mod.loadBallFaceTexture();
+          await mod.loadAbilityBlockTextures();
+          await mod.loadIndestructibleCrystalTexture();
           bbLog('3D overlay module loaded');
+        }
+        if (typeof loadAbilityBlockAssets === 'function') {
+          await loadAbilityBlockAssets();
+        } else if (typeof loadAbilityGravelImage === 'function') {
+          await loadAbilityGravelImage();
         }
         status.remove();
         initLevelBar(entry, campaignCtx || null);

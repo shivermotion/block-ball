@@ -171,26 +171,26 @@ const LEVEL_DEMO_LEVEL_01 = {
       ],
       [
         0,
+        28,
         0,
         0,
         0,
         0,
         0,
-        0,
-        0,
+        28,
         0,
         0
       ],
       [
         0,
+        30,
+        31,
         0,
         0,
         0,
         0,
-        0,
-        0,
-        0,
-        0,
+        30,
+        31,
         0
       ],
       [
@@ -499,6 +499,16 @@ const LEVEL_DEMO_LEVEL_01 = {
   },
   "enemies": [
     {
+      "col": 4,
+      "row": 5,
+      "type": "ground_walker"
+    },
+    {
+      "col": 7,
+      "row": 5,
+      "type": "saucer"
+    },
+    {
       "col": 1,
       "row": 1,
       "type": "drifter"
@@ -507,12 +517,22 @@ const LEVEL_DEMO_LEVEL_01 = {
       "col": 8,
       "row": 1,
       "type": "drifter"
+    },
+    {
+      "col": 4,
+      "row": 9,
+      "type": "drifter"
+    },
+    {
+      "col": 7,
+      "row": 9,
+      "type": "drifter"
     }
   ],
   "items": [
     {
       "col": 4,
-      "row": 9,
+      "row": 6,
       "type": "item_bonus_chance"
     }
   ],

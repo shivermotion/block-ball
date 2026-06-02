@@ -14,6 +14,9 @@ const BLOCK_PICKER_OPTIONS = [
   { value: 3, label: 'Power', key: '3', procedural: 'power', power: true },
   { value: 14, label: 'Power Long ↔', key: 'c', procedural: 'power', power: true, long: 'h' },
   { value: 16, label: 'Power Long ↕', key: 'd', procedural: 'power', power: true, long: 'v' },
+  { value: 28, label: 'Ability', key: '7', ability: true },
+  { value: 30, label: 'Ability Long ↔', key: 'j', ability: true, long: 'h' },
+  { value: 32, label: 'Ability Long ↕', key: 'k', ability: true, long: 'v' },
   { value: 4, label: 'Spike', key: '4', procedural: 'spike' },
   { value: 5, label: 'Indestructible', key: '5', procedural: 'indestructible' },
   { value: 18, label: 'Score', key: 'e', procedural: 'score', span: '2x2' },
@@ -27,6 +30,7 @@ const HIDDEN_REVEAL_PICKER_OPTIONS = [
   { value: 1, label: 'Normal', key: '1', procedural: 'normal' },
   { value: 2, label: 'Gray', key: '2', procedural: 'gray' },
   { value: 3, label: 'Power', key: '3', procedural: 'power', power: true },
+  { value: 28, label: 'Ability', key: '7', ability: true },
   { value: 4, label: 'Spike', key: '4', procedural: 'spike' },
   { value: 5, label: 'Indestructible', key: '5', procedural: 'indestructible' },
   { value: 22, label: 'Bonus', key: 'u', procedural: 'bonus' },
@@ -48,6 +52,9 @@ const BLOCK_FALLBACK_COLORS = {
   3: '#235789',
   14: '#235789',
   16: '#235789',
+  28: '#8b7355',
+  30: '#8b7355',
+  32: '#8b7355',
   4: '#ff2266',
   5: '#44aaff',
   18: '#cc66ff',
@@ -398,6 +405,29 @@ function drawStretched(ctx, sprite, x, y, w, h, pad = 0) {
   ctx.drawImage(sprite, px, py, pw, ph);
 }
 
+function drawAbilityPickerThumb(c, size, sprite, opt) {
+  c.clearRect(0, 0, size, size);
+  const pad = 2;
+  if (!sprite) {
+    c.fillStyle = BLOCK_FALLBACK_COLORS[opt.value] || '#8b7355';
+    if (opt.long === 'h') {
+      c.fillRect(pad, pad + size * 0.2, size - pad * 2, size * 0.55);
+    } else if (opt.long === 'v') {
+      c.fillRect(pad + size * 0.2, pad, size * 0.55, size - pad * 2);
+    } else {
+      c.fillRect(pad, pad, size - pad * 2, size - pad * 2);
+    }
+    return;
+  }
+  if (opt.long === 'h') {
+    drawStretched(c, sprite, pad, pad + size * 0.2, size - pad * 2, size * 0.55, 0);
+  } else if (opt.long === 'v') {
+    drawStretched(c, sprite, pad + size * 0.2, pad, size * 0.55, size - pad * 2, 0);
+  } else {
+    drawStretched(c, sprite, pad, pad, size - pad * 2, size - pad * 2, 0);
+  }
+}
+
 function drawPowerPickerThumb(c, size, sprite, opt) {
   c.clearRect(0, 0, size, size);
   const pad = 2;
@@ -455,6 +485,11 @@ function drawLongPickerThumb(c, size, sprite, opt) {
 
 function resolveBlockSprite(opt, cellW, cellH) {
   if (opt.value === 0) return null;
+  if (opt.ability && typeof buildAbilityBlockCanvas === 'function') {
+    const colSpan = opt.long === 'h' ? 2 : 1;
+    const rowSpan = opt.long === 'v' ? 2 : 1;
+    return buildAbilityBlockCanvas(cellW, cellH, colSpan, rowSpan);
+  }
   if (opt.procedural) {
     return buildProceduralBlockCanvas(cellW, cellH, opt.procedural);
   }
@@ -466,6 +501,15 @@ function resolveBlockSprite(opt, cellW, cellH) {
 }
 
 function resolveEnemySprite(entry, cellW, cellH) {
+  if (entry.id === 'ground_walker' && typeof buildGroundWalkerCanvas === 'function') {
+    return buildGroundWalkerCanvas(cellW, cellH);
+  }
+  if (entry.id === 'drifter' && typeof buildDrifterCanvas === 'function') {
+    return buildDrifterCanvas(cellW, cellH);
+  }
+  if (entry.id === 'saucer' && typeof buildSaucerCanvas === 'function') {
+    return buildSaucerCanvas(cellW, cellH);
+  }
   if (entry.implemented) {
     return buildProceduralEnemyCanvas(cellW, cellH);
   }
@@ -488,7 +532,14 @@ function buildEntityArt(cellW, cellH) {
 
   const enemies = {};
   for (const entry of getEnemyPickerOptions()) {
-    enemies[entry.id] = resolveEnemySprite(entry, cellW, cellH);
+    const foot = typeof getEnemyFootprint === 'function'
+      ? getEnemyFootprint(entry.id)
+      : { colSpan: 2, rowSpan: 2 };
+    enemies[entry.id] = resolveEnemySprite(
+      entry,
+      cellW * foot.colSpan,
+      cellH * foot.rowSpan
+    );
   }
 
   const items = {};
@@ -556,6 +607,7 @@ const EditorEntityArt = {
   drawContained,
   drawStretched,
   drawPowerPickerThumb,
+  drawAbilityPickerThumb,
   drawLongPickerThumb,
   drawSpan2PickerThumb,
   drawBonusChanceItemArt,

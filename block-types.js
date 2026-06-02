@@ -118,12 +118,32 @@ const BLOCK_COMPENDIUM = [
   {
     id: 'ability',
     name: 'Ability Block',
-    implemented: false,
-    appearance: 'Special pattern',
-    points: 0,
-    normalHit: 'immune_or_weak',
-    powerHit: 'damage_with_ability',
-    notes: 'Usually needs active Copy Ability to destroy.',
+    implemented: true,
+    appearance: 'Gravel texture with mob icon — Copy Ability gatekeeper',
+    points: 300,
+    normalHit: 'ability_gated',
+    powerHit: 'ability_gated',
+    notes: 'Immune unless Copy Ability is active. Optional — does not count toward level clear.',
+  },
+  {
+    id: 'ability_long_h',
+    name: 'Ability Block (long — horizontal)',
+    implemented: true,
+    appearance: 'Same as Ability; spans 2×1 play cells',
+    points: 500,
+    normalHit: 'ability_gated',
+    powerHit: 'ability_gated',
+    notes: 'Wide gatekeeper — optional; does not count toward level clear.',
+  },
+  {
+    id: 'ability_long_v',
+    name: 'Ability Block (long — vertical)',
+    implemented: true,
+    appearance: 'Same as Ability; spans 1×2 play cells',
+    points: 500,
+    normalHit: 'ability_gated',
+    powerHit: 'ability_gated',
+    notes: 'Tall gatekeeper — optional; does not count toward level clear.',
   },
   {
     id: 'indestructible',
@@ -380,6 +400,40 @@ const BLOCK_TYPES = {
     powerHit: 'destroy',
     countsTowardClear: true,
   },
+  ability: {
+    id: 'ability',
+    texture: 'block_ability',
+    points: 300,
+    powerOnly: false,
+    abilityGated: true,
+    normalHit: 'ability_gated',
+    powerHit: 'ability_gated',
+    countsTowardClear: false,
+  },
+  ability_long_h: {
+    id: 'ability_long_h',
+    texture: 'block_ability_long_h',
+    colSpan: 2,
+    rowSpan: 1,
+    points: 500,
+    powerOnly: false,
+    abilityGated: true,
+    normalHit: 'ability_gated',
+    powerHit: 'ability_gated',
+    countsTowardClear: false,
+  },
+  ability_long_v: {
+    id: 'ability_long_v',
+    texture: 'block_ability_long_v',
+    colSpan: 1,
+    rowSpan: 2,
+    points: 500,
+    powerOnly: false,
+    abilityGated: true,
+    normalHit: 'ability_gated',
+    powerHit: 'ability_gated',
+    countsTowardClear: false,
+  },
 };
 
 /** Grid cell for hidden-block surface (1×1). */
@@ -389,7 +443,7 @@ const HIDDEN_BLOCK_CELL = 23;
 const HIDDEN_2X2_BLOCK_CELL = 24;
 
 /** Allowed `hiddenBehind` values for 1×1 hidden panels. */
-const HIDDEN_REVEAL_CELLS = new Set([1, 2, 3, 4, 5, 22]);
+const HIDDEN_REVEAL_CELLS = new Set([1, 2, 3, 4, 5, 22, 28]);
 
 /** Extra reveal types valid only behind a 2×2 hidden panel (e.g. score block). */
 const HIDDEN_2X2_REVEAL_CELLS = new Set([18]);
@@ -415,6 +469,9 @@ const BLOCK_CELL_MAP = {
   22: 'bonus',
   23: 'hidden',
   24: 'hidden_2x2',
+  28: 'ability',
+  30: 'ability_long_h',
+  32: 'ability_long_v',
 };
 
 /** Long-block extension cells (second half of footprint; not spawned as their own body). */
@@ -431,6 +488,8 @@ const BLOCK_CELL_EXTENSION = {
   25: { anchorCell: 24, dCol: -1, dRow: 0 },
   26: { anchorCell: 24, dCol: 0, dRow: -1 },
   27: { anchorCell: 24, dCol: -1, dRow: -1 },
+  31: { anchorCell: 30, dCol: -1, dRow: 0 },
+  33: { anchorCell: 32, dCol: 0, dRow: -1 },
 };
 
 /** Score block — 2×2 anchor `18` plus extension cells `19`–`21`. */
@@ -455,6 +514,8 @@ const LONG_BLOCK_PAINT = {
   12: { ext: 13, dCol: 0, dRow: 1 },
   14: { ext: 15, dCol: 1, dRow: 0 },
   16: { ext: 17, dCol: 0, dRow: 1 },
+  30: { ext: 31, dCol: 1, dRow: 0 },
+  32: { ext: 33, dCol: 0, dRow: 1 },
 };
 
 function isBlockExtensionCell(cell) {
@@ -683,7 +744,7 @@ function getBlockDef(typeId) {
   return BLOCK_TYPES[typeId] || BLOCK_TYPES.normal;
 }
 
-/** Whether destroying this block type can complete the level (score/spike/indestructible: false). */
+/** Whether destroying this block type can complete the level (score/ability/spike/indestructible: false). */
 function blockCountsTowardLevelClear(typeId) {
   if (!typeId || typeId === 'score' || typeId === 'hidden' || typeId === 'hidden_2x2') return false;
   return getBlockDef(typeId).countsTowardClear === true;
@@ -766,11 +827,16 @@ function getCompendiumEntry(typeId) {
   return BLOCK_COMPENDIUM.find((b) => b.id === typeId);
 }
 
-function resolveBlockHit(typeId, isPowered) {
+function resolveBlockHit(typeId, isPowered, options = {}) {
   const def = getBlockDef(typeId);
+  const hasCopyAbility = Boolean(options.hasCopyAbility);
   if (def.normalHit === 'hazard' || def.isHazard) {
     if (isPowered && def.powerHit === 'hazard_bounce') return { action: 'hazard_bounce', points: 0 };
     return { action: 'hazard', points: 0 };
+  }
+  if (def.abilityGated || def.normalHit === 'ability_gated') {
+    if (hasCopyAbility) return { action: 'destroy', points: def.points };
+    return { action: 'immune', points: 0 };
   }
   if (isPowered) {
     if (def.powerHit === 'destroy') return { action: 'destroy', points: def.points };

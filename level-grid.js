@@ -194,6 +194,13 @@ const BLOCK_LAYOUT_CHARS = {
   O: 18,
   u: 22,
   U: 22,
+  '7': 28,
+  f: 28,
+  F: 28,
+  j: 30,
+  J: 30,
+  k: 32,
+  K: 32,
   h: 23,
   H: 23,
   '?': 23,
@@ -498,6 +505,12 @@ function fitSpikeToCellBottom(gameObject, levelGrid, col, row, options = {}) {
   gameObject.setPosition(tl.x + cellWidth / 2, Math.min(cellBottom, gridBottom));
   gameObject.setDisplaySize(w, h);
 
+  if (gameObject.body && options.circle) {
+    const r = Math.min(w, h) / 2;
+    gameObject.body.setCircle(r);
+    return { width: w, height: h, radius: r };
+  }
+
   if (gameObject.body && options.setBody !== false) {
     gameObject.body.setSize(w, h);
   }
@@ -521,12 +534,22 @@ function fitEntityToCellSpan(gameObject, levelGrid, colSpan, rowSpan = 1, option
     const dw = tw * scale;
     const dh = th * scale;
     gameObject.setDisplaySize(dw, dh);
+    if (gameObject.body && options.circle) {
+      const r = Math.min(dw, dh) / 2;
+      gameObject.body.setCircle(r);
+      return { width: dw, height: dh, slotWidth: w, slotHeight: h, radius: r };
+    }
     if (gameObject.body && options.setBody !== false) {
       gameObject.body.setSize(dw, dh);
     }
     return { width: dw, height: dh, slotWidth: w, slotHeight: h };
   }
   gameObject.setDisplaySize(w, h);
+  if (gameObject.body && options.circle) {
+    const r = Math.min(w, h) / 2;
+    gameObject.body.setCircle(r);
+    return { width: w, height: h, radius: r };
+  }
   if (gameObject.body && options.setBody !== false) {
     gameObject.body.setSize(w, h);
   }

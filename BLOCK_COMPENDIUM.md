@@ -2,7 +2,7 @@
 
 Reference for every block type: durability, scoring, and how each block responds to **Normal Bounce** vs **Power Bounce** hits.
 
-**Demo implementation today:** `normal`, `gray`, `normal_long_h` / `normal_long_v`, `gray_long_h` / `gray_long_v`, `power`, `power_long_h` / `power_long_v`, `spike`, `indestructible`, `score`, `bonus` — see [`block-types.js`](block-types.js).
+**Demo implementation today:** `normal`, `gray`, `normal_long_h` / `normal_long_v`, `gray_long_h` / `gray_long_v`, `power`, `power_long_h` / `power_long_v`, `ability`, `ability_long_h` / `ability_long_v`, `spike`, `indestructible`, `score`, `bonus` — see [`block-types.js`](block-types.js).
 
 ---
 
@@ -16,7 +16,8 @@ Reference for every block type: durability, scoring, and how each block responds
 | **Gray long** (↔ / ↕) | 2 | 200 | Becomes Normal long | Destroyed in 1 hit | Same as Gray across two cells; grid `10`/`11` or `12`/`13`. |
 | **Power** | 1 | 500 | No effect (immune) — god-ray sweep + squash | Destroyed in 1 hit | Gatekeeper; requires Power Bounce. Often shields clusters or forces puzzle paths. |
 | **Splitting** | 1 (large) | 200 (white large) / 400 (gray large); pieces 50–100 | Splits into 4 smaller blocks | Can destroy completely or split | Raises block count, chaos, and scoring chances. |
-| **Ability** | 1 | 300 (small) / 500 (wide) | Usually no effect or minimal damage | Stronger hit, often still not enough alone | Typically needs special destruction rules beyond a normal Power Bounce. |
+| **Ability** | 1 | 300 (1×1) / **500** (long) | No effect — immune | No effect — immune | **Copy Ability required** to destroy; see [Ability block](#ability-block). |
+| **Ability long** (↔ / ↕) | 1 | 500 | Same as Ability | Same as Ability | **2×1** or **1×2** gatekeeper; grid `30`/`31` or `32`/`33`. |
 | **Indestructible** | ∞ | 0 | No effect | No effect | Cannot be broken by bounce alone; used for permanent walls and mazes. |
 | **Spike** *(demo hazard)* | ∞ | 0 | Hazard on contact | Safe bounce while powered | Demo-only hazard tile (`block_spike`); not destroyed by hits. |
 
@@ -26,7 +27,7 @@ Reference for every block type: durability, scoring, and how each block responds
 
 | Generic name | HP / durability | Points (base) | Normal bounce | Power bounce | Purpose |
 |--------------|-----------------|---------------|---------------|--------------|---------|
-| **Star / Protective Star** | 1 | **0** | Destroyed / collected | Same | **Round 4 only** — protective covers for the boss fight; see [Star blocks](#star--protective-star-block). |
+| **Shield** | 1 | **0** | Destroyed / collected | Same | **Round 4 only** — protective covers for the boss fight; see [Shield block](#shield-block). |
 | **Switch / Bonus Trigger** | 1 | Varies (usually low) | Destroyed / collected | Same | **Bonus Chance** — collect all; remaining blocks become **Through** blocks. |
 | **Through** | 1 | 40–160 (size-dependent) | Ball passes through (no ricochet) | Same | Appears when Switch blocks trigger Bonus Chance; no bounce. |
 | **Score** | Up to 7 hits | 50 → 100 → 200 → 400 → 800 → 1600 → 3200 | Points rise per hit | Even higher | **2×2** optional target — **not required for level clear**; see [Score block](#score-block). |
@@ -35,9 +36,34 @@ Reference for every block type: durability, scoring, and how each block responds
 
 ---
 
-## Star / Protective Star Block
+## Ability Block
 
-Star blocks are **not items you carry** — they are **level blocks** collected by breaking them. They exist to earn **protective covers** over spike gutters before the **boss round**.
+Ability blocks are **Copy Ability gatekeepers** — tougher than normal blocks, but unlike Power blocks they do **not** yield to a Power Bounce alone.
+
+| Property | Details |
+|----------|---------|
+| **Destruction rule** | Destroyed only while the player holds an **active Copy Ability** (from enemy drops or Changer item) |
+| **Normal bounce** | **Immune** — ball bounces off; cyan resist FX |
+| **Power bounce** | **Still immune** — Power Bounce alone is not enough |
+| **Points** | **300** (1×1) · **500** (long ↔ / ↕) |
+| **Look** | Violet puff with a **cyan ability diamond** on the face (2D + 3D) |
+| **Long variants** | `ability_long_h` (2×1) and `ability_long_v` (1×2) — same rules, higher payout |
+| **Level clear** | **Does not count** toward `blocksRemaining` — optional bonus targets (like Score blocks) |
+
+### vs Power Block
+
+| Block | What breaks it |
+|-------|----------------|
+| **Power** | Power Bounce (release timing) |
+| **Ability** | Active Copy Ability — any bounce type while ability is held |
+
+Collect a Copy Ability item first, then hit Ability blocks to destroy them for points. Without an ability equipped, they behave like permanent obstacles. Clearing the level never requires destroying Ability blocks.
+
+---
+
+## Shield Block
+
+Shield blocks are **not items you carry** — they are **level blocks** collected by breaking them. They exist to earn **protective covers** over spike gutters before the **boss round**.
 
 | Property | Details |
 |----------|---------|
@@ -50,20 +76,20 @@ Star blocks are **not items you carry** — they are **level blocks** collected 
 
 ### Boss-round protection
 
-1. Each collected Star Block places a **protective cover** over one **Spike** gutter in the boss fight.
-2. More stars collected → more gutters stay covered → **safer boss fight**.
-3. Collecting **all** Star Blocks in Round 4 awards a **1-Up** plus full spike coverage for the boss round.
+1. Each collected Shield Block places a **protective cover** over one **Spike** gutter in the boss fight.
+2. More shields collected → more gutters stay covered → **safer boss fight**.
+3. Collecting **all** Shield Blocks in Round 4 awards a **1-Up** plus full spike coverage for the boss round.
 
 ### Covers vs spikes
 
-- A cover sits on top of a spike gutter the player earned by collecting stars.
+- A cover sits on top of a spike gutter the player earned by collecting shields.
 - When the ball hits a cover, the cover is **removed** and the **Spike** block underneath is active again.
 
-### Star vs Switch vs Score (easy to confuse)
+### Shield vs Switch vs Score (easy to confuse)
 
 | Block | Main purpose |
 |-------|----------------|
-| **Star / Protective Star** | Round 4 boss spike protection; **0 points**; full set → **1-Up** |
+| **Shield** | Round 4 boss spike protection; **0 points**; full set → **1-Up** |
 | **Switch / Bonus Trigger** | Triggers **Bonus Chance** (Through blocks) |
 | **Score** | Escalating points over up to 7 hits; optional **1-Up** on 7th hit |
 
@@ -108,7 +134,7 @@ During **Bonus Chance**, bonus blocks **collide** with the ball — you must hit
 
 - Collect **all** Switch blocks in a round to start **Bonus Chance**.
 - Remaining blocks turn into **Through** blocks.
-- Distinct from Star blocks: Switch blocks trigger **Through** transformation, not spike covers.
+- Distinct from Shield blocks: Switch blocks trigger **Through** transformation, not spike covers.
 
 ---
 
@@ -119,13 +145,15 @@ During **Bonus Chance**, bonus blocks **collide** with the ball — you must hit
 - **Normal:** destroyed in one hit
 - **Gray:** first hit → becomes Normal; second hit destroys
 - **Power:** immune
-- **Star / Switch:** collected or destroyed instantly (when implemented)
+- **Ability:** immune unless Copy Ability is active
+- **Shield / Switch:** collected or destroyed instantly (when implemented)
 - **Spike** *(demo):* hazard on contact; not destroyed
 - **Indestructible:** immune; ball bounces
 
 ### Power bounce
 
 - **Required** for Power blocks
+- Does **not** destroy Ability blocks — Copy Ability is still required
 - One-shots **Gray** blocks
 - Often higher score multiplier on destroyable blocks (demo: 1.5×)
 - **Spike** *(demo):* safe to bounce off while powered; hazard otherwise
@@ -138,19 +166,20 @@ During **Bonus Chance**, bonus blocks **collide** with the ball — you must hit
 | Interaction | Effect |
 |-------------|--------|
 | **Gray → Normal** | First normal bounce downgrades Gray to Normal; second hit destroys |
-| **Power Bounce** | Required to destroy Power blocks; one-shots Gray |
+| **Power Bounce** | Required to destroy Power blocks; one-shots Gray; **does not** break Ability blocks |
+| **Copy Ability + hit** | Required to destroy Ability blocks (300 / 500 pts) |
 | **Switch → Through** | All Switch blocks collected → remaining blocks become Through blocks (Bonus Chance) |
 | **Bonus Chance item** | Collect item → **30s** timer; blocks become hit-to-collect (no ricochet); uncollected blocks revert when time ends |
-| **Star → spike cover** | Each Star collected (Round 4) adds a protective cover over one boss-round Spike gutter; all stars → **1-Up** + safer fight |
+| **Shield → spike cover** | Each Shield collected (Round 4) adds a protective cover over one boss-round Spike gutter; all shields → **1-Up** + safer fight |
 | **Score** | Layout block; up to 7 hits for escalating points; 7th hit with ability active may grant **1-Up** |
 | **Splitting** | Large block splits into four smaller Normal/Gray pieces |
-| **Required vs optional** | Normal, Gray, Power, Splitting usually required to clear; Star, Score, Pinball often optional |
+| **Required vs optional** | Normal, Gray, Power, Splitting usually required to clear; Shield, Score, Ability, Pinball often optional |
 
 ---
 
 ## Block art (demo)
 
-All block, ball, paddle, enemy, and item visuals are **procedural placeholders** drawn at runtime in `generateTextures()` ([`block-ball-demo.html`](block-ball-demo.html)) and [`editor-entity-art.js`](editor-entity-art.js). Texture keys match `BLOCK_TYPES` in [`block-types.js`](block-types.js) (`block_normal`, `block_gray`, `block_power`, `block_power_long_h` / `_v`, `block_spike`, `block_indestructible`).
+All block, ball, paddle, enemy, and item visuals are **procedural placeholders** drawn at runtime in `generateTextures()` ([`block-ball-demo.html`](block-ball-demo.html)), [`block-ability-art.js`](block-ability-art.js), and [`editor-entity-art.js`](editor-entity-art.js). Texture keys match `BLOCK_TYPES` in [`block-types.js`](block-types.js) (`block_normal`, `block_gray`, `block_power`, `block_power_long_h` / `_v`, `block_ability`, `block_ability_long_h` / `_v`, `block_spike`, `block_indestructible`).
 
 | Type | Texture key | Source |
 |------|-------------|--------|
@@ -162,6 +191,8 @@ All block, ball, paddle, enemy, and item visuals are **procedural placeholders**
 | **Indestructible** | `block_indestructible` | Procedural steel + **X** |
 | **Score** | `block_score` | Procedural lavender **2×2** tile (50→3200, ×7 hits) |
 | **Bonus** | `block_bonus` | Procedural gold tile — pass-through collectible (100 pts when placed) |
+| **Ability** | `block_ability` | Procedural violet block + cyan diamond |
+| **Ability long** | `block_ability_long_*` | Stretched from `block_ability` |
 
 **Destroy VFX:** clay-chunk particles (`clay_debris` atlas); tint sampled from the destroyed block’s texture (see `getBlockDebrisTint` in [`block-ball-demo.html`](block-ball-demo.html)).
 
@@ -185,12 +216,15 @@ All block, ball, paddle, enemy, and item visuals are **procedural placeholders**
 | `16` + `17` | Power long ↕ |
 | `18` + `19`–`21` | Score **2×2** (anchor `18` top-left) |
 | `22` | Bonus (pass-through collectible) |
+| `28` | Ability — Copy Ability gatekeeper (**300** pts) |
+| `30` + `31` | Ability long ↔ (**500** pts) |
+| `32` + `33` | Ability long ↕ (**500** pts) |
 
-String keys: `.` empty, `1` normal, `g` gray, `p` power, `s` spike, `i` indestructible, `e` score, `u` bonus.
+String keys: `.` empty, `1` normal, `g` gray, `p` power, `s` spike, `i` indestructible, `7`/`f` ability, `j`/`k` ability long, `e` score, `u` bonus.
 
 Spike blocks use cell value `4` in `blocks.cells`. Legacy `blocks.spikes` is migrated at load.
 
-Future types (star, switch, through, pinball, splitting, ability) will need new cell values when implemented.
+Future types (shield, switch, through, pinball, splitting) will need new cell values when implemented.
 
 ---
 
