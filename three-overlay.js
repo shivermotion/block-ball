@@ -98,12 +98,7 @@ function detachScoreStarForLiberation(starGroup, blockGroup, root, camera) {
   if (starGroup.parent !== blockGroup) return null;
   root.attach(starGroup);
   starGroup.updateWorldMatrix(true, false);
-  camera.getWorldPosition(_libStarScratch.camW);
-  starGroup.lookAt(_libStarScratch.camW);
-  starGroup.traverse((child) => {
-    if (!child.material) return;
-    child.material.side = THREE.DoubleSide;
-  });
+  prepareStarCameraBillboard(starGroup, camera);
   setLiberatedStarOpacity(starGroup, 1);
   const s = starGroup.scale;
   const safe = (n) => (Number.isFinite(n) && n > 1e-4 ? n : 1);
@@ -701,6 +696,65 @@ function createStarOutlineShape(outerR, innerRatio = 0.66, roundness = 0.42, thi
   return outer;
 }
 
+/** Fill + outline star mesh pair (score block, liberation, bonus chance). */
+function createFaceStarGroup(outerR, {
+  fillColor = 0xffee44,
+  outlineColor = 0x331100,
+  detailTag = 'starDetail',
+  renderOrder = 0,
+  depthTest = true,
+  depthWrite = false,
+} = {}) {
+  const starGroup = new THREE.Group();
+
+  const fill = new THREE.Mesh(
+    new THREE.ShapeGeometry(createCuteStarShape(outerR)),
+    new THREE.MeshBasicMaterial({
+      color: fillColor,
+      transparent: false,
+      opacity: 1,
+      depthTest,
+      depthWrite,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    })
+  );
+  fill.userData[detailTag] = true;
+  fill.renderOrder = renderOrder;
+
+  const outline = new THREE.Mesh(
+    new THREE.ShapeGeometry(createStarOutlineShape(outerR, 0.66, 0.42, 0.2)),
+    new THREE.MeshBasicMaterial({
+      color: outlineColor,
+      transparent: false,
+      opacity: 1,
+      depthTest,
+      depthWrite,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    })
+  );
+  outline.position.z = 0.02;
+  outline.userData[detailTag] = true;
+  outline.renderOrder = renderOrder;
+
+  starGroup.add(fill, outline);
+  starGroup.renderOrder = renderOrder;
+  return starGroup;
+}
+
+/** Face the camera and draw both sides — same setup as liberation detach. */
+function prepareStarCameraBillboard(starGroup, camera) {
+  camera.getWorldPosition(_libStarScratch.camW);
+  starGroup.lookAt(_libStarScratch.camW);
+  starGroup.traverse((child) => {
+    if (!child.material) return;
+    child.material.side = THREE.DoubleSide;
+  });
+}
+
 function addNormalBlockStarFace(group, pw, ph, depth) {
   const outerR = Math.min(pw, ph) * 0.26;
   const zFront = dioramaFrontZ(depth);
@@ -812,33 +866,8 @@ function addScoreBlockStar(group, pw, ph, depth) {
   const outerR = Math.min(pw, ph) * SCORE_BLOCK_FX.starScale;
   const zFront = dioramaFrontZ(depth) + 0.04;
 
-  const starGroup = new THREE.Group();
+  const starGroup = createFaceStarGroup(outerR, { detailTag: 'blockDetail' });
   starGroup.position.set(0, 0, zFront);
-
-  const fill = new THREE.Mesh(
-    new THREE.ShapeGeometry(createCuteStarShape(outerR)),
-    new THREE.MeshBasicMaterial({
-      color: 0xffee44,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-    })
-  );
-  fill.userData.blockDetail = true;
-
-  const outline = new THREE.Mesh(
-    new THREE.ShapeGeometry(createStarOutlineShape(outerR, 0.66, 0.42, 0.2)),
-    new THREE.MeshBasicMaterial({
-      color: 0x331100,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3,
-    })
-  );
-  outline.position.z = 0.02;
-  outline.userData.blockDetail = true;
-
-  starGroup.add(fill, outline);
   group.userData.scoreStarGroup = starGroup;
   group.userData.scoreStarOffset = { x: 0, y: 0 };
   group.userData.scoreStarTarget = { x: 0, y: 0 };
@@ -1501,6 +1530,228 @@ function createPaddleMesh(width, height) {
   return group;
 }
 
+/** Stepped rainbow hue cycle — bonus chance item + converted bonus blocks. */
+const BONUS_RAINBOW_STROBE = {
+  periodMs: 5600,
+  steps: 7,
+  saturation: 0.88,
+  lightness: 0.54,
+};
+
+/** Bonus Chance pickup — marble sphere, rainbow strobe, tilted-orbit satellites. */
+const BONUS_CHANCE_ITEM_FX = {
+  orbitSpeedRadPerMs: 0.00165,
+  marbleSpinRadPerMs: 0.00085,
+  orbitTiltX: Math.PI / 5,
+  starOuterFrac: 0.42,
+  /** Local +Z offset — star sits on the marble surface, not at the center. */
+  starSurfaceFrac: 1.02,
+  satelliteRadiusFrac: 0.24,
+  orbitRadiusFrac: 1.48,
+};
+
+const _bonusRainbowColor = new THREE.Color();
+
+let bonusChanceMarbleTexture = null;
+
+function getBonusChanceMarbleTexture() {
+  if (bonusChanceMarbleTexture) return bonusChanceMarbleTexture;
+
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const baseGrad = ctx.createRadialGradient(size * 0.42, size * 0.38, size * 0.04, size * 0.5, size * 0.52, size * 0.58);
+  baseGrad.addColorStop(0, '#7dffc0');
+  baseGrad.addColorStop(0.28, '#3ef5a0');
+  baseGrad.addColorStop(0.52, '#22ee88');
+  baseGrad.addColorStop(0.78, '#0fb868');
+  baseGrad.addColorStop(1, '#067a42');
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  const veins = [
+    { c: 'rgba(255,255,255,0.55)', w: 14, pts: [[18, 210], [72, 168], [118, 92], [196, 48]] },
+    { c: 'rgba(210,255,235,0.42)', w: 10, pts: [[240, 188], [176, 142], [132, 78], [58, 34]] },
+    { c: 'rgba(255,255,255,0.32)', w: 8, pts: [[34, 118], [98, 132], [154, 176], [228, 154]] },
+    { c: 'rgba(180,255,220,0.36)', w: 12, pts: [[128, 12], [108, 88], [142, 156], [188, 228]] },
+    { c: 'rgba(255,255,255,0.28)', w: 6, pts: [[8, 64], [64, 98], [112, 62], [168, 88]] },
+  ];
+  ctx.lineCap = 'round';
+  for (const vein of veins) {
+    ctx.strokeStyle = vein.c;
+    ctx.lineWidth = vein.w;
+    ctx.beginPath();
+    ctx.moveTo(vein.pts[0][0], vein.pts[0][1]);
+    ctx.bezierCurveTo(
+      vein.pts[1][0], vein.pts[1][1],
+      vein.pts[2][0], vein.pts[2][1],
+      vein.pts[3][0], vein.pts[3][1]
+    );
+    ctx.stroke();
+  }
+
+  const depthGrad = ctx.createRadialGradient(size * 0.52, size * 0.48, size * 0.08, size * 0.5, size * 0.5, size * 0.62);
+  depthGrad.addColorStop(0, 'rgba(255,255,255,0.22)');
+  depthGrad.addColorStop(0.55, 'rgba(255,255,255,0)');
+  depthGrad.addColorStop(1, 'rgba(0,48,24,0.28)');
+  ctx.fillStyle = depthGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  const specGrad = ctx.createLinearGradient(size * 0.08, size * 0.04, size * 0.72, size * 0.58);
+  specGrad.addColorStop(0, 'rgba(255,255,255,0.55)');
+  specGrad.addColorStop(0.35, 'rgba(255,255,255,0.12)');
+  specGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = specGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  bonusChanceMarbleTexture = new THREE.CanvasTexture(canvas);
+  bonusChanceMarbleTexture.colorSpace = THREE.SRGBColorSpace;
+  return bonusChanceMarbleTexture;
+}
+
+function createBonusChanceStar(outerR) {
+  return createFaceStarGroup(outerR, {
+    fillColor: 0xffee44,
+    outlineColor: 0x331100,
+    detailTag: 'bonusChanceDetail',
+    renderOrder: 20,
+    depthTest: true,
+    depthWrite: true,
+  });
+}
+
+function bonusRainbowColorAt(timeMs, out = _bonusRainbowColor) {
+  const { periodMs, steps, saturation, lightness } = BONUS_RAINBOW_STROBE;
+  const stepCount = Math.max(2, steps);
+  const phase = (timeMs % periodMs) / periodMs;
+  const step = Math.floor(phase * stepCount) % stepCount;
+  const hue = step / stepCount;
+  out.setHSL(hue, saturation, lightness);
+  return out;
+}
+
+function applyBonusRainbowMaterials(materials, rainbow, { emissiveIntensity = 0.45 } = {}) {
+  const list = Array.isArray(materials) ? materials : [materials];
+  for (const mat of list) {
+    if (!mat?.color) continue;
+    mat.color.copy(rainbow);
+    if (mat.emissive) {
+      mat.emissive.copy(rainbow);
+      mat.emissiveIntensity = emissiveIntensity;
+    }
+  }
+}
+
+function syncBonusCollectibleBlockRainbow(block, entry, timeMs) {
+  if (!block.getData('isBonusCollectible')) return;
+  const box = entry.group.userData.boxMesh;
+  if (!box?.material) return;
+  const spec = BLOCK_MATERIALS.bonusCollectible;
+  applyBonusRainbowMaterials(box.material, bonusRainbowColorAt(timeMs), {
+    emissiveIntensity: spec.emissiveIntensity ?? 0.5,
+  });
+}
+
+function syncBonusChanceRainbowColors(group, timeMs) {
+  const rainbow = bonusRainbowColorAt(timeMs);
+
+  const marble = group.userData.marbleMesh;
+  if (marble?.material) {
+    applyBonusRainbowMaterials(marble.material, rainbow, { emissiveIntensity: 0.22 });
+  }
+
+  const orbitGroup = group.userData.orbitGroup;
+  if (orbitGroup) {
+    for (const child of orbitGroup.children) {
+      if (child.material) {
+        applyBonusRainbowMaterials(child.material, rainbow, { emissiveIntensity: 0.48 });
+      }
+    }
+  }
+}
+
+function createBonusChanceSatelliteMaterial() {
+  return new THREE.MeshPhysicalMaterial({
+    color: 0xd4ffe8,
+    emissive: 0x44ffaa,
+    emissiveIntensity: 0.55,
+    roughness: 0.14,
+    metalness: 0.05,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.1,
+    transparent: true,
+    opacity: 0.94,
+    transmission: 0.04,
+    thickness: 0.4,
+  });
+}
+
+function createBonusChanceItemMesh(displayWidth, displayHeight) {
+  const group = new THREE.Group();
+  const size = Math.min(Math.max(1, displayWidth), Math.max(1, displayHeight));
+  const radius = size * 0.44;
+  group.userData.baseRadius = radius;
+  group.userData.baseSize = size;
+
+  const tiltGroup = new THREE.Group();
+  tiltGroup.rotation.set(DIORAMA.viewTiltX, DIORAMA.viewTiltY, 0);
+  group.add(tiltGroup);
+  group.userData.tiltGroup = tiltGroup;
+
+  const marble = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 32, 28),
+    new THREE.MeshPhysicalMaterial({
+      map: getBonusChanceMarbleTexture(),
+      color: 0xffffff,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.22,
+      transparent: true,
+      opacity: 0.94,
+      roughness: 0.1,
+      metalness: 0.03,
+      clearcoat: 1,
+      clearcoatRoughness: 0.06,
+      transmission: 0.06,
+      thickness: radius * 0.65,
+      ior: 1.48,
+      depthWrite: true,
+    })
+  );
+  marble.renderOrder = 6;
+  const starGroup = createBonusChanceStar(radius * BONUS_CHANCE_ITEM_FX.starOuterFrac);
+  starGroup.position.set(0, 0, radius * BONUS_CHANCE_ITEM_FX.starSurfaceFrac);
+  marble.add(starGroup);
+  group.userData.starGroup = starGroup;
+  tiltGroup.add(marble);
+  group.userData.marbleMesh = marble;
+
+  const orbitPivot = new THREE.Group();
+  orbitPivot.rotation.x = BONUS_CHANCE_ITEM_FX.orbitTiltX;
+
+  const orbitGroup = new THREE.Group();
+  const orbitR = radius * BONUS_CHANCE_ITEM_FX.orbitRadiusFrac;
+  const satR = radius * BONUS_CHANCE_ITEM_FX.satelliteRadiusFrac;
+  const satGeo = new THREE.SphereGeometry(satR, 16, 14);
+  const satMat = createBonusChanceSatelliteMaterial();
+
+  for (let i = 0; i < 2; i++) {
+    const angle = i * Math.PI;
+    const sat = new THREE.Mesh(satGeo, satMat.clone());
+    sat.position.set(Math.cos(angle) * orbitR, 0, Math.sin(angle) * orbitR);
+    sat.renderOrder = 7;
+    orbitGroup.add(sat);
+  }
+  orbitPivot.add(orbitGroup);
+  tiltGroup.add(orbitPivot);
+  group.userData.orbitGroup = orbitGroup;
+
+  group.renderOrder = 6;
+  return group;
+}
+
 function createBallMesh(radius) {
   const tex = ballFaceTexture;
   const material = tex
@@ -1666,6 +1917,8 @@ export function createThreeOverlay(opts) {
 
   /** @type {Map<object, { group: THREE.Group, powerFxGroup: THREE.Group | null }>} */
   const blockMeshes = new Map();
+  /** @type {Map<object, { group: THREE.Group }>} */
+  const itemMeshes = new Map();
   /** @type {Array<{ starGroup: THREE.Group, start: number, baseY: number, baseRot: number, onComplete?: () => void }>} */
   const scoreStarLiberations = [];
   let ballMesh = null;
@@ -1714,7 +1967,11 @@ export function createThreeOverlay(opts) {
   function placeMesh(mesh, sprite, zBias = 0, liftPx = 0) {
     const px = sprite.x;
     const liftSign = Math.sign(DIORAMA.viewTiltX || 1);
-    const py = sprite.y + liftSign * liftPx;
+    let py = sprite.y + liftSign * liftPx;
+    // Hazards use Phaser origin (0.5, 1) at the cell bottom; meshes are group-centered.
+    if (sprite.getData?.('isHazard')) {
+      py -= sprite.displayHeight * 0.5;
+    }
     mesh.position.set(
       Math.round(px),
       Math.round(phaserYToThreeY(py)),
@@ -1725,6 +1982,7 @@ export function createThreeOverlay(opts) {
   }
 
   function blockLiftFor(block, group = null) {
+    if (block.getData?.('isHazard')) return 0;
     const depth =
       group?.userData?.blockDepth ??
       blockPuffyDimensions(block.displayWidth, block.displayHeight).depth;
@@ -1807,6 +2065,9 @@ export function createThreeOverlay(opts) {
     const col = block.getData('gridCol') ?? 0;
     placeMesh(entry.group, block, -row * 0.45 + col * 0.02 + 4, blockLiftFor(block, entry.group));
     refreshBlockMaterial(block, entry);
+    if (phaserScene?.time && block.getData('isBonusCollectible')) {
+      syncBonusCollectibleBlockRainbow(block, entry, phaserScene.time.now);
+    }
     syncPowerBlockFx(block, entry, phaserScene);
     syncGrayDowngradeFx(block, entry, phaserScene);
     syncNormalBlockStarRotation(block, entry, phaserScene);
@@ -1887,6 +2148,51 @@ export function createThreeOverlay(opts) {
     }
   }
 
+  function placeBonusChanceItemMesh(group, item, zBias = 0, liftPx = 0) {
+    const px = item.x;
+    const liftSign = Math.sign(DIORAMA.viewTiltX || 1);
+    const py = item.y + liftSign * liftPx;
+    group.position.set(
+      Math.round(px),
+      Math.round(phaserYToThreeY(py)),
+      zBias
+    );
+    const rz = item.rotation || 0;
+    const tiltGroup = group.userData.tiltGroup;
+    if (tiltGroup) {
+      tiltGroup.rotation.set(DIORAMA.viewTiltX, DIORAMA.viewTiltY, rz);
+    }
+  }
+
+  function syncBonusChanceItemMesh(entry) {
+    const item = entry.itemRef;
+    const group = entry.group;
+    if (!item?.active || !group) return;
+
+    const depth = group.userData.baseRadius ?? 8;
+    placeBonusChanceItemMesh(group, item, 5.5, dioramaBlockLift(depth));
+
+    const size = Math.min(item.displayWidth, item.displayHeight);
+    const baseSize = group.userData.baseSize;
+    if (baseSize > 0 && Math.abs(size - baseSize) > 0.5) {
+      const s = size / baseSize;
+      group.scale.set(s, s, s);
+    }
+
+    group.visible = item.active;
+
+    const timeMs = phaserScene?.time?.now ?? performance.now();
+    const marble = group.userData.marbleMesh;
+    if (marble) {
+      marble.rotation.y = timeMs * BONUS_CHANCE_ITEM_FX.marbleSpinRadPerMs;
+    }
+    const orbitGroup = group.userData.orbitGroup;
+    if (orbitGroup) {
+      orbitGroup.rotation.y = timeMs * BONUS_CHANCE_ITEM_FX.orbitSpeedRadPerMs;
+    }
+    syncBonusChanceRainbowColors(group, timeMs);
+  }
+
   function syncMeshes() {
     if (!phaserScene) return;
 
@@ -1895,6 +2201,10 @@ export function createThreeOverlay(opts) {
 
     for (const block of blockMeshes.keys()) {
       if (block.active) syncBlock(block);
+    }
+
+    for (const entry of itemMeshes.values()) {
+      if (entry.itemRef?.active) syncBonusChanceItemMesh(entry);
     }
 
     syncLiberatedScoreStars(phaserScene, scoreStarLiberations, root, camera);
@@ -2100,6 +2410,32 @@ export function createThreeOverlay(opts) {
       hidePhaserSprite(ball);
     },
 
+    registerItem(item) {
+      const typeId = item.getData('typeId');
+      if (typeId !== 'item_bonus_chance') return false;
+      if (itemMeshes.has(item)) return true;
+
+      const group = createBonusChanceItemMesh(item.displayWidth, item.displayHeight);
+      root.add(group);
+      itemMeshes.set(item, { group, itemRef: item });
+      hidePhaserSprite(item);
+      syncBonusChanceItemMesh(itemMeshes.get(item));
+      return true;
+    },
+
+    unregisterItem(item) {
+      restorePhaserSprite(item);
+      const entry = itemMeshes.get(item);
+      if (!entry) return;
+      root.remove(entry.group);
+      disposeMeshTree(entry.group);
+      itemMeshes.delete(item);
+    },
+
+    hasItemMesh(item) {
+      return itemMeshes.has(item);
+    },
+
     syncLayout,
 
     resize(w, h) {
@@ -2122,6 +2458,9 @@ export function createThreeOverlay(opts) {
       window.removeEventListener('resize', syncLayout);
       for (const block of [...blockMeshes.keys()]) {
         api.unregisterBlock(block);
+      }
+      for (const item of [...itemMeshes.keys()]) {
+        api.unregisterItem(item);
       }
       for (const lib of scoreStarLiberations) {
         if (lib.starGroup?.parent) root.remove(lib.starGroup);

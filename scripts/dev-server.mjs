@@ -1,5 +1,6 @@
+import { createReadStream, existsSync } from 'fs';
 import { createServer } from 'http';
-import { dirname, join } from 'path';
+import { dirname, extname, join } from 'path';
 import { fileURLToPath } from 'url';
 import handler from 'serve-handler';
 import { deleteLevelFromRepo, saveLevelToRepo } from './level-save.mjs';
@@ -33,6 +34,36 @@ function sendJson(res, status, data) {
 function sendRedirect(res, location) {
   res.writeHead(301, { Location: location });
   res.end();
+}
+
+const VENDOR_MIME = {
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.wasm': 'application/wasm',
+};
+
+/** Local Phaser/Three (avoids CDN blocks in Chrome ad blockers). */
+function tryServeVendor(pathname, res) {
+  let diskPath = null;
+  if (pathname === '/vendor/phaser.min.js') {
+    diskPath = join(ROOT, 'node_modules/phaser/dist/phaser.min.js');
+  } else if (pathname === '/vendor/three/build/three.module.js') {
+    diskPath = join(ROOT, 'node_modules/three/build/three.module.js');
+  } else if (pathname.startsWith('/vendor/three/examples/jsm/')) {
+    const rel = pathname.slice('/vendor/three/examples/jsm/'.length);
+    if (!rel || rel.includes('..')) return false;
+    diskPath = join(ROOT, 'node_modules/three/examples/jsm', rel);
+  }
+  if (!diskPath || !existsSync(diskPath)) return false;
+
+  const ext = extname(diskPath);
+  res.writeHead(200, {
+    'Content-Type': VENDOR_MIME[ext] || 'application/octet-stream',
+    'Cache-Control': 'no-store',
+  });
+  createReadStream(diskPath).pipe(res);
+  return true;
 }
 
 createServer(async (req, res) => {
@@ -91,6 +122,10 @@ createServer(async (req, res) => {
 
   if (url.pathname.endsWith('.html')) {
     sendRedirect(res, url.pathname.slice(0, -5) + url.search);
+    return;
+  }
+
+  if (req.method === 'GET' && tryServeVendor(url.pathname, res)) {
     return;
   }
 

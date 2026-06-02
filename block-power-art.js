@@ -39,7 +39,7 @@ const SPIKE_STYLE = {
   sheenDark: 0x08060c,
   sheenDarkCanvas: '#08060c',
   tipYFrac: 0.1,
-  baseYFrac: 0.9,
+  baseYFrac: 1,
   halfWFrac: 0.38,
 };
 
@@ -58,7 +58,7 @@ function sampleCuteSpikePoints(cx, tipY, baseY, halfW, segments = 10) {
   const left = { x: cx - halfW, y: baseY };
   const tip = { x: cx, y: tipY };
   const right = { x: cx + halfW, y: baseY };
-  const baseMid = { x: cx, y: baseY + bulge };
+  const baseMid = { x: cx, y: baseY - bulge * 0.45 };
   const leftMid = { x: cx - halfW * 0.38, y: (baseY + tipY) * 0.38 };
   const rightMid = { x: cx + halfW * 0.38, y: (baseY + tipY) * 0.38 };
   const pts = [];
@@ -108,7 +108,7 @@ function fillCuteSpikeGradientCanvas(ctx, pad, innerW, innerH) {
   grad.addColorStop(0.38, SPIKE_STYLE.sheenMidCanvas);
   grad.addColorStop(1, SPIKE_STYLE.sheenDarkCanvas);
   ctx.fillStyle = grad;
-  ctx.fillRect(cx - halfW * 1.1, tipY - halfW * 0.2, halfW * 2.2, baseY - tipY + halfW * 0.5);
+  ctx.fillRect(cx - halfW * 1.1, tipY - halfW * 0.2, halfW * 2.2, baseY - tipY + 1);
   ctx.restore();
 }
 

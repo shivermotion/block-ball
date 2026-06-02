@@ -215,6 +215,9 @@ emoji-regex@^9.2.2:
   resolved "https://registry.npmjs.org/emoji-regex/-/emoji-regex-9.2.2.tgz"
   integrity sha512-L18DaJsXSUk2+42pv8mLs5jJT2hqFkFE4j21wOmgbUqsZ2hL72NsUU785g9RXgo3s0ZNgVl42TiHp3ZtOv/Vyg==
 
+eventemitter3@^5.0.1:
+  version "5.0.4"
+
 execa@^5.1.1:
   version "5.1.1"
   resolved "https://registry.npmjs.org/execa/-/execa-5.1.1.tgz"
@@ -380,19 +383,12 @@ path-to-regexp@3.3.0:
   resolved "https://registry.npmjs.org/path-to-regexp/-/path-to-regexp-3.3.0.tgz"
   integrity sha512-qyCH421YQPS2WFDxDjftfc1ZR5WKQzVzqsp4n9M2kQhVOo/ByahFoUNJfl58kOcEGfQ//7weFTDhm+ss8Ecxgw==
 
-playwright-core@1.49.1:
-  version "1.49.1"
-  resolved "https://registry.npmjs.org/playwright-core/-/playwright-core-1.49.1.tgz"
-  integrity sha512-BzmpVcs4kE2CH15rWfzpjzVGhWERJfmnXmniSyKeRZUs9Ws65m+RGIi7mjJK/euCegfn3i7jvqWeWyHe9y3Vgg==
-
-playwright@1.49.1:
-  version "1.49.1"
-  resolved "https://registry.npmjs.org/playwright/-/playwright-1.49.1.tgz"
-  integrity sha512-VYL8zLoNTBxVOrJBbDuRgDWa3i+mfQgDTrL8Ah9QXZ7ax4Dsj0MSq5bYgytRnDVVe+njoKnfsYkH3HzqVj5UZA==
+phaser@^3.90.0:
+  version "3.90.0"
+  resolved "https://registry.npmjs.org/phaser/-/phaser-3.90.0.tgz"
+  integrity sha512-/cziz/5ZIn02uDkC9RzN8VF9x3Gs3XdFFf9nkiMEQT3p7hQlWuyjy4QWosU802qqno2YSLn2BfqwOKLv/sSVfQ==
   dependencies:
-    playwright-core "1.49.1"
-  optionalDependencies:
-    fsevents "2.3.2"
+    eventemitter3 "^5.0.1"
 
 range-parser@1.2.0:
   version "1.2.0"
@@ -529,6 +525,11 @@ supports-color@^7.1.0:
   integrity sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==
   dependencies:
     has-flag "^4.0.0"
+
+three@^0.172.0:
+  version "0.172.0"
+  resolved "https://registry.npmjs.org/three/-/three-0.172.0.tgz"
+  integrity sha512-6HMgMlzU97MsV7D/tY8Va38b83kz8YJX+BefKjspMNAv0Vx6dxMogHOrnRl/sbMIs3BPUKijPqDqJ/+UwJbIow==
 
 type-fest@^2.13.0:
   version "2.19.0"

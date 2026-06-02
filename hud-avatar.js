@@ -7,9 +7,6 @@ const HUD_AVATAR_STATES = {
   default: { texture: 'ball', fallback: 'hud_avatar_default', priority: 0 },
   power: { texture: 'ball_determined', fallback: 'hud_avatar_power', priority: 40 },
   hurt: { texture: 'hud_avatar_hurt', priority: 10 },
-  charging: { texture: 'hud_avatar_charging', priority: 20 },
-  armed: { texture: 'hud_avatar_armed', priority: 25 },
-  cooling: { texture: 'hud_avatar_cooling', priority: 30 },
   level_clear: { texture: 'hud_avatar_happy', priority: 50 },
   game_over: { texture: 'hud_avatar_defeated', priority: 60 },
 };
@@ -45,26 +42,6 @@ function generateHudAvatarTextures(scene, size = 48) {
   g.fillStyle(0xff4488, 0.95);
   g.fillTriangle(av * 0.72, av * 0.18, av * 0.88, av * 0.34, av * 0.72, av * 0.34);
   g.generateTexture('hud_avatar_hurt', av, av);
-
-  g.clear();
-  drawAvatarFace(g, av, 0xffd4a8, 0x00ccaa);
-  g.lineStyle(3, 0x88ffee, 0.95);
-  g.strokeCircle(av / 2, av / 2, av / 2 - 4);
-  g.generateTexture('hud_avatar_charging', av, av);
-
-  g.clear();
-  drawAvatarFace(g, av, 0xffd4a8, 0x8844ff);
-  g.fillStyle(0xffee44, 1);
-  g.fillCircle(av * 0.78, av * 0.22, av * 0.1);
-  g.lineStyle(2, 0xffee44, 0.95);
-  g.strokeCircle(av * 0.78, av * 0.22, av * 0.14);
-  g.generateTexture('hud_avatar_armed', av, av);
-
-  g.clear();
-  drawAvatarFace(g, av, 0xd8e4ff, 0x4466ff);
-  g.lineStyle(2, 0xa8c0ff, 0.85);
-  g.strokeCircle(av / 2, av / 2, av / 2 - 3);
-  g.generateTexture('hud_avatar_cooling', av, av);
 
   if (!scene.textures.exists('ball_determined')) {
     g.clear();
@@ -109,9 +86,6 @@ function resolveHudAvatarState(snap) {
   if (snap.gameState === 'gameOver') candidates.push('game_over');
   if (snap.gameState === 'levelClear') candidates.push('level_clear');
   if (snap.ballPowerMode) candidates.push('power');
-  if (snap.ballPowerCooling) candidates.push('cooling');
-  if (snap.powerBounceQueued) candidates.push('armed');
-  if (snap.paddleCharging) candidates.push('charging');
   if (snap.lives === 1 && snap.lives > 0) candidates.push('hurt');
 
   if (candidates.length === 0) return 'default';

@@ -5,6 +5,18 @@
 
 /** Matches arcade frame inset in block-ball-demo.html */
 const GAME_FRAME_INSET = 8;
+/** Yellow game-frame stroke width in block-ball-demo.html (strokeRect lineStyle). */
+const GAME_FRAME_BORDER_WIDTH = 4;
+/** Reserved strip below the spike row — bottom border draws inside this zone. */
+const PLAY_BOTTOM_BORDER_HEIGHT = 10;
+
+function getPlayLayoutBounds(gameHeight, frameInset, level = {}) {
+  const innerBottom = gameHeight - frameInset;
+  const playBottomBorder = level.playBottomBorder ?? PLAY_BOTTOM_BORDER_HEIGHT;
+  const playGridBottom = innerBottom - playBottomBorder;
+  const playBottomBorderY = playGridBottom + GAME_FRAME_BORDER_WIDTH;
+  return { innerBottom, playGridBottom, playBottomBorder, playBottomBorderY };
+}
 
 const DEFAULT_LEVEL_GRID = {
   cols: 10,
@@ -108,7 +120,7 @@ function getGameFrameBounds(gameWidth, gameHeight, frameInset = GAME_FRAME_INSET
 function resolvePlayGridConfig(level, gameHeight = 780, frameInset = GAME_FRAME_INSET) {
   const config = { ...DEFAULT_LEVEL_GRID, ...(level.grid || {}) };
   const fillBelowHud = level.grid?.fillBelowHud !== false;
-  const innerBottom = gameHeight - frameInset;
+  const { playGridBottom } = getPlayLayoutBounds(gameHeight, frameInset, level);
 
   if (level.hud) {
     const hud = { ...DEFAULT_HUD, ...level.hud };
@@ -117,12 +129,18 @@ function resolvePlayGridConfig(level, gameHeight = 780, frameInset = GAME_FRAME_
     const playTop = level.grid?.originY ?? hud.originY + hudH + gap;
     config.originY = playTop;
 
-    const available = innerBottom - playTop;
-    if (fillBelowHud && level.grid?.rows == null) {
+    const available = playGridBottom - playTop;
+
+    const cellRows = level.blocks?.cells?.length;
+    if (cellRows > 0 && level.grid?.rows == null) {
+      config.rows = cellRows;
+    }
+
+    if (fillBelowHud && level.grid?.rows == null && !cellRows) {
       const baseCellH = config.cellHeight;
       config.rows = Math.max(1, Math.floor(available / baseCellH));
       config.cellHeight = available / config.rows;
-    } else if (fillBelowHud && level.grid?.rows != null) {
+    } else if (fillBelowHud && config.rows != null) {
       config.cellHeight = available / config.rows;
     }
   }
@@ -187,7 +205,11 @@ function createLevelGrid(level, gameHeight = 780, gameWidth = 390) {
   const frameInset = level.frameInset ?? GAME_FRAME_INSET;
   const config = resolvePlayGridConfig(level, gameHeight, frameInset);
   const gameFrame = getGameFrameBounds(gameWidth, gameHeight, frameInset);
-  const innerBottom = gameHeight - frameInset;
+  const { innerBottom, playGridBottom, playBottomBorder, playBottomBorderY } = getPlayLayoutBounds(
+    gameHeight,
+    frameInset,
+    level
+  );
 
   // Default: play grid fills the arcade frame width (fractional cellWidth allowed).
   config.originX = gameFrame.x;
@@ -263,12 +285,23 @@ function createLevelGrid(level, gameHeight = 780, gameWidth = 390) {
     return getPlayBounds();
   }
 
+  /** Full PLAY view rect — grid rows plus the black bottom border strip. */
   function getPlayBounds() {
     return {
       x: config.originX,
       y: config.originY,
       width: config.cols * config.cellWidth,
       height: innerBottom - config.originY,
+    };
+  }
+
+  /** Grid-only playfield (excludes bottom border strip) — use for physics/collision bounds. */
+  function getPlayGridBounds() {
+    return {
+      x: config.originX,
+      y: config.originY,
+      width: config.cols * config.cellWidth,
+      height: playGridBottom - config.originY,
     };
   }
 
@@ -282,9 +315,13 @@ function createLevelGrid(level, gameHeight = 780, gameWidth = 390) {
     frameInset,
     gameFrame,
     innerBottom,
+    playGridBottom,
+    playBottomBorder,
+    playBottomBorderY,
     hud,
     playAreaTop,
     getPlayBounds,
+    getPlayGridBounds,
     cellTopLeft,
     cellCenter,
     cellSpanCenter,
@@ -447,7 +484,28 @@ function fitEntityToCell(gameObject, levelGrid, options = {}) {
   return { width: w, height: h };
 }
 
-/** Multi-cell entity (paddle uses heightFraction 0.5, spike row full height). */
+/** Anchor spike hazard to the bottom of its grid cell (above the play bottom border strip). */
+function fitSpikeToCellBottom(gameObject, levelGrid, col, row, options = {}) {
+  const { cellWidth, cellHeight } = levelGrid.config;
+  const pad = options.padding ?? 1;
+  const w = cellWidth - pad * 2;
+  const h = cellHeight - pad * 2;
+  const tl = levelGrid.cellTopLeft(col, row);
+  const cellBottom = tl.y + cellHeight;
+  const gridBottom = levelGrid.playGridBottom ?? cellBottom;
+
+  gameObject.setOrigin(0.5, 1);
+  gameObject.setPosition(tl.x + cellWidth / 2, Math.min(cellBottom, gridBottom));
+  gameObject.setDisplaySize(w, h);
+
+  if (gameObject.body && options.setBody !== false) {
+    gameObject.body.setSize(w, h);
+  }
+
+  return { width: w, height: h };
+}
+
+/** Multi-cell entity (paddle uses heightFraction 0.5). */
 function fitEntityToCellSpan(gameObject, levelGrid, colSpan, rowSpan = 1, options = {}) {
   const { cellWidth, cellHeight } = levelGrid.config;
   const pad = options.padding ?? 1;
@@ -590,4 +648,70 @@ function drawDevViewBorders(scene, levelGrid, gameWidth, gameHeight, options = {
   label(play.x + 4, play.y + 3, 'PLAY', '#ff66ff');
 
   return gfx;
+}
+
+/** Rects for black bezel: canvas margin outside GAME frame + strip between HUD and PLAY. */
+function getGameFrameBezelRects(levelGrid, gameWidth, gameHeight) {
+  const frame = levelGrid.gameFrame ?? getGameFrameBounds(gameWidth, gameHeight, levelGrid.frameInset);
+  const play = levelGrid.getPlayBounds();
+  const rects = [];
+
+  if (frame.y > 0) {
+    rects.push({ x: 0, y: 0, width: gameWidth, height: frame.y });
+  }
+  const below = gameHeight - (frame.y + frame.height);
+  if (below > 0) {
+    rects.push({ x: 0, y: frame.y + frame.height, width: gameWidth, height: below });
+  }
+  if (frame.x > 0) {
+    rects.push({ x: 0, y: frame.y, width: frame.x, height: frame.height });
+  }
+  const rightX = frame.x + frame.width;
+  if (rightX < gameWidth) {
+    rects.push({ x: rightX, y: frame.y, width: gameWidth - rightX, height: frame.height });
+  }
+
+  const hud = levelGrid.hud;
+  if (hud) {
+    const gapTop = hud.bounds.y + hud.bounds.height;
+    const gapH = play.y - gapTop;
+    if (gapH > 0) {
+      rects.push({ x: frame.x, y: gapTop, width: frame.width, height: gapH });
+    }
+  }
+
+  return rects;
+}
+
+/**
+ * Fill arcade bezel (outside GAME frame + HUD/PLAY gap) with black.
+ * @param {Phaser.Scene|CanvasRenderingContext2D} target — Phaser scene or 2D canvas context
+ */
+function drawGameFrameBezelFill(target, levelGrid, gameWidth, gameHeight, options = {}) {
+  const rects = getGameFrameBezelRects(levelGrid, gameWidth, gameHeight);
+  if (!rects.length) return null;
+
+  const depth = options.depth ?? -90;
+  const color = options.color ?? 0x000000;
+  const alpha = options.alpha ?? 1;
+
+  if (target?.add?.graphics) {
+    const gfx = target.add.graphics().setDepth(depth).setScrollFactor(0);
+    gfx.fillStyle(color, alpha);
+    for (const r of rects) {
+      gfx.fillRect(r.x, r.y, r.width, r.height);
+    }
+    return gfx;
+  }
+
+  if (target?.fillRect) {
+    const prevFill = target.fillStyle;
+    target.fillStyle = options.cssColor ?? '#000000';
+    for (const r of rects) {
+      target.fillRect(r.x, r.y, r.width, r.height);
+    }
+    target.fillStyle = prevFill;
+  }
+
+  return rects;
 }

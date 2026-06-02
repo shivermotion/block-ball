@@ -334,7 +334,7 @@ PACKAGING FOR REAL MOBILE APPS
   <script src="levels/registry.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
   <script>
-    /* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, blockCountsTowardLevelClear, getHiddenRevealCell, canBlockBecomeBonus, getBonusCollectPoints, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemEffect, getItemTextureKey, getItemFootprint, ITEM_CATEGORY, spawnFloatingScore, spawnFloatingHint, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, fitEntityToCell, fitEntityToCellSpan, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES, markStageCompleted, getNextStage, campaignPlayUrl, campaignMenuUrl, createParallaxGridBackground, updateParallaxGridBackground, setGameHapticsEnabled, gameHaptic, hapticLaunchChargeStart, hapticLaunchChargeTick, hapticLaunchRelease */
+    /* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, blockCountsTowardLevelClear, getHiddenRevealCell, canBlockBecomeBonus, getBonusCollectPoints, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemEffect, getItemTextureKey, getItemFootprint, ITEM_CATEGORY, spawnFloatingScore, spawnFloatingHint, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, drawGameFrameBezelFill, fitEntityToCell, fitEntityToCellSpan, fitSpikeToCellBottom, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES, markStageCompleted, getNextStage, campaignPlayUrl, campaignMenuUrl, createParallaxGridBackground, updateParallaxGridBackground, setGameHapticsEnabled, gameHaptic, hapticLaunchChargeStart, hapticLaunchChargeTick, hapticLaunchRelease */
 
     let ACTIVE_LEVEL = null;
     /** @type {{ campaign: object, worldId: string, worldName: string, worldIndex: number, stageIndex: number, stageNumber: number } | null} */
@@ -779,7 +779,11 @@ PACKAGING FOR REAL MOBILE APPS
 
       {
         g.clear();
-        drawCuteSpikePhaser(g, pad, innerW, innerH);
+        const spikeSidePad = 2;
+        const spikeTopPad = 2;
+        const spikeInnerW = cellW - spikeSidePad * 2;
+        const spikeInnerH = cellH - spikeTopPad;
+        drawCuteSpikePhaser(g, spikeSidePad, spikeInnerW, spikeInnerH);
         g.generateTexture('block_spike', cellW, cellH);
       }
 
@@ -1185,6 +1189,7 @@ PACKAGING FOR REAL MOBILE APPS
 
         // Parallax black-lined grid background
         createParallaxGridBackground(this, width, height);
+        drawGameFrameBezelFill(this, this.levelGrid, width, height);
 
         if (DEV_BORDERS) {
           const frame = this.add.graphics();
@@ -1198,16 +1203,23 @@ PACKAGING FOR REAL MOBILE APPS
 
         this.initThreeOverlay();
 
-        // Physics world — only the playfield (below HUD), not the full frame
-        const playBounds = this.levelGrid.getPlayBounds();
-        this.physics.world.setBounds(playBounds.x, playBounds.y, playBounds.width, playBounds.height);
+        // Physics world — grid rows only (spikes sit above the bottom border strip)
+        const playGridBounds = this.levelGrid.getPlayGridBounds();
+        this.physics.world.setBounds(
+          playGridBounds.x,
+          playGridBounds.y,
+          playGridBounds.width,
+          playGridBounds.height
+        );
         this.physics.world.setBoundsCollision(true, true, true, true);
 
-        const playFloor = this.add.graphics().setDepth(8);
-        const floorH = 6;
-        const floorY = playBounds.y + playBounds.height - floorH;
-        playFloor.fillStyle(0x000000, 1);
-        playFloor.fillRoundedRect(playBounds.x, floorY, playBounds.width, floorH, floorH / 2);
+        const { playGridBottom, playBottomBorder } = this.levelGrid;
+        const floorW = this.levelGrid.config.cols * this.levelGrid.config.cellWidth;
+        const floorX = this.levelGrid.config.originX;
+        this.playFloorGfx = this.add.graphics().setDepth(3);
+        this.playFloorGfx.fillStyle(0x000000, 1);
+        const floorRadius = Math.min(3, playBottomBorder / 2);
+        this.playFloorGfx.fillRoundedRect(floorX, playGridBottom, floorW, playBottomBorder, floorRadius);
 
         this.createBlocks();
         this.createEnemies();
@@ -1391,11 +1403,13 @@ PACKAGING FOR REAL MOBILE APPS
           const isPower = isPowerBlockType(typeId);
           if (isLong || isPower) {
             fitEntityToCellSpan(block, this.levelGrid, colSpan, rowSpan);
+          } else if (def.isHazard) {
+            fitSpikeToCellBottom(block, this.levelGrid, gridCol, gridRow);
           } else {
             fitEntityToCell(block, this.levelGrid);
           }
           block.refreshBody();
-          block.setDepth(def.isHazard ? 8 : 5);
+          block.setDepth(def.isHazard ? 10 : 5);
           block.setData('typeId', typeId);
           block.setData('points', def.points);
           block.setData('isPower', def.powerOnly);
@@ -1483,6 +1497,7 @@ PACKAGING FOR REAL MOBILE APPS
           item.setData('baseY', y);
           this.levelItems.add(item);
           this.applyItemFloatTween(item, y, spawn, index);
+          this.threeOverlay?.registerItem(item);
         });
 
         bbLog('createItems', { count: this.levelItems.getLength() });
@@ -2402,6 +2417,7 @@ PACKAGING FOR REAL MOBILE APPS
 
         const { x, y } = item;
         this.tweens.killTweensOf(item);
+        this.threeOverlay?.unregisterItem(item);
         this.awardDestroyPoints(points, x, y, { color: '#ff9de2' });
         if (points > 0) {
           this.spawnDestroyParticles(x, y, 0xff9de2);
@@ -3331,15 +3347,12 @@ PACKAGING FOR REAL MOBILE APPS
         this.bonusChanceTimerText = null;
       }
 
-      /** Updates portrait from gameplay state (power, charging, lives, etc.). */
+      /** Updates portrait from gameplay state (power, lives, etc.). */
       updateHudAvatar() {
         if (!this.hudAvatar) return;
         const stateId = resolveHudAvatarState({
           gameState: this.gameState,
           ballPowerMode: this.ballPowerMode,
-          ballPowerCooling: this.ballPowerCooling,
-          paddleCharging: this.paddleCharging,
-          powerBounceQueued: this.powerBounceQueued,
           lives: this.lives,
         });
         this.hudAvatarState = applyHudAvatarState(this.hudAvatar, stateId, this.hudAvatarConfig);
