@@ -110,16 +110,19 @@ Blocks (including **spike** hazards), enemies, and paddle use **only** the playf
 | `16` + `17` | Power long **vertical** (1×2; anchor `16` top, `17` bottom) |
 | `18` + `19`–`21` | Score **2×2** (anchor `18` top-left; `19` top-right, `20` bottom-left, `21` bottom-right) |
 | `22` | Bonus — pass-through collectible (**100** pts when placed; also created by Bonus Chance item) |
+| `28` | Ability — Copy Ability gatekeeper (**300** pts) |
+| `30` + `31` | Ability long **horizontal** (2×1; anchor `30` left, `31` right) |
+| `32` + `33` | Ability long **vertical** (1×2; anchor `32` top, `33` bottom) |
 | `23` | Hidden — wooden panel (1×1); first hit flips to reveal block behind (see `blocks.hiddenBehind`) |
 | `24` + `25`–`27` | Hidden **2×2** (anchor `24` top-left; `25` top-right, `26` bottom-left, `27` bottom-right) |
 
 ### Hidden blocks (`blocks.hiddenBehind`)
 
-Parallel grid, same size as `blocks.cells`. For each cell where the surface is `23` or part of a `24` footprint, `hiddenBehind[row][col]` stores the **reveal** cell value (`1` normal, `2` gray, `3` power, `4` spike, `5` indestructible, `22` bonus; **`18` score** only for 2×2 hidden). Omitted or `0` defaults to **normal** (`1`). Set in the level editor via **Hidden reveals as** when the Hidden or Hidden 2×2 brush is selected.
+Parallel grid, same size as `blocks.cells`. For each cell where the surface is `23` or part of a `24` footprint, `hiddenBehind[row][col]` stores the **reveal** cell value (`1` normal, `2` gray, `3` power, `4` spike, `5` indestructible, `22` bonus, `28` ability; **`18` score** only for 2×2 hidden). Omitted or `0` defaults to **normal** (`1`). Set in the level editor via **Hidden reveals as** when the Hidden or Hidden 2×2 brush is selected.
 
 Long blocks and score blocks use one physics body across the footprint. Paint from the **anchor** cell (top-left for ↔ and 2×2, top for ↕).
 
-String keys in row strings (legacy import): `.` `1` `g` `p` `s` `i` `e` `u` `h` `x` (hidden 2×2). Older levels may use `anchor` + `layer` + `spikes`; they are migrated to `blocks.cells` at load time.
+String keys in row strings (legacy import): `.` `1` `g` `p` `s` `i` `7` `f` `j` `k` `e` `u` `h` `x` (hidden 2×2). Older levels may use `anchor` + `layer` + `spikes`; they are migrated to `blocks.cells` at load time.
 
 ## Files
 

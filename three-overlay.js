@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { cloneEnemyModel, hasEnemyModel, isEnemyModelLoaded } from './enemy-models.js';
 
 const DIORAMA = {
   /** Soft isometric tilt — blocks lean toward camera; Phaser positions unchanged. */
@@ -358,6 +359,265 @@ function getScoreBlockSheenTexture() {
   return scoreBlockSheenTexture;
 }
 
+let abilityGravelTexture = null;
+let abilityGravelLoadPromise = null;
+
+const ABILITY_GRAVEL_URL = 'assets/blocks/ability-gravel.png?v=1';
+const ABILITY_MOB_ICON_URL = 'assets/blocks/ability-mob-icon.png?v=2';
+
+/** >1 zooms wrapped albedo in (lower UV repeat = larger detail on each face). */
+const TILED_BLOCK_TEXTURE_ZOOM = 9.4;
+
+/** Mob icon on ability block front face — fraction of min(pw, ph). */
+function getAbilityMobIconScale() {
+  return globalThis.ABILITY_MOB_ICON_SCALE ?? 0.98;
+}
+
+/** Ability block hit — teeter, flame behind icon, icon flashes white. */
+const ABILITY_BLOCK_HIT_FX = {
+  durationMs: 560,
+  teeterCycles: 2.75,
+  teeterMaxDeg: 12,
+};
+
+let abilityMobIconWhiteTexture = null;
+let abilityFlameTexture = null;
+
+function computeTiledBlockFaceRepeats(pw, ph, depth) {
+  const unit = Math.min(pw, ph);
+  const scale = 1 / TILED_BLOCK_TEXTURE_ZOOM;
+  return [
+    [(depth / unit) * scale, (ph / unit) * scale],
+    [(depth / unit) * scale, (ph / unit) * scale],
+    [(pw / unit) * scale, (depth / unit) * scale],
+    [(pw / unit) * scale, (depth / unit) * scale],
+    [(pw / unit) * scale, (ph / unit) * scale],
+    [(pw / unit) * scale, (ph / unit) * scale],
+  ];
+}
+
+function applyTiledTextureRepeat(tex, repeatX, repeatY) {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(Math.max(0.1, repeatX), Math.max(0.1, repeatY));
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function loadAbilityGravelTextureFromUrl(url) {
+  return new Promise((resolve) => {
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      url,
+      (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        resolve(tex);
+      },
+      undefined,
+      () => {
+        console.warn('[BlockBall:3D] ability gravel failed to load:', url);
+        resolve(null);
+      }
+    );
+  });
+}
+
+export function loadAbilityGravelTexture() {
+  if (abilityGravelTexture) return Promise.resolve(abilityGravelTexture);
+  if (abilityGravelLoadPromise) return abilityGravelLoadPromise;
+
+  abilityGravelLoadPromise = loadAbilityGravelTextureFromUrl(ABILITY_GRAVEL_URL).then((tex) => {
+    abilityGravelTexture = tex;
+    return abilityGravelTexture;
+  });
+
+  return abilityGravelLoadPromise;
+}
+
+let abilityMobIconTexture = null;
+let abilityMobIconLoadPromise = null;
+
+function canvasToMobIconTexture(canvas) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function loadAbilityMobIconTexture() {
+  if (abilityMobIconTexture && abilityMobIconWhiteTexture) {
+    return Promise.resolve(abilityMobIconTexture);
+  }
+  if (abilityMobIconLoadPromise) return abilityMobIconLoadPromise;
+
+  abilityMobIconLoadPromise = new Promise((resolve) => {
+    const finish = async () => {
+      if (typeof globalThis.loadAbilityMobIconImage === 'function') {
+        await globalThis.loadAbilityMobIconImage();
+      }
+      const img = new Image();
+      img.onload = () => {
+        const strip = globalThis.removeWhiteFromImageSource;
+        const ink = globalThis.ABILITY_MOB_ICON_INK;
+        const inkWhite = globalThis.ABILITY_MOB_ICON_INK_WHITE;
+        if (typeof strip === 'function' && ink && inkWhite) {
+          abilityMobIconTexture = canvasToMobIconTexture(strip(img, undefined, ink));
+          abilityMobIconWhiteTexture = canvasToMobIconTexture(strip(img, undefined, inkWhite));
+        } else {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          canvas.getContext('2d').drawImage(img, 0, 0);
+          abilityMobIconTexture = canvasToMobIconTexture(canvas);
+          abilityMobIconWhiteTexture = abilityMobIconTexture;
+        }
+        resolve(abilityMobIconTexture);
+      };
+      img.onerror = () => {
+        console.warn('[BlockBall:3D] ability mob icon failed to load:', ABILITY_MOB_ICON_URL);
+        resolve(null);
+      };
+      img.src = ABILITY_MOB_ICON_URL;
+    };
+    finish();
+  });
+
+  return abilityMobIconLoadPromise;
+}
+
+export function loadAbilityBlockTextures() {
+  return Promise.all([loadAbilityGravelTexture(), loadAbilityMobIconTexture()]);
+}
+
+function cloneAbilityGravelMap(repeatX, repeatY) {
+  if (!abilityGravelTexture) return null;
+  return applyTiledTextureRepeat(abilityGravelTexture.clone(), repeatX, repeatY);
+}
+
+function makeAbilityBlockMaterial(repeatX, repeatY, tone = 1) {
+  const map = cloneAbilityGravelMap(repeatX, repeatY);
+  const spec = BLOCK_MATERIALS.ability;
+  const color = new THREE.Color(map ? 0xffffff : spec.color);
+  if (tone !== 1) color.multiplyScalar(tone);
+
+  return new THREE.MeshPhysicalMaterial({
+    map,
+    color,
+    emissive: map ? 0x221108 : spec.emissive,
+    emissiveIntensity: map ? 0.03 : (spec.emissiveIntensity ?? 0.34),
+    roughness: map ? 0.94 : 0.78,
+    metalness: 0,
+    clearcoat: map ? 0.08 : 0.28,
+    clearcoatRoughness: 0.9,
+    sheen: map ? 0.18 : 0.62,
+    sheenRoughness: 0.72,
+    sheenColor: new THREE.Color(0xfff0d8),
+  });
+}
+
+/** Gravel texture tiled per face — scales with long variants. */
+function makeAbilityBlockMaterials(pw, ph, depth) {
+  const faceRepeats = computeTiledBlockFaceRepeats(pw, ph, depth);
+  const faceTones = [0.94, 0.92, 1.06, 0.88, 1.02, 0.9];
+  const frontIdx = dioramaFrontFaceIndex();
+
+  return faceRepeats.map(([rx, ry], i) => {
+    let tone = faceTones[i];
+    if (i === frontIdx) tone = Math.max(tone, 1);
+    if (i === BOX_FACE.POS_Y) tone = Math.max(tone, 1.04);
+    return makeAbilityBlockMaterial(rx, ry, tone);
+  });
+}
+
+function blockMeshMaterialsFor(matKey, pw, ph, depth) {
+  if (matKey === 'ability') return makeAbilityBlockMaterials(pw, ph, depth);
+  if (matKey === 'indestructible') return makeIndestructibleBlockMaterials(pw, ph, depth);
+  return makeDioramaBlockMaterials(matKey);
+}
+
+let indestructibleCrystalTexture = null;
+let indestructibleCrystalLoadPromise = null;
+
+const INDESTRUCTIBLE_CRYSTAL_URL = 'assets/blocks/indestructible-crystal.png?v=1';
+
+function loadIndestructibleCrystalTextureFromUrl(url) {
+  return new Promise((resolve) => {
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      url,
+      (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        resolve(tex);
+      },
+      undefined,
+      () => {
+        console.warn('[BlockBall:3D] indestructible crystal failed to load:', url);
+        resolve(null);
+      }
+    );
+  });
+}
+
+export function loadIndestructibleCrystalTexture() {
+  if (indestructibleCrystalTexture) return Promise.resolve(indestructibleCrystalTexture);
+  if (indestructibleCrystalLoadPromise) return indestructibleCrystalLoadPromise;
+
+  indestructibleCrystalLoadPromise = loadIndestructibleCrystalTextureFromUrl(INDESTRUCTIBLE_CRYSTAL_URL).then(
+    (tex) => {
+      indestructibleCrystalTexture = tex;
+      return indestructibleCrystalTexture;
+    }
+  );
+
+  return indestructibleCrystalLoadPromise;
+}
+
+function cloneIndestructibleCrystalMap(repeatX, repeatY) {
+  if (!indestructibleCrystalTexture) return null;
+  return applyTiledTextureRepeat(indestructibleCrystalTexture.clone(), repeatX, repeatY);
+}
+
+function makeIndestructibleBlockMaterial(repeatX, repeatY, tone = 1) {
+  const map = cloneIndestructibleCrystalMap(repeatX, repeatY);
+  const spec = BLOCK_MATERIALS.indestructible;
+  const color = new THREE.Color(map ? 0xffffff : spec.color);
+  if (tone !== 1) color.multiplyScalar(tone);
+
+  return new THREE.MeshPhysicalMaterial({
+    map,
+    color,
+    emissive: map ? 0x180828 : spec.emissive,
+    emissiveIntensity: map ? 0.08 : (spec.emissiveIntensity ?? 0.12),
+    roughness: map ? 0.36 : 0.78,
+    metalness: map ? 0.58 : 0,
+    clearcoat: map ? 0.78 : 0.28,
+    clearcoatRoughness: map ? 0.18 : 0.82,
+    sheen: map ? 0.52 : 0.62,
+    sheenRoughness: map ? 0.28 : 0.58,
+    sheenColor: new THREE.Color(0xbb88ff),
+  });
+}
+
+/** Dark crystal texture tiled per face. */
+function makeIndestructibleBlockMaterials(pw, ph, depth) {
+  const faceRepeats = computeTiledBlockFaceRepeats(pw, ph, depth);
+  const faceTones = [0.92, 0.9, 1.08, 0.86, 1.04, 0.88];
+  const frontIdx = dioramaFrontFaceIndex();
+
+  return faceRepeats.map(([rx, ry], i) => {
+    let tone = faceTones[i];
+    if (i === frontIdx) tone = Math.max(tone, 1.02);
+    if (i === BOX_FACE.POS_Y) tone = Math.max(tone, 1.06);
+    return makeIndestructibleBlockMaterial(rx, ry, tone);
+  });
+}
+
 function makeNormalBlockMaterial(tone = 1) {
   const spec = BLOCK_MATERIALS.normal;
   const tint = new THREE.Color(0xffffff);
@@ -422,6 +682,8 @@ const BLOCK_MATERIALS = {
   normal: { color: 0xffe600, emissive: 0xffe014, emissiveIntensity: 0.28 },
   gray: { color: 0x4466ff, emissive: 0x3355ee, emissiveIntensity: 0.3 },
   power: { color: 0x235789, emissive: 0x235789, emissiveIntensity: 0.28 },
+  ability: { color: 0x5533aa, emissive: 0x4422aa, emissiveIntensity: 0.34 },
+  indestructible: { color: 0x1a1a22, emissive: 0x0a0812, emissiveIntensity: 0.12 },
   spike: {
     color: 0x2e2438,
     emissive: 0x120a18,
@@ -444,6 +706,10 @@ const MESH_BLOCK_TYPES = new Set([
   'bonus',
   'score',
   'power',
+  'ability',
+  'ability_long_h',
+  'ability_long_v',
+  'indestructible',
   'normal_long_h',
   'normal_long_v',
   'gray_long_h',
@@ -456,21 +722,27 @@ function isPowerBlockTypeId(typeId) {
   return typeId === 'power' || typeId === 'power_long_h' || typeId === 'power_long_v';
 }
 
+function isAbilityBlockTypeId(typeId) {
+  return typeId === 'ability' || typeId === 'ability_long_h' || typeId === 'ability_long_v';
+}
+
 function blockMaterialKey(block) {
   if (block.getData('isBonusCollectible')) return 'bonusCollectible';
   const typeId = block.getData('typeId');
+  if (isPowerBlockTypeId(typeId)) return 'power';
+  if (isAbilityBlockTypeId(typeId)) return 'ability';
+  if (typeId === 'indestructible') return 'indestructible';
   if (typeId === 'spike') return 'spike';
   if (typeId === 'bonus') return 'bonus';
   if (typeId === 'score') return 'score';
   if (typeId === 'hidden' || typeId === 'hidden_2x2') return 'hidden';
-  if (isPowerBlockTypeId(typeId)) return 'power';
   if (typeId === 'gray' || typeId.startsWith('gray_')) return 'gray';
   return 'normal';
 }
 
 function makePuffyBlockMaterial(key, tone = 1) {
   const spec = BLOCK_MATERIALS[key] || BLOCK_MATERIALS.normal;
-  const whiteMix = key === 'normal' || key === 'power' ? 0.04 : 0.14;
+  const whiteMix = key === 'normal' || key === 'power' || key === 'ability' ? 0.04 : 0.14;
   const color = new THREE.Color(spec.color).lerp(new THREE.Color(0xffffff), whiteMix);
   if (tone !== 1) color.multiplyScalar(tone);
 
@@ -541,8 +813,26 @@ function makeDioramaBlockMaterials(key) {
 }
 
 function disposeBlockMaterials(material) {
-  if (Array.isArray(material)) material.forEach((m) => m.dispose());
-  else material?.dispose();
+  const sharedMaps = new Set([
+    normalBlockSheenTexture,
+    grayBlockSheenTexture,
+    scoreBlockSheenTexture,
+    abilityGravelTexture,
+    abilityMobIconTexture,
+    abilityMobIconWhiteTexture,
+    abilityFlameTexture,
+    indestructibleCrystalTexture,
+    powerGodRayTexture,
+    ballFaceTexture,
+    ballPowerFaceTexture,
+  ]);
+  const disposeOne = (m) => {
+    if (!m) return;
+    if (m.map && !sharedMaps.has(m.map)) m.map.dispose();
+    m.dispose();
+  };
+  if (Array.isArray(material)) material.forEach(disposeOne);
+  else disposeOne(material);
 }
 
 function blockPuffyDimensions(w, h) {
@@ -1123,6 +1413,165 @@ function addPowerBlockFaceDetails(group, pw, ph, depth) {
   group.add(glow);
 }
 
+function getAbilityFlameTexture() {
+  if (abilityFlameTexture) return abilityFlameTexture;
+  const w = 48;
+  const h = 96;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, h, 0, 0);
+  grad.addColorStop(0, 'rgba(180, 40, 0, 0)');
+  grad.addColorStop(0.28, 'rgba(255, 90, 20, 0.92)');
+  grad.addColorStop(0.55, 'rgba(255, 170, 60, 0.88)');
+  grad.addColorStop(0.82, 'rgba(255, 230, 140, 0.55)');
+  grad.addColorStop(1, 'rgba(255, 255, 220, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(w / 2, h * 0.52, w * 0.34, h * 0.44, 0, 0, Math.PI * 2);
+  ctx.fill();
+  abilityFlameTexture = new THREE.CanvasTexture(canvas);
+  abilityFlameTexture.colorSpace = THREE.SRGBColorSpace;
+  return abilityFlameTexture;
+}
+
+function createAbilityFlameGroup(iconSize) {
+  const tex = getAbilityFlameTexture();
+  const root = new THREE.Group();
+  const specs = [
+    { x: -0.14, scale: 0.82, opacity: 0.5 },
+    { x: 0, scale: 1, opacity: 0.72 },
+    { x: 0.14, scale: 0.78, opacity: 0.46 },
+  ];
+  for (const spec of specs) {
+    const flame = new THREE.Mesh(
+      new THREE.PlaneGeometry(iconSize * 0.34 * spec.scale, iconSize * 0.52 * spec.scale),
+      new THREE.MeshBasicMaterial({
+        map: tex,
+        color: 0xff8833,
+        transparent: true,
+        opacity: spec.opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    flame.position.set(iconSize * spec.x, -iconSize * 0.04, -0.02);
+    flame.userData.blockDetail = true;
+    flame.userData.baseOpacity = spec.opacity;
+    root.add(flame);
+  }
+  root.visible = false;
+  return root;
+}
+
+function addAbilityBlockMobIcon(group, pw, ph, depth) {
+  if (!abilityMobIconTexture) return;
+  const zFront = dioramaFrontZ(depth);
+  const iconSize = Math.min(pw, ph) * getAbilityMobIconScale();
+  const pivot = new THREE.Group();
+  pivot.position.set(0, 0, zFront);
+
+  const flameGroup = createAbilityFlameGroup(iconSize);
+  pivot.add(flameGroup);
+
+  const iconBeige = new THREE.Mesh(
+    new THREE.PlaneGeometry(iconSize, iconSize),
+    new THREE.MeshBasicMaterial({
+      map: abilityMobIconTexture,
+      transparent: true,
+      alphaTest: 0.15,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -4,
+    })
+  );
+  iconBeige.position.z = 0.12;
+  iconBeige.userData.blockDetail = true;
+  pivot.add(iconBeige);
+
+  let iconWhite = null;
+  if (abilityMobIconWhiteTexture) {
+    iconWhite = new THREE.Mesh(
+      new THREE.PlaneGeometry(iconSize, iconSize),
+      new THREE.MeshBasicMaterial({
+        map: abilityMobIconWhiteTexture,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -5,
+        polygonOffsetUnits: -5,
+      })
+    );
+    iconWhite.position.z = 0.13;
+    iconWhite.userData.blockDetail = true;
+    pivot.add(iconWhite);
+  }
+
+  group.add(pivot);
+  group.userData.abilityIconPivot = pivot;
+  group.userData.abilityMobIcon = iconBeige;
+  group.userData.abilityMobIconWhite = iconWhite;
+  group.userData.abilityFlameGroup = flameGroup;
+}
+
+function syncAbilityBlockHitFx(block, entry, scene) {
+  if (!isAbilityBlockTypeId(block.getData('typeId'))) return;
+
+  const pivot = entry.group.userData.abilityIconPivot;
+  const iconBeige = entry.group.userData.abilityMobIcon;
+  const iconWhite = entry.group.userData.abilityMobIconWhite;
+  const flameGroup = entry.group.userData.abilityFlameGroup;
+  if (!pivot || !iconBeige) return;
+
+  const fxStart = block.getData('abilityHitFxStart');
+  if (!fxStart || !scene?.time) {
+    pivot.rotation.z = 0;
+    if (flameGroup) flameGroup.visible = false;
+    if (iconWhite?.material) iconWhite.material.opacity = 0;
+    return;
+  }
+
+  const elapsed = scene.time.now - fxStart;
+  const { durationMs, teeterCycles, teeterMaxDeg } = ABILITY_BLOCK_HIT_FX;
+
+  if (elapsed >= durationMs) {
+    block.setData('abilityHitFxStart', null);
+    pivot.rotation.z = 0;
+    if (flameGroup) flameGroup.visible = false;
+    if (iconWhite?.material) iconWhite.material.opacity = 0;
+    return;
+  }
+
+  const t = elapsed / durationMs;
+  const decay = 1 - t;
+  const wobble =
+    Math.sin(elapsed * 0.001 * teeterCycles * Math.PI * 2) * teeterMaxDeg * decay;
+  pivot.rotation.z = THREE.MathUtils.degToRad(wobble);
+
+  const whiteBlend = Math.sin(Math.min(1, elapsed / 180) * Math.PI) * decay;
+  if (iconWhite?.material) {
+    iconWhite.material.opacity = whiteBlend;
+  }
+
+  if (flameGroup) {
+    flameGroup.visible = true;
+    const iconSize = Math.min(block.displayWidth, block.displayHeight) * getAbilityMobIconScale();
+    const flameIn = Math.min(1, elapsed / 90);
+    const flameOut = elapsed > durationMs - 150 ? (durationMs - elapsed) / 150 : 1;
+    const pulse = 0.75 + 0.25 * Math.sin(elapsed * 0.014);
+    flameGroup.children.forEach((flame, i) => {
+      const base = flame.userData.baseOpacity ?? 0.6;
+      if (flame.material) {
+        flame.material.opacity = base * flameIn * flameOut * pulse;
+      }
+      flame.position.y = -iconSize * 0.04 + Math.sin(elapsed * 0.016 + i * 1.7) * 1.5;
+    });
+  }
+}
+
 function disposePowerFxGroup(entry) {
   if (!entry?.powerFxGroup) return;
   entry.group.remove(entry.powerFxGroup);
@@ -1317,7 +1766,7 @@ function createBlockMesh(block) {
   const group = new THREE.Group();
   const matKey = blockMaterialKey(block);
   const geo = new RoundedBoxGeometry(pw, ph, depth, DIORAMA.roundedBoxSegments, radius);
-  const box = new THREE.Mesh(geo, makeDioramaBlockMaterials(matKey));
+  const box = new THREE.Mesh(geo, blockMeshMaterialsFor(matKey, pw, ph, depth));
   box.scale.set(
     DIORAMA.blockBulgeScaleX,
     DIORAMA.blockBulgeScaleY,
@@ -1337,6 +1786,10 @@ function createBlockMesh(block) {
     addPowerBlockFaceDetails(group, pw, ph, depth);
   }
 
+  if (isAbilityBlockTypeId(typeId)) {
+    addAbilityBlockMobIcon(group, pw, ph, depth);
+  }
+
   if (block.getData('typeId') === 'spike' || block.getData('isHazard')) {
     addCuteSpikeFace(group, pw, ph, depth);
   }
@@ -1344,6 +1797,8 @@ function createBlockMesh(block) {
   group.userData.matKey = matKey;
   group.userData.boxMesh = box;
   group.userData.blockDepth = depth;
+  group.userData.blockPw = pw;
+  group.userData.blockPh = ph;
   return group;
 }
 
@@ -1752,6 +2207,24 @@ function createBonusChanceItemMesh(displayWidth, displayHeight) {
   return group;
 }
 
+function createEnemyMesh(typeId) {
+  const model = cloneEnemyModel(typeId);
+  if (!model) return null;
+
+  const group = new THREE.Group();
+  const tiltGroup = new THREE.Group();
+  const facingGroup = new THREE.Group();
+  facingGroup.add(model);
+  tiltGroup.add(facingGroup);
+  group.add(tiltGroup);
+
+  group.userData.tiltGroup = tiltGroup;
+  group.userData.facingGroup = facingGroup;
+  group.userData.baseMaxDim = model.userData.baseMaxDim ?? 1;
+  group.renderOrder = 7;
+  return group;
+}
+
 function createBallMesh(radius) {
   const tex = ballFaceTexture;
   const material = tex
@@ -1919,6 +2392,8 @@ export function createThreeOverlay(opts) {
   const blockMeshes = new Map();
   /** @type {Map<object, { group: THREE.Group }>} */
   const itemMeshes = new Map();
+  /** @type {Map<object, { group: THREE.Group, enemyRef: object, baseMaxDim: number, bobPhase: number, hitFlashStart: number | null }>} */
+  const enemyMeshes = new Map();
   /** @type {Array<{ starGroup: THREE.Group, start: number, baseY: number, baseRot: number, onComplete?: () => void }>} */
   const scoreStarLiberations = [];
   let ballMesh = null;
@@ -1989,6 +2464,80 @@ export function createThreeOverlay(opts) {
     return dioramaBlockLift(depth);
   }
 
+  function placeEnemyMesh(group, enemy, zBias = 0, liftPx = 0) {
+    const px = enemy.x;
+    const liftSign = Math.sign(DIORAMA.viewTiltX || 1);
+    const py = enemy.y + liftSign * liftPx;
+    group.position.set(
+      Math.round(px),
+      Math.round(phaserYToThreeY(py)),
+      zBias
+    );
+    const tilt = group.userData.tiltGroup;
+    if (tilt) {
+      tilt.rotation.set(DIORAMA.viewTiltX, DIORAMA.viewTiltY, enemy.rotation || 0);
+    }
+  }
+
+  function syncEnemyMesh(entry) {
+    const enemy = entry.enemyRef;
+    const group = entry.group;
+    if (!enemy?.active || !group) return;
+
+    const targetH = enemy.displayHeight * 0.9;
+    const baseMax = entry.baseMaxDim || group.userData.baseMaxDim || 1;
+    const s = targetH / baseMax;
+    group.scale.set(s, s, s);
+
+    const timeMs = phaserScene?.time?.now ?? performance.now();
+    const bobAmp = entry.typeId === 'drifter' ? 3.5 : entry.typeId === 'saucer' ? 4 : 2.5;
+    const bob = Math.sin(timeMs * 0.0018 + entry.bobPhase) * bobAmp;
+    placeEnemyMesh(group, enemy, 6, dioramaBlockLift(12) + bob);
+    group.visible = enemy.active;
+
+    const facing = group.userData.facingGroup;
+    if (facing) {
+      if (entry.typeId === 'drifter') {
+        facing.rotation.y = Math.sin(timeMs * 0.0011 + entry.bobPhase) * 0.5;
+        facing.rotation.z = Math.cos(timeMs * 0.0013 + entry.bobPhase) * 0.16;
+      } else if (entry.typeId === 'saucer') {
+        facing.rotation.y += 0.0045 * (phaserScene?.game?.loop?.delta ?? 16);
+        facing.rotation.x = Math.sin(timeMs * 0.0022 + entry.bobPhase) * 0.1;
+        facing.rotation.z = Math.cos(timeMs * 0.0018 + entry.bobPhase) * 0.06;
+        const vx = enemy.body?.velocity?.x ?? 0;
+        const vy = enemy.body?.velocity?.y ?? 0;
+        if (Math.hypot(vx, vy) > 12) {
+          facing.rotation.z += Math.atan2(vx, -vy) * 0.08;
+        }
+      } else {
+        const vx = enemy.body?.velocity?.x ?? 0;
+        if (Math.abs(vx) > 2) {
+          facing.rotation.y = vx > 0 ? -0.42 : 0.42;
+        }
+      }
+    }
+
+    if (entry.hitFlashStart) {
+      const elapsed = performance.now() - entry.hitFlashStart;
+      const flash = elapsed < 100 ? 1 - elapsed / 100 : 0;
+      group.traverse((obj) => {
+        if (!obj.isMesh || !obj.material?.emissive) return;
+        if (!obj.userData.enemyBaseEmissive) {
+          obj.userData.enemyBaseEmissive = obj.material.emissive.clone();
+          obj.userData.enemyBaseEmissiveIntensity = obj.material.emissiveIntensity ?? 0;
+        }
+        if (flash > 0) {
+          obj.material.emissive.setRGB(flash, flash, flash);
+          obj.material.emissiveIntensity = 0.35 + flash * 0.45;
+        } else {
+          obj.material.emissive.copy(obj.userData.enemyBaseEmissive);
+          obj.material.emissiveIntensity = obj.userData.enemyBaseEmissiveIntensity;
+        }
+      });
+      if (elapsed >= 100) entry.hitFlashStart = null;
+    }
+  }
+
   function refreshBlockMaterial(block, entry) {
     const mesh = entry.group;
     const matKey = blockMaterialKey(block);
@@ -1997,7 +2546,10 @@ export function createThreeOverlay(opts) {
     const box = mesh.userData.boxMesh;
     if (box) {
       disposeBlockMaterials(box.material);
-      box.material = makeDioramaBlockMaterials(matKey);
+      const pw = mesh.userData.blockPw ?? blockPuffyDimensions(block.displayWidth, block.displayHeight).pw;
+      const ph = mesh.userData.blockPh ?? blockPuffyDimensions(block.displayWidth, block.displayHeight).ph;
+      const depth = mesh.userData.blockDepth ?? blockPuffyDimensions(block.displayWidth, block.displayHeight).depth;
+      box.material = blockMeshMaterialsFor(matKey, pw, ph, depth);
     }
     mesh.userData.matKey = matKey;
     if (matKey === 'normal' && prevKey !== 'normal') {
@@ -2069,6 +2621,7 @@ export function createThreeOverlay(opts) {
       syncBonusCollectibleBlockRainbow(block, entry, phaserScene.time.now);
     }
     syncPowerBlockFx(block, entry, phaserScene);
+    syncAbilityBlockHitFx(block, entry, phaserScene);
     syncGrayDowngradeFx(block, entry, phaserScene);
     syncNormalBlockStarRotation(block, entry, phaserScene);
     syncScoreBlockFx(block, entry, phaserScene);
@@ -2205,6 +2758,10 @@ export function createThreeOverlay(opts) {
 
     for (const entry of itemMeshes.values()) {
       if (entry.itemRef?.active) syncBonusChanceItemMesh(entry);
+    }
+
+    for (const entry of enemyMeshes.values()) {
+      if (entry.enemyRef?.active) syncEnemyMesh(entry);
     }
 
     syncLiberatedScoreStars(phaserScene, scoreStarLiberations, root, camera);
@@ -2436,6 +2993,49 @@ export function createThreeOverlay(opts) {
       return itemMeshes.has(item);
     },
 
+    registerEnemy(enemy) {
+      const typeId = enemy.getData?.('typeId');
+      if (!typeId || !hasEnemyModel(typeId) || enemyMeshes.has(enemy)) return false;
+      if (!isEnemyModelLoaded(typeId)) {
+        console.warn('[BlockBall 3D] enemy model not loaded yet:', typeId);
+        return false;
+      }
+
+      const group = createEnemyMesh(typeId);
+      if (!group) {
+        console.warn('[BlockBall 3D] failed to create enemy mesh:', typeId);
+        return false;
+      }
+
+      root.add(group);
+      enemyMeshes.set(enemy, {
+        group,
+        enemyRef: enemy,
+        typeId,
+        baseMaxDim: group.userData.baseMaxDim,
+        bobPhase: Math.random() * Math.PI * 2,
+        hitFlashStart: null,
+      });
+      hidePhaserSprite(enemy);
+      syncEnemyMesh(enemyMeshes.get(enemy));
+      return true;
+    },
+
+    unregisterEnemy(enemy) {
+      restorePhaserSprite(enemy);
+      const entry = enemyMeshes.get(enemy);
+      if (!entry) return;
+      root.remove(entry.group);
+      disposeMeshTree(entry.group);
+      enemyMeshes.delete(enemy);
+    },
+
+    triggerEnemyHit(enemy) {
+      const entry = enemyMeshes.get(enemy);
+      if (!entry) return;
+      entry.hitFlashStart = performance.now();
+    },
+
     syncLayout,
 
     resize(w, h) {
@@ -2461,6 +3061,9 @@ export function createThreeOverlay(opts) {
       }
       for (const item of [...itemMeshes.keys()]) {
         api.unregisterItem(item);
+      }
+      for (const enemy of [...enemyMeshes.keys()]) {
+        api.unregisterEnemy(enemy);
       }
       for (const lib of scoreStarLiberations) {
         if (lib.starGroup?.parent) root.remove(lib.starGroup);

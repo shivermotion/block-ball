@@ -1,5 +1,11 @@
 [
   {
+    "id": "ability-and-indestructible-block-test",
+    "name": "ability-and-indestructible-block-test",
+    "script": "levels/ability-and-indestructible-block-test.js",
+    "global": "LEVEL_ABILITY_AND_INDESTRUCTIBLE_BLOCK_TEST"
+  },
+  {
     "id": "bonus",
     "name": "bonus chance",
     "script": "levels/bonus.js",
@@ -16,6 +22,12 @@
     "name": "demo-level-02",
     "script": "levels/demo-level-02.js",
     "global": "LEVEL_DEMO_LEVEL_02"
+  },
+  {
+    "id": "enemy-test",
+    "name": "enemy-test",
+    "script": "levels/enemy-test.js",
+    "global": "LEVEL_ENEMY_TEST"
   },
   {
     "id": "score-test-block-fix",
