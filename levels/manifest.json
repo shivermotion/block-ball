@@ -12,10 +12,16 @@
     "global": "LEVEL_BONUS"
   },
   {
-    "id": "demo-level-01",
-    "name": "demo-level-01",
-    "script": "levels/demo-level-01.js",
-    "global": "LEVEL_DEMO_LEVEL_01"
+    "id": "bumper-test-01",
+    "name": "bumper-test-01",
+    "script": "levels/bumper-test-01.js",
+    "global": "LEVEL_BUMPER_TEST_01"
+  },
+  {
+    "id": "demo-level",
+    "name": "demo-level",
+    "script": "levels/demo-level.js",
+    "global": "LEVEL_DEMO_LEVEL"
   },
   {
     "id": "demo-level-02",
@@ -24,10 +30,16 @@
     "global": "LEVEL_DEMO_LEVEL_02"
   },
   {
-    "id": "enemy-test",
-    "name": "enemy-test",
-    "script": "levels/enemy-test.js",
-    "global": "LEVEL_ENEMY_TEST"
+    "id": "enemy-test-01",
+    "name": "enemy-test-01",
+    "script": "levels/enemy-test-01.js",
+    "global": "LEVEL_ENEMY_TEST_01"
+  },
+  {
+    "id": "pinball-bumper-test",
+    "name": "pinball-bumper-test",
+    "script": "levels/pinball-bumper-test.js",
+    "global": "LEVEL_PINBALL_BUMPER_TEST"
   },
   {
     "id": "score-test-block-fix",

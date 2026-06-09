@@ -19,6 +19,14 @@ export const ENEMY_MODELS = {
     url: 'assets/enemies/saucer/ufo.glb',
     anchor: 'center',
   },
+  horizontal_flyer: {
+    url: 'assets/enemies/horizontal-flyer/cute_monster.glb',
+    anchor: 'center',
+  },
+  flame_riser: {
+    url: 'assets/enemies/slime-fire/slime_fire.glb',
+    anchor: 'center',
+  },
 };
 
 /** @type {Map<string, THREE.Object3D>} */
@@ -29,8 +37,10 @@ let loadAllPromise = null;
 
 function poseSkinnedMeshes(root) {
   root.traverse((node) => {
-    if (node.isSkinnedMesh) {
+    if (node.isMesh) {
       node.frustumCulled = false;
+    }
+    if (node.isSkinnedMesh) {
       node.skeleton?.pose();
     }
   });
@@ -77,11 +87,19 @@ async function loadTemplate(typeId) {
   return normalized;
 }
 
-/** Preload all registered enemy GLBs. */
+/** Preload all registered enemy GLBs (failures are logged; other models still load). */
 export function loadEnemyModels() {
   if (!loadAllPromise) {
     const ids = Object.keys(ENEMY_MODELS);
-    loadAllPromise = Promise.all(ids.map((id) => loadTemplate(id))).then(() => {});
+    loadAllPromise = Promise.all(
+      ids.map(async (id) => {
+        try {
+          await loadTemplate(id);
+        } catch (err) {
+          console.error(`[BlockBall 3D] failed to load enemy model "${id}":`, err);
+        }
+      })
+    ).then(() => {});
   }
   return loadAllPromise;
 }
@@ -100,7 +118,16 @@ export function isEnemyModelLoaded(typeId) {
 export function cloneEnemyModel(typeId) {
   const tpl = templates.get(typeId);
   if (!tpl) return null;
-  const clone = SkeletonUtils.clone(tpl);
-  poseSkinnedMeshes(clone);
-  return clone;
+  let hasSkinned = false;
+  tpl.traverse((node) => {
+    if (node.isSkinnedMesh) hasSkinned = true;
+  });
+  try {
+    const clone = hasSkinned ? SkeletonUtils.clone(tpl) : tpl.clone(true);
+    poseSkinnedMeshes(clone);
+    return clone;
+  } catch (err) {
+    console.error(`[BlockBall 3D] clone failed for "${typeId}":`, err);
+    return null;
+  }
 }

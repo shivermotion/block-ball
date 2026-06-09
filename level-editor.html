@@ -408,7 +408,9 @@
           <strong class="brush-selection-name" id="brush-selection" aria-live="polite">Normal</strong>
         </p>
         <div id="block-brush-pane" class="brush-panel-pane">
-          <div id="block-brush" class="entity-picker" role="radiogroup" aria-label="Block brush"></div>
+          <div class="entity-picker-scroll">
+            <div id="block-brush" class="entity-picker" role="radiogroup" aria-label="Block brush"></div>
+          </div>
           <p class="brush-selection-wrap" id="hidden-reveal-wrap" hidden>
             <span class="brush-selection-label">Hidden reveals as</span>
             <strong class="brush-selection-name" id="hidden-reveal-selection" aria-live="polite">Normal</strong>
@@ -496,6 +498,8 @@
   <script src="enemy-ground-walker-art.js"></script>
   <script src="enemy-drifter-art.js"></script>
   <script src="enemy-saucer-art.js"></script>
+  <script src="enemy-horizontal-flyer-art.js"></script>
+  <script src="enemy-slime-fire-art.js"></script>
   <script src="item-types.js"></script>
   <script src="editor-entity-art.js"></script>
   <script src="level-grid.js"></script>
@@ -1184,6 +1188,9 @@
           if (value === 18) {
             if (!canPaintScoreBlock(cells, cols, rows, gridCol, gridRow)) return;
             paintScoreBlockCells(cells, gridCol, gridRow);
+          } else if (value === 34) {
+            if (!canPaintPinballBlock(cells, cols, rows, gridCol, gridRow)) return;
+            paintPinballBlockCells(cells, gridCol, gridRow);
           } else if (value === HIDDEN_2X2_CELL) {
             if (typeof canPaintHidden2x2Block === 'function' && !canPaintHidden2x2Block(cells, cols, rows, gridCol, gridRow)) {
               return;
@@ -1840,7 +1847,8 @@
         '8': 8,
         '7': 28,
         a: 10,
-        b: 12,
+        v: 12,
+        b: 34,
         c: 14,
         d: 16,
         j: 30,

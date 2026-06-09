@@ -127,6 +127,74 @@
       overflow: visible;
     }
 
+    #hero-death-overlay {
+      position: absolute;
+      margin: 0;
+      padding: 0;
+      z-index: 14;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    #hero-death-overlay .hero-death-sprite {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    #death-curtain-overlay {
+      position: absolute;
+      margin: 0;
+      padding: 0;
+      z-index: 15;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    #death-curtain-overlay .death-curtain-panel {
+      position: absolute;
+      top: 0;
+      width: 50%;
+      height: 100%;
+      overflow: hidden;
+      will-change: transform;
+    }
+
+    #death-curtain-overlay .death-curtain-panel--left {
+      left: 0;
+      transform: translateX(-100%);
+    }
+
+    #death-curtain-overlay .death-curtain-panel--right {
+      right: 0;
+      transform: translateX(100%);
+    }
+
+    #death-curtain-overlay .death-curtain-panel img {
+      display: block;
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 200%;
+      max-width: none;
+      object-fit: cover;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    #death-curtain-overlay .death-curtain-panel--left img {
+      left: 0;
+      object-position: left center;
+    }
+
+    #death-curtain-overlay .death-curtain-panel--right img {
+      right: 0;
+      object-position: right center;
+    }
+
     #game-modal-overlay {
       position: absolute;
       margin: 0;
@@ -328,6 +396,8 @@ PACKAGING FOR REAL MOBILE APPS
   <script src="enemy-ground-walker-art.js"></script>
   <script src="enemy-drifter-art.js"></script>
   <script src="enemy-saucer-art.js"></script>
+  <script src="enemy-horizontal-flyer-art.js"></script>
+  <script src="enemy-slime-fire-art.js"></script>
   <script src="item-types.js"></script>
   <script src="score-popup.js"></script>
   <script src="level-grid.js"></script>
@@ -390,6 +460,103 @@ PACKAGING FOR REAL MOBILE APPS
       if (!modal) return;
       modal.hidden = true;
       modal.innerHTML = '';
+    }
+
+    function syncDeathCurtainOverlayLayout(scene) {
+      const parent = document.getElementById('game-container');
+      const canvas = scene?.game?.canvas;
+      if (!parent || !canvas) return null;
+
+      scene.scale?.updateBounds?.();
+      let overlay = document.getElementById('death-curtain-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'death-curtain-overlay';
+        overlay.hidden = true;
+        overlay.innerHTML = `
+          <div class="death-curtain-panel death-curtain-panel--left" aria-hidden="true">
+            <img alt="" />
+          </div>
+          <div class="death-curtain-panel death-curtain-panel--right" aria-hidden="true">
+            <img alt="" />
+          </div>
+        `;
+        for (const img of overlay.querySelectorAll('img')) {
+          img.src = DEATH_CURTAIN_ASSET;
+        }
+        parent.appendChild(overlay);
+      }
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
+      overlay.style.left = `${canvasRect.left - parentRect.left}px`;
+      overlay.style.top = `${canvasRect.top - parentRect.top}px`;
+      overlay.style.width = `${canvasRect.width}px`;
+      overlay.style.height = `${canvasRect.height}px`;
+      return overlay;
+    }
+
+    function hideDeathCurtainOverlay() {
+      const overlay = document.getElementById('death-curtain-overlay');
+      if (!overlay) return;
+      overlay.hidden = true;
+    }
+
+    function syncHeroDeathOverlayLayout(scene) {
+      const parent = document.getElementById('game-container');
+      const canvas = scene?.game?.canvas;
+      if (!parent || !canvas) return null;
+
+      scene.scale?.updateBounds?.();
+      let overlay = document.getElementById('hero-death-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'hero-death-overlay';
+        overlay.hidden = true;
+        parent.appendChild(overlay);
+      }
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const parentRect = parent.getBoundingClientRect();
+      overlay.style.left = `${canvasRect.left - parentRect.left}px`;
+      overlay.style.top = `${canvasRect.top - parentRect.top}px`;
+      overlay.style.width = `${canvasRect.width}px`;
+      overlay.style.height = `${canvasRect.height}px`;
+      return overlay;
+    }
+
+    function hideHeroDeathOverlay() {
+      const overlay = document.getElementById('hero-death-overlay');
+      if (!overlay) return;
+      overlay.hidden = true;
+    }
+
+    function worldToGameOverlayCoords(scene, overlayEl, worldX, worldY) {
+      const cam = scene.cameras?.main;
+      const scale = scene.scale;
+      if (!overlayEl || !cam || !scale) return null;
+
+      const view = cam.worldView;
+      if (!view.width || !view.height) return null;
+
+      let sx = ((worldX - view.x) / view.width) * cam.width;
+      let sy = ((worldY - view.y) / view.height) * cam.height;
+      const shakeX = cam._shakeOffsetX ?? cam.shakeOffsetX ?? 0;
+      const shakeY = cam._shakeOffsetY ?? cam.shakeOffsetY ?? 0;
+      sx += shakeX;
+      sy += shakeY;
+
+      const gameW = scale.gameSize.width;
+      const gameH = scale.gameSize.height;
+      const displayW = overlayEl.clientWidth || 1;
+      const displayH = overlayEl.clientHeight || 1;
+
+      return {
+        x: Math.round(sx * (displayW / gameW)),
+        y: Math.round(sy * (displayH / gameH)),
+        scaleX: displayW / gameW,
+        scaleY: displayH / gameH,
+      };
     }
 
     function showGameModalOverlay(scene, { title, subtitle, buttons }) {
@@ -512,6 +679,7 @@ PACKAGING FOR REAL MOBILE APPS
       power: 0x235789,
       spike: 0x3a3048,
       indestructible: 0x88ccff,
+      pinball: 0xff4455,
       score: 0xff9922,
     };
 
@@ -523,6 +691,9 @@ PACKAGING FOR REAL MOBILE APPS
       powerBounceSpeed: 680,
       powerAngleAmp: 1.38,
       paddleBounceFactor: 1.05,
+      /** Bumper blocks can push the ball above normal caps (still clamped). */
+      bumperMaxSpeed: 680,
+      bumperPowerMaxSpeed: 920,
     };
 
     /** Prevent near-horizontal side-wall ping-pong (stall). */
@@ -642,6 +813,16 @@ PACKAGING FOR REAL MOBILE APPS
       godRayHaloAlpha: 0.38,
     };
 
+    const PINBALL_BUMPER = {
+      cooldownMs: 140,
+      speedMul: 1.22,
+      minSpeedMul: 0.82,
+      squashScale: 1.14,
+      squashMs: 48,
+      settleMs: 180,
+      flashTint: 0xff6644,
+    };
+
     const ABILITY_BLOCK_HIT_FX = {
       durationMs: 560,
       teeterCycles: 2.75,
@@ -676,6 +857,59 @@ PACKAGING FOR REAL MOBILE APPS
       coolRingTintCool: 0x66ddff,
     };
 
+    const GROUND_WALKER_FX = {
+      stretchMax: 0.14,
+      squashMax: 0.11,
+      stepSpeed: 0.0046,
+      speedForFull: 52,
+    };
+
+    const HORIZONTAL_FLYER_FX = {
+      floatSpeed: 0.0016,
+      flapSpeed: 0.0042,
+      wingSpread: 0.07,
+      bodySquash: 0.05,
+      tiltMax: 0.09,
+    };
+
+    const HORIZONTAL_FLYER_MOVE = {
+      speedFrac: 0.55,
+    };
+
+    const SAUCER_MOVE = {
+      speedFrac: 1.05,
+      dirChangeMinMs: 500,
+      dirChangeMaxMs: 1200,
+    };
+
+    const FLAME_RISER_MOVE = {
+      fallDistFrac: 2.6,
+      fallDurationMs: 3000,
+      chargeDurationMs: 520,
+      rocketDurationMs: 380,
+    };
+
+    const FLAME_RISER_FX = {
+      flickerSpeed: 0.014,
+      waverSpeed: 0.021,
+    };
+
+    /** Hitstop + flash when the ball destroys an enemy. */
+    const ENEMY_KILL_IMPACT = {
+      freezeRealMs: 150,
+      freezeTimeScale: 0.12,
+      poweredFreezeTimeScale: 0.06,
+      screenFlashAlpha: 0.24,
+      poweredScreenFlashAlpha: 0.34,
+      screenFlashMs: 130,
+      cameraShakeMs: 120,
+      cameraShakeIntensity: 0.0048,
+      poweredCameraShakeIntensity: 0.0072,
+      /** Full death anim length — 3D pop/spin/fade + 2D implode. */
+      destroyDelayMs: 300,
+      shockwaveMs: 220,
+    };
+
     /** Player ball face PNGs — neutral smile + power surprise. */
     const BALL_TEXTURE = {
       neutral: 'ball',
@@ -683,6 +917,41 @@ PACKAGING FOR REAL MOBILE APPS
     };
     const BALL_FACE_ASSET = 'assets/ball/face.png?v=1';
     const BALL_POWER_FACE_ASSET = 'assets/ball/power.png?v=1';
+    const HERO_DEATH_ASSET = 'assets/ball/hero-dead.png?v=1';
+
+    const DEATH_CURTAIN_ASSET = 'assets/effects/death-curtain.png?v=1';
+    const DEATH_CURTAIN = {
+      closeMs: 520,
+      openMs: 560,
+      holdMs: 100,
+    };
+
+    /** NES Mario–style impact frames, hop up, then fall off the bottom of the playfield. */
+    const HERO_DEATH = {
+      sizeMul: 1.75,
+      hopPx: 96,
+      hopMs: 260,
+      fallMs: 620,
+      /** Hop tips forward; fall spins to 540° (1½ turns, ends upside-down). */
+      hopSpinDeg: 95,
+      fallSpinDeg: 540,
+      impact: {
+        freezeRealMs: 100,
+        freezeTimeScale: 0.1,
+        cameraShakeMs: 110,
+        cameraShakeIntensity: 0.0055,
+        screenFlashAlpha: 0.2,
+        screenFlashMs: 120,
+        shockwaveMs: 190,
+        frameMs: 52,
+        frames: [
+          { scaleX: 1.3, scaleY: 0.7, flash: true },
+          { scaleX: 0.84, scaleY: 1.18 },
+          { scaleX: 1.14, scaleY: 0.86 },
+          { scaleX: 1, scaleY: 1 },
+        ],
+      },
+    };
 
     /** Matches procedural paddle texture size (see generateTextures). */
     const PADDLE_PAD = 2;
@@ -806,6 +1075,28 @@ PACKAGING FOR REAL MOBILE APPS
         gfx.lineBetween(px + w - 4, px + 4, px + 4, px + h - 4);
       });
 
+      // Pinball bumper — 2×2 (Simple Bumpers palette; 3D uses scene.gltf)
+      {
+        const pinballW = 2 * cellW - pad;
+        const pinballH = 2 * cellH - pad;
+        g.clear();
+        const cx = pinballW / 2;
+        const baseH = pinballH * 0.28;
+        const domeR = Math.min(pinballW, pinballH) * 0.36;
+        const domeCy = pinballH - baseH - domeR * 0.82;
+        g.fillStyle(0x0000cc, 1);
+        g.fillRect(pad, pinballH - baseH, pinballW - pad * 2, baseH);
+        g.fillStyle(0xcc0022, 1);
+        g.fillEllipse(cx, pinballH - baseH * 0.55, domeR * 2.1, baseH * 1.44);
+        g.fillStyle(0x00cc33, 1);
+        g.fillCircle(cx, domeCy, domeR);
+        g.lineStyle(Math.max(2, domeR * 0.08), 0xffffff, 0.35);
+        g.beginPath();
+        g.arc(cx, domeCy, domeR * 0.72, Math.PI * 1.12, Math.PI * -0.12);
+        g.strokePath();
+        g.generateTexture('block_pinball', pinballW, pinballH);
+      }
+
       // Score block — 2×2 footprint (3D overlay replaces with orange puff + star)
       {
         const scoreW = 2 * cellW - pad;
@@ -928,6 +1219,34 @@ PACKAGING FOR REAL MOBILE APPS
           g.fillStyle(COLORS.enemy, 1);
           g.fillEllipse(mobW / 2, mobH * 0.58, (mobW - 4) * 0.8, (mobH - 4) * 0.65);
           g.generateTexture('enemy_saucer', mobW, mobH);
+        }
+      }
+
+      if (!scene.textures.exists('enemy_horizontal_flyer')) {
+        const mobW = cellW * 2;
+        const mobH = cellH * 2;
+        if (typeof buildHorizontalFlyerCanvas === 'function') {
+          const hfCanvas = buildHorizontalFlyerCanvas(mobW, mobH);
+          scene.textures.addCanvas('enemy_horizontal_flyer', hfCanvas);
+        } else {
+          g.clear();
+          g.fillStyle(COLORS.enemyDark, 1);
+          g.fillEllipse(mobW / 2, mobH * 0.65, (mobW - 4) * 0.85, (mobH - 4) * 0.7);
+          g.fillStyle(COLORS.enemy, 1);
+          g.fillEllipse(mobW / 2, mobH * 0.58, (mobW - 4) * 0.8, (mobH - 4) * 0.65);
+          g.generateTexture('enemy_horizontal_flyer', mobW, mobH);
+        }
+      }
+
+      if (!scene.textures.exists('enemy_flame_riser')) {
+        if (typeof buildSlimeFireCanvas === 'function') {
+          const sfCanvas = buildSlimeFireCanvas(cellW, cellH);
+          scene.textures.addCanvas('enemy_flame_riser', sfCanvas);
+        } else {
+          g.clear();
+          g.fillStyle(0xc42e10, 1);
+          g.fillEllipse(cellW / 2, cellH * 0.58, (cellW - 4) * 0.8, (cellH - 4) * 0.65);
+          g.generateTexture('enemy_flame_riser', cellW, cellH);
         }
       }
 
@@ -1165,6 +1484,14 @@ PACKAGING FOR REAL MOBILE APPS
         this.ball.clearTint();
       }
 
+      /** Three.js overlay hides the Phaser ball sprite — keep it that way after respawn. */
+      setBallPlayActive(active) {
+        if (!this.ball) return;
+        this.ball.setActive(active);
+        this.ball.setVisible(active && !this.threeOverlay);
+        this.threeOverlay?.setBallMeshVisible?.(active);
+      }
+
       clearPaddleTweenRefs() {
         this.paddleChargeScaleTween = null;
         this.paddleChargeShakeTween = null;
@@ -1224,6 +1551,9 @@ PACKAGING FOR REAL MOBILE APPS
         this.dragging = false;
         this.pointerWasDragging = false;
         this.isLosingBall = false;
+        this.heroDeathMotion = null;
+        this.heroDeathSpriteEl = null;
+        this.heroDeathImpactEvent = null;
         this.paddleCharging = false;
         this.paddleSpringing = false;
         this.paddleChargeScaleTween = null;
@@ -1295,8 +1625,20 @@ PACKAGING FOR REAL MOBILE APPS
           if (!document.getElementById('game-modal-overlay')?.hidden) {
             syncGameModalOverlayLayout(this);
           }
+          const curtain = document.getElementById('death-curtain-overlay');
+          if (curtain && !curtain.hidden) {
+            syncDeathCurtainOverlayLayout(this);
+          }
+          if (this.heroDeathSpriteEl) {
+            syncHeroDeathOverlayLayout(this);
+            this.applyHeroDeathSpritePosition();
+          }
         });
-        this.events.once('shutdown', hideGameModalOverlay);
+        this.events.once('shutdown', () => {
+          hideGameModalOverlay();
+          hideDeathCurtainOverlay();
+          this.destroyHeroDeathSprite();
+        });
 
         if (SHOW_LEVEL_GRID) {
           drawLevelGridDebug(this, this.levelGrid, this.level);
@@ -1516,6 +1858,13 @@ PACKAGING FOR REAL MOBILE APPS
           );
           this.spawnEnemy(spawn.type, x, y, i, spawn.col, spawn.row, foot);
         });
+        this.time.delayedCall(0, () => {
+          this.enemies?.getChildren().forEach((enemy) => {
+            if (!this.threeOverlay?.hasEnemyMesh?.(enemy)) {
+              this.threeOverlay?.registerEnemy(enemy);
+            }
+          });
+        });
       }
 
       applyItemFloatTween(item, baseY, spawn, index) {
@@ -1576,12 +1925,14 @@ PACKAGING FOR REAL MOBILE APPS
         const def = getEnemyDef(typeId);
         const span = foot ?? getEnemyFootprint(typeId);
         const enemy = this.enemies.create(x, y, def.texture);
-        fitEntityToCellSpan(enemy, this.levelGrid, span.colSpan, span.rowSpan, {
-          contain: true,
-          circle: true,
-        });
+        const fitOpts = { contain: true, circle: true };
+        if (span.colSpan === 1 && span.rowSpan === 1) {
+          fitEntityToCell(enemy, this.levelGrid, fitOpts);
+        } else {
+          fitEntityToCellSpan(enemy, this.levelGrid, span.colSpan, span.rowSpan, fitOpts);
+        }
         enemy.setBounce(1);
-        enemy.setCollideWorldBounds(true);
+        enemy.setCollideWorldBounds(false);
         enemy.setImmovable(true);
         enemy.body.allowGravity = false;
         enemy.setDepth(7);
@@ -1594,28 +1945,99 @@ PACKAGING FOR REAL MOBILE APPS
         enemy.setData('maxHp', def.maxHp);
         enemy.setData('points', def.points);
         enemy.setData('drop', def.drop);
+        enemy.setData('bobPhase', index * 1.7 + Math.random() * 0.4);
+        enemy.setData('baseScaleX', enemy.scaleX);
+        enemy.setData('baseScaleY', enemy.scaleY);
+        enemy.setData('movePrev', { x, y });
 
         this.applyEnemyMovement(enemy, def, index, x, y);
+        if (typeId === 'flame_riser' && !USE_3D_OVERLAY) {
+          this.attachFlameRiserParticles(enemy);
+          this.attachFlameRiserRocketTailParticles(enemy);
+        }
         this.threeOverlay?.registerEnemy(enemy);
         return enemy;
       }
 
+      getEnemyPlayMargin(enemy) {
+        const r = enemy.body?.radius ?? Math.min(enemy.displayWidth, enemy.displayHeight) * 0.5;
+        return r + 2;
+      }
+
+      clampEnemyPoint(x, y, margin) {
+        const b = this.levelGrid.getPlayGridBounds();
+        return {
+          x: Phaser.Math.Clamp(x, b.x + margin, b.x + b.width - margin),
+          y: Phaser.Math.Clamp(y, b.y + margin, b.y + b.height - margin),
+        };
+      }
+
+      clampEnemyPosition(enemy) {
+        const margin = this.getEnemyPlayMargin(enemy);
+        const clamped = this.clampEnemyPoint(enemy.x, enemy.y, margin);
+        enemy.x = clamped.x;
+        enemy.y = clamped.y;
+      }
+
+      getEnemyCircleRadius(enemy) {
+        return enemy.body?.radius ?? Math.min(enemy.displayWidth, enemy.displayHeight) * 0.5;
+      }
+
+      enemyCircleOverlapsRect(ex, ey, radius, rx, ry, rw, rh) {
+        const hw = rw * 0.5;
+        const hh = rh * 0.5;
+        const closestX = Phaser.Math.Clamp(ex, rx - hw, rx + hw);
+        const closestY = Phaser.Math.Clamp(ey, ry - hh, ry + hh);
+        const dx = ex - closestX;
+        const dy = ey - closestY;
+        return dx * dx + dy * dy < radius * radius;
+      }
+
+      enemyOverlapsAnyBlock(ex, ey, radius) {
+        for (const block of this.blocks.getChildren()) {
+          if (!block?.active) continue;
+          if (this.enemyCircleOverlapsRect(
+            ex,
+            ey,
+            radius,
+            block.x,
+            block.y,
+            block.displayWidth,
+            block.displayHeight
+          )) {
+            return true;
+          }
+        }
+        return false;
+      }
+
       applyEnemyMovement(enemy, def, index, startX, startY) {
         const { cellWidth, cellHeight } = this.levelGrid.config;
+        const margin = this.getEnemyPlayMargin(enemy);
         switch (def.movement) {
           case 'slow_horizontal': {
             const travel = cellWidth * 0.42;
+            const b = this.levelGrid.getPlayGridBounds();
+            const minX = b.x + margin;
+            const maxX = b.x + b.width - margin;
+            const tx = Phaser.Math.Clamp(
+              startX + (index % 2 === 0 ? travel : -travel),
+              minX,
+              maxX
+            );
             this.tweens.add({
               targets: enemy,
-              x: startX + (index % 2 === 0 ? travel : -travel),
+              x: tx,
               duration: 5200 + index * 350,
               yoyo: true,
               repeat: -1,
               ease: 'Sine.easeInOut',
             });
+            const minY = b.y + margin;
+            const maxY = b.y + b.height - margin;
             this.tweens.add({
               targets: enemy,
-              y: startY - cellHeight * 0.05,
+              y: Phaser.Math.Clamp(startY - cellHeight * 0.05, minY, maxY),
               duration: 3400 + index * 250,
               yoyo: true,
               repeat: -1,
@@ -1628,8 +2050,13 @@ PACKAGING FOR REAL MOBILE APPS
               if (!enemy.active) return;
               const angle = Math.random() * Math.PI * 2;
               const dist = cellWidth * (0.28 + Math.random() * 0.62);
-              const tx = startX + Math.cos(angle) * dist;
-              const ty = startY + Math.sin(angle) * dist * 0.72;
+              let tx = enemy.x + Math.cos(angle) * dist;
+              let ty = enemy.y + Math.sin(angle) * dist * 0.72;
+              ({ x: tx, y: ty } = this.clampEnemyPoint(tx, ty, margin));
+              if (Math.hypot(tx - enemy.x, ty - enemy.y) < cellWidth * 0.1) {
+                wander();
+                return;
+              }
               this.tweens.add({
                 targets: enemy,
                 x: tx,
@@ -1642,18 +2069,40 @@ PACKAGING FOR REAL MOBILE APPS
             wander();
             break;
           }
-          case 'circle_figure8': {
+          case 'circle_figure8':
+          case 'fast_horizontal_random': {
+            const now = this.time?.now ?? 0;
             enemy.setData('saucerMove', {
+              dir: Math.random() < 0.5 ? 1 : -1,
+              speed: cellWidth * SAUCER_MOVE.speedFrac,
+              nextDirChangeAt: now + Phaser.Math.Between(
+                SAUCER_MOVE.dirChangeMinMs,
+                SAUCER_MOVE.dirChangeMaxMs
+              ),
+            });
+            break;
+          }
+          case 'horizontal_bounce':
+          case 'horizontal_wave': {
+            enemy.setData('flyerMove', {
+              dir: index % 2 === 0 ? 1 : -1,
+              speed: cellWidth * HORIZONTAL_FLYER_MOVE.speedFrac,
+            });
+            break;
+          }
+          case 'vertical_diagonal': {
+            const { cellHeight } = this.levelGrid.config;
+            const b = this.levelGrid.getPlayGridBounds();
+            const maxFall = Math.max(
+              cellHeight * 0.8,
+              b.y + b.height - margin - startY
+            );
+            enemy.setData('riserMove', {
               startX,
               startY,
-              rx: cellWidth * 0.36,
-              ry: cellHeight * 0.26,
-              t: index * 0.7,
-              mode: 'circle',
-              modeTimer: 0,
-              dartFrom: { x: startX, y: startY },
-              dartTo: { x: startX, y: startY },
-              dartProgress: 0,
+              phase: 'fall',
+              t: 0,
+              fallDistance: Math.min(cellHeight * FLAME_RISER_MOVE.fallDistFrac, maxFall),
             });
             break;
           }
@@ -2076,6 +2525,11 @@ PACKAGING FOR REAL MOBILE APPS
           return;
         }
 
+        if (result.action === 'bounce_boost') {
+          this.onPinballBumperHit(ball, block, result.points);
+          return;
+        }
+
         if (result.action === 'destroy') {
           let points = result.points;
           if (this.powerBounceMultiplier) {
@@ -2128,6 +2582,101 @@ PACKAGING FOR REAL MOBILE APPS
           },
         });
         block.setData('scoreJitterEvent', ev);
+      }
+
+      onPinballBumperHit(ball, block, points) {
+        if (!block?.active || !ball?.body) return;
+
+        this.boostBallOffPinballBumper(ball, block);
+
+        const last = block.getData('lastPinballHitAt') || 0;
+        if (this.time.now - last < PINBALL_BUMPER.cooldownMs) return;
+        block.setData('lastPinballHitAt', this.time.now);
+
+        this.awardDestroyPoints(points, block.x, block.y, { color: '#ff8866' });
+        this.flashBlock(block, PINBALL_BUMPER.flashTint);
+        this.playPinballBumperHitFx(block);
+        gameHaptic('blockHit');
+        this.threeOverlay?.triggerPinballBumperHit?.(block);
+      }
+
+      playPinballBumperHitFx(block) {
+        if (!block?.active || this.threeOverlay?.hasBlockMesh?.(block)) return;
+        const bx = block.getData('pinballBaseScaleX') ?? block.scaleX;
+        const by = block.getData('pinballBaseScaleY') ?? block.scaleY;
+        block.setData('pinballBaseScaleX', bx);
+        block.setData('pinballBaseScaleY', by);
+        this.tweens.add({
+          targets: block,
+          scaleX: bx * PINBALL_BUMPER.squashScale,
+          scaleY: by * (2 - PINBALL_BUMPER.squashScale),
+          duration: PINBALL_BUMPER.squashMs,
+          yoyo: true,
+          ease: 'Quad.easeOut',
+        });
+      }
+
+      boostBallOffPinballBumper(ball, block) {
+        const body = ball.body;
+        const blockBody = block.body;
+        if (!body?.enable || !blockBody) return;
+
+        const ballR = body.halfWidth;
+        const bx = blockBody.center.x;
+        const by = blockBody.center.y;
+        const hw = blockBody.halfWidth;
+        const hh = blockBody.halfHeight;
+
+        const closestX = Phaser.Math.Clamp(ball.x, bx - hw, bx + hw);
+        const closestY = Phaser.Math.Clamp(ball.y, by - hh, by + hh);
+        let nx = ball.x - closestX;
+        let ny = ball.y - closestY;
+        let dist = Math.hypot(nx, ny);
+
+        if (dist < 0.001) {
+          nx = ball.x - bx;
+          ny = ball.y - by;
+          dist = Math.hypot(nx, ny);
+          if (dist < 0.001) {
+            nx = 0;
+            ny = -1;
+            dist = 1;
+          }
+        }
+
+        nx /= dist;
+        ny /= dist;
+
+        const overlap = ballR - dist;
+        if (overlap > 0) {
+          ball.x += nx * (overlap + 2);
+          ball.y += ny * (overlap + 2);
+        }
+
+        const minSpeed = PHYSICS.ballSpeed * PINBALL_BUMPER.minSpeedMul;
+        let vx = body.velocity.x;
+        let vy = body.velocity.y;
+        const dot = vx * nx + vy * ny;
+        if (dot < 0) {
+          vx -= 2 * dot * nx;
+          vy -= 2 * dot * ny;
+        }
+
+        let outSpeed = Math.hypot(vx, vy);
+        if (outSpeed < minSpeed * 0.45) {
+          outSpeed = minSpeed;
+          vx = nx * outSpeed;
+          vy = ny * outSpeed;
+        } else {
+          outSpeed = Math.max(minSpeed, outSpeed * PINBALL_BUMPER.speedMul);
+          const scale = outSpeed / Math.hypot(vx, vy);
+          vx *= scale;
+          vy *= scale;
+        }
+
+        ball.setVelocity(vx, vy);
+        const bumperCap = this.ballPowerMode ? PHYSICS.bumperPowerMaxSpeed : PHYSICS.bumperMaxSpeed;
+        this.clampBallSpeed({ maxSpeed: bumperCap });
       }
 
       onScoreBlockHit(ball, block, powered) {
@@ -2801,18 +3350,148 @@ PACKAGING FOR REAL MOBILE APPS
           return;
         }
 
+        if (enemy.getData('killPending')) return;
+
         let points = pointsOnKill;
         if (this.powerBounceMultiplier) {
           points = Math.floor(points * SCORE.powerMultiplier);
         }
         const { x, y } = enemy;
+        const powered = !!this.powerBounceActive;
+
+        enemy.setData('killPending', true);
+        if (enemy.body) enemy.body.checkCollision.none = true;
+
         this.awardDestroyPoints(points, x, y);
-        this.spawnDestroyParticles(x, y, COLORS.enemy);
         gameHaptic('enemyKill');
-        this.threeOverlay?.unregisterEnemy(enemy);
-        enemy.destroy();
+        this.playEnemyKillImpact(enemy, x, y, { powered });
         this.clampBallSpeed();
         bbLog('enemy defeated', { typeId, points });
+      }
+
+      pulseImpactFreeze(realMs, timeScale) {
+        const prevScale = this.time.timeScale;
+        this.time.timeScale = Math.min(prevScale, timeScale);
+        window.setTimeout(() => {
+          if (!this.isSceneActive()) return;
+          if (this.time && this.time.timeScale <= timeScale + 0.001) {
+            this.time.timeScale = prevScale === 0 ? 1 : prevScale;
+          }
+        }, realMs);
+      }
+
+      spawnEnemyKillImpactFx(x, y, tint, powered) {
+        const fx = ENEMY_KILL_IMPACT;
+        const flashColor = powered ? 0xfff4aa : 0xffffff;
+        const flashAlpha = powered ? fx.poweredScreenFlashAlpha : fx.screenFlashAlpha;
+
+        const screen = this.add.rectangle(
+          this.scale.width / 2,
+          this.scale.height / 2,
+          this.scale.width,
+          this.scale.height,
+          flashColor,
+          flashAlpha * 0.5
+        ).setDepth(154);
+        this.tweens.add({
+          targets: screen,
+          alpha: 0,
+          duration: fx.screenFlashMs,
+          onComplete: () => screen.destroy(),
+        });
+
+        const burst = this.add.rectangle(x, y, 44, 44, flashColor, flashAlpha)
+          .setDepth(155)
+          .setBlendMode(Phaser.BlendModes.ADD);
+        this.tweens.add({
+          targets: burst,
+          scaleX: powered ? 5.4 : 4.1,
+          scaleY: powered ? 5.4 : 4.1,
+          alpha: 0,
+          duration: fx.screenFlashMs,
+          onComplete: () => burst.destroy(),
+        });
+
+        const ring = this.add.graphics({ x, y }).setDepth(153);
+        ring.lineStyle(powered ? 4 : 3, 0xffffff, 0.92);
+        ring.strokeCircle(0, 0, 11);
+        ring.lineStyle(2, tint, 0.7);
+        ring.strokeCircle(0, 0, 15);
+        this.tweens.add({
+          targets: ring,
+          scaleX: powered ? 4.6 : 3.5,
+          scaleY: powered ? 4.6 : 3.5,
+          alpha: 0,
+          duration: fx.shockwaveMs,
+          ease: 'Cubic.easeOut',
+          onComplete: () => ring.destroy(),
+        });
+      }
+
+      playEnemyKillImpact2D(enemy, powered) {
+        const fx = ENEMY_KILL_IMPACT;
+        const bx = enemy.getData('baseScaleX') ?? enemy.scaleX;
+        const by = enemy.getData('baseScaleY') ?? enemy.scaleY;
+        const pop = powered ? 1.48 : 1.36;
+        const popMs = Math.floor(fx.destroyDelayMs * 0.22);
+        const outMs = fx.destroyDelayMs - popMs;
+        enemy.setTint(0xffffff);
+        enemy.setAlpha(1);
+        this.tweens.add({
+          targets: enemy,
+          scaleX: bx * pop,
+          scaleY: by * pop,
+          duration: popMs,
+          ease: 'Quad.easeOut',
+          onComplete: () => {
+            if (!enemy.active) return;
+            this.tweens.add({
+              targets: enemy,
+              scaleX: 0,
+              scaleY: 0,
+              alpha: 0,
+              angle: (enemy.angle || 0) + (powered ? 210 : 150),
+              duration: outMs,
+              ease: 'Cubic.easeIn',
+            });
+          },
+        });
+      }
+
+      playEnemyKillImpact(enemy, x, y, options = {}) {
+        const powered = !!options.powered;
+        const fx = ENEMY_KILL_IMPACT;
+        const tint = powered ? 0xffee88 : COLORS.enemy;
+
+        this.pulseImpactFreeze(
+          fx.freezeRealMs,
+          powered ? fx.poweredFreezeTimeScale : fx.freezeTimeScale
+        );
+        this.cameras.main.shake(
+          fx.cameraShakeMs,
+          powered ? fx.poweredCameraShakeIntensity : fx.cameraShakeIntensity
+        );
+        this.spawnEnemyKillImpactFx(x, y, tint, powered);
+        this.threeOverlay?.triggerEnemyKillImpact?.(enemy, {
+          powered,
+          durationMs: fx.destroyDelayMs,
+        });
+        if (!this.threeOverlay?.hasEnemyMesh?.(enemy)) {
+          this.playEnemyKillImpact2D(enemy, powered);
+        }
+
+        this.time.delayedCall(fx.destroyDelayMs, () => {
+          this.finishEnemyKill(enemy, x, y, tint);
+        });
+      }
+
+      finishEnemyKill(enemy, x, y, tint) {
+        if (!enemy?.active) return;
+        this.spawnDestroyParticles(x, y, tint);
+        this.threeOverlay?.unregisterEnemy(enemy);
+        enemy.getData('flameParticles')?.destroy();
+        enemy.getData('rocketTailParticles')?.destroy();
+        enemy.destroy();
       }
 
       flashEnemyHit(enemy) {
@@ -3297,6 +3976,268 @@ PACKAGING FOR REAL MOBILE APPS
       // Ball lifecycle
       // ---------------------------------------------------------------------------
 
+      destroyHeroDeathSprite() {
+        if (this.heroDeathMotion) {
+          this.tweens.killTweensOf(this.heroDeathMotion);
+        }
+        if (this.heroDeathImpactEvent) {
+          this.heroDeathImpactEvent.destroy();
+          this.heroDeathImpactEvent = null;
+        }
+        if (this.heroDeathSpriteEl) {
+          this.heroDeathSpriteEl.remove();
+          this.heroDeathSpriteEl = null;
+        }
+        this.heroDeathMotion = null;
+        hideHeroDeathOverlay();
+      }
+
+      applyHeroDeathSpritePosition() {
+        const img = this.heroDeathSpriteEl;
+        const motion = this.heroDeathMotion;
+        const overlay = document.getElementById('hero-death-overlay');
+        if (!img || !motion || !overlay) return;
+
+        const pos = worldToGameOverlayCoords(this, overlay, motion.wx, motion.wy);
+        if (!pos) return;
+
+        const ballSize = this.ballRadius != null ? this.ballRadius * 2 : this.ball?.displayWidth ?? 32;
+        const size = Math.max(8, Math.round(ballSize * pos.scaleX * HERO_DEATH.sizeMul));
+        const sx = motion.scaleX ?? 1;
+        const sy = motion.scaleY ?? 1;
+        const rot = motion.rotation ?? 0;
+        img.style.width = `${size}px`;
+        img.style.height = `${size}px`;
+        img.style.left = `${pos.x}px`;
+        img.style.top = `${pos.y}px`;
+        img.style.transform = `translate(-50%, -50%) rotate(${rot}deg) scale(${sx}, ${sy})`;
+        img.style.filter = motion.flash ? 'brightness(2.4) saturate(0.35)' : '';
+      }
+
+      spawnHeroDeathImpactFx(x, y) {
+        const fx = HERO_DEATH.impact;
+        const tint = COLORS.ball;
+        const flashColor = 0xffffff;
+        const flashAlpha = fx.screenFlashAlpha;
+
+        const screen = this.add
+          .rectangle(
+            this.scale.width / 2,
+            this.scale.height / 2,
+            this.scale.width,
+            this.scale.height,
+            flashColor,
+            flashAlpha * 0.45
+          )
+          .setDepth(154);
+        this.tweens.add({
+          targets: screen,
+          alpha: 0,
+          duration: fx.screenFlashMs,
+          onComplete: () => screen.destroy(),
+        });
+
+        const burst = this.add
+          .rectangle(x, y, 36, 36, flashColor, flashAlpha)
+          .setDepth(155)
+          .setBlendMode(Phaser.BlendModes.ADD);
+        this.tweens.add({
+          targets: burst,
+          scaleX: 4.2,
+          scaleY: 4.2,
+          alpha: 0,
+          duration: fx.screenFlashMs,
+          onComplete: () => burst.destroy(),
+        });
+
+        const ring = this.add.graphics({ x, y }).setDepth(153);
+        ring.lineStyle(3, 0xffffff, 0.9);
+        ring.strokeCircle(0, 0, 10);
+        ring.lineStyle(2, tint, 0.75);
+        ring.strokeCircle(0, 0, 14);
+        this.tweens.add({
+          targets: ring,
+          scaleX: 3.8,
+          scaleY: 3.8,
+          alpha: 0,
+          duration: fx.shockwaveMs,
+          ease: 'Cubic.easeOut',
+          onComplete: () => ring.destroy(),
+        });
+      }
+
+      playHeroDeathImpactFrames(onComplete) {
+        const motion = this.heroDeathMotion;
+        const frames = HERO_DEATH.impact.frames;
+        if (!motion || !frames.length) {
+          onComplete?.();
+          return;
+        }
+
+        let index = 0;
+        const step = () => {
+          if (!this.heroDeathMotion) return;
+          if (index >= frames.length) {
+            onComplete?.();
+            return;
+          }
+          const frame = frames[index];
+          motion.scaleX = frame.scaleX;
+          motion.scaleY = frame.scaleY;
+          motion.flash = !!frame.flash;
+          this.applyHeroDeathSpritePosition();
+          index += 1;
+          this.heroDeathImpactEvent = this.time.delayedCall(HERO_DEATH.impact.frameMs, () => {
+            this.heroDeathImpactEvent = null;
+            step();
+          });
+        };
+        step();
+      }
+
+      playHeroDeathAnimation(onComplete) {
+        const overlay = syncHeroDeathOverlayLayout(this);
+        if (!overlay || !this.ball) {
+          onComplete?.();
+          return;
+        }
+
+        const deathX = this.ball.x;
+        const deathY = this.ball.y;
+        const impact = HERO_DEATH.impact;
+
+        this.destroyHeroDeathSprite();
+        overlay.hidden = false;
+
+        const img = document.createElement('img');
+        img.className = 'hero-death-sprite';
+        img.src = HERO_DEATH_ASSET;
+        img.alt = '';
+        img.draggable = false;
+        overlay.appendChild(img);
+        this.heroDeathSpriteEl = img;
+
+        this.pulseImpactFreeze(impact.freezeRealMs, impact.freezeTimeScale);
+        this.cameras.main.shake(impact.cameraShakeMs, impact.cameraShakeIntensity);
+        this.spawnHeroDeathImpactFx(deathX, deathY);
+
+        const fallTargetY = this.scale.height + (this.ballRadius ?? 16) * 2.5;
+        this.heroDeathMotion = {
+          wx: deathX,
+          wy: deathY,
+          scaleX: 1,
+          scaleY: 1,
+          rotation: 0,
+          flash: false,
+        };
+        this.applyHeroDeathSpritePosition();
+
+        const runHopAndFall = () => {
+          const motion = this.heroDeathMotion;
+          if (!motion) {
+            onComplete?.();
+            return;
+          }
+          motion.scaleX = 1;
+          motion.scaleY = 1;
+          motion.rotation = 0;
+          motion.flash = false;
+          const hopY = motion.wy - HERO_DEATH.hopPx;
+          this.tweens.add({
+            targets: motion,
+            wy: hopY,
+            rotation: HERO_DEATH.hopSpinDeg,
+            duration: HERO_DEATH.hopMs,
+            ease: 'Quad.easeOut',
+            onUpdate: () => this.applyHeroDeathSpritePosition(),
+            onComplete: () => {
+              this.tweens.add({
+                targets: motion,
+                wy: fallTargetY,
+                rotation: HERO_DEATH.fallSpinDeg,
+                duration: HERO_DEATH.fallMs,
+                ease: 'Quad.easeIn',
+                onUpdate: () => this.applyHeroDeathSpritePosition(),
+                onComplete: () => {
+                  this.destroyHeroDeathSprite();
+                  onComplete?.();
+                },
+              });
+            },
+          });
+        };
+
+        this.playHeroDeathImpactFrames(runHopAndFall);
+      }
+
+      destroyDeathCurtainPanels() {
+        if (this.deathCurtainMotion) {
+          this.tweens.killTweensOf(this.deathCurtainMotion);
+        }
+        if (this.deathCurtainHoldEvent) {
+          this.deathCurtainHoldEvent.destroy();
+          this.deathCurtainHoldEvent = null;
+        }
+        hideDeathCurtainOverlay();
+        this.deathCurtainMotion = null;
+        this.deathCurtainLeftEl = null;
+        this.deathCurtainRightEl = null;
+      }
+
+      applyDeathCurtainMotion() {
+        const motion = this.deathCurtainMotion;
+        if (!motion || !this.deathCurtainLeftEl || !this.deathCurtainRightEl) return;
+        this.deathCurtainLeftEl.style.transform = `translateX(${motion.leftX * 100}%)`;
+        this.deathCurtainRightEl.style.transform = `translateX(${motion.rightX * 100}%)`;
+      }
+
+      playDeathCurtainWipe(callbacks = {}, options = {}) {
+        const overlay = syncDeathCurtainOverlayLayout(this);
+        if (!overlay) return;
+
+        const left = overlay.querySelector('.death-curtain-panel--left');
+        const right = overlay.querySelector('.death-curtain-panel--right');
+        if (!left || !right) return;
+
+        this.destroyDeathCurtainPanels();
+        overlay.hidden = false;
+        this.deathCurtainLeftEl = left;
+        this.deathCurtainRightEl = right;
+        this.deathCurtainMotion = { leftX: -1, rightX: 1 };
+        this.applyDeathCurtainMotion();
+
+        this.tweens.add({
+          targets: this.deathCurtainMotion,
+          leftX: 0,
+          rightX: 0,
+          duration: DEATH_CURTAIN.closeMs,
+          ease: 'Cubic.easeIn',
+          onUpdate: () => this.applyDeathCurtainMotion(),
+          onComplete: () => {
+            callbacks.onCovered?.();
+            if (options.stayClosed) {
+              callbacks.onComplete?.();
+              return;
+            }
+            this.deathCurtainHoldEvent = this.time.delayedCall(DEATH_CURTAIN.holdMs, () => {
+              this.deathCurtainHoldEvent = null;
+              this.tweens.add({
+                targets: this.deathCurtainMotion,
+                leftX: -1,
+                rightX: 1,
+                duration: DEATH_CURTAIN.openMs,
+                ease: 'Cubic.easeOut',
+                onUpdate: () => this.applyDeathCurtainMotion(),
+                onComplete: () => {
+                  this.destroyDeathCurtainPanels();
+                  callbacks.onComplete?.();
+                },
+              });
+            });
+          },
+        });
+      }
+
       loseBall() {
         if (this.gameState !== 'playing' || this.isLosingBall) return;
         bbLog('loseBall', { livesBefore: this.lives });
@@ -3306,28 +4247,41 @@ PACKAGING FOR REAL MOBILE APPS
         gameHaptic('lifeLost', { force: true });
         this.updateUI();
         this.stopBallTrail();
-        this.spawnDestroyParticles(this.ball.x, this.ball.y, COLORS.ball);
+        this.stopLaunchAimCycle();
+        this.ball.body.setVelocity(0, 0);
+        this.setBallPlayActive(false);
 
-        if (this.lives <= 0) {
-          this.stopLaunchAimCycle();
-          this.ball.setActive(false).setVisible(false);
-          this.stopBallTrail();
-          this.showGameOver();
-          return;
-        }
+        const gameOver = this.lives <= 0;
 
-        this.attachBallToPaddle(true);
-        this.powerBounceQueued = false;
-        this.time.delayedCall(400, () => {
-          this.isLosingBall = false;
-          this.startLaunchAimCycle();
+        this.playHeroDeathAnimation(() => {
+          this.playDeathCurtainWipe(
+            {
+              onCovered: () => {
+                if (gameOver) {
+                  this.showGameOver();
+                  return;
+                }
+                this.attachBallToPaddle(true);
+                this.powerBounceQueued = false;
+                this.setBallPlayActive(true);
+              },
+              onComplete: () => {
+                if (gameOver) return;
+                this.isLosingBall = false;
+                this.startLaunchAimCycle();
+              },
+            },
+            { stayClosed: gameOver }
+          );
         });
       }
 
-      clampBallSpeed() {
+      clampBallSpeed(options = {}) {
         const v = this.ball.body.velocity;
         const speed = Math.sqrt(v.x * v.x + v.y * v.y);
-        const cap = this.ballPowerMode ? PHYSICS.powerBallMaxSpeed : PHYSICS.ballMaxSpeed;
+        const cap =
+          options.maxSpeed ??
+          (this.ballPowerMode ? PHYSICS.powerBallMaxSpeed : PHYSICS.ballMaxSpeed);
         if (speed > cap) {
           const scale = cap / speed;
           this.ball.setVelocity(v.x * scale, v.y * scale);
@@ -4170,64 +5124,256 @@ PACKAGING FOR REAL MOBILE APPS
         this.showOverlay('Game Over', `Score: ${this.score}`, 'Try Again', () => this.scene.restart());
       }
 
-      updateSaucerMovement(delta) {
+      stepHorizontalEnemy(enemy, move, dt, options = {}) {
+        const margin = this.getEnemyPlayMargin(enemy);
+        const r = this.getEnemyCircleRadius(enemy);
+        const b = this.levelGrid.getPlayGridBounds();
+        const minX = b.x + margin;
+        const maxX = b.x + b.width - margin;
+        const ny = enemy.y;
+        const randomDir = () => (Math.random() < 0.5 ? 1 : -1);
+
+        const tryStep = (dir) => {
+          let nx = enemy.x + dir * move.speed * dt;
+          if (nx - r < minX) {
+            return { nx: minX, blocked: true, dir: 1 };
+          }
+          if (nx + r > maxX) {
+            return { nx: maxX, blocked: true, dir: -1 };
+          }
+          if (this.enemyOverlapsAnyBlock(nx, ny, r)) {
+            return {
+              nx: enemy.x,
+              blocked: true,
+              dir: options.randomOnBlock ? randomDir() : -dir,
+            };
+          }
+          return { nx, blocked: false, dir };
+        };
+
+        let step = tryStep(move.dir);
+        if (step.blocked) {
+          move.dir = step.dir;
+          step = tryStep(move.dir);
+        }
+        enemy.x = step.nx;
+        move.dir = step.dir;
+        return step.blocked;
+      }
+
+      updateHorizontalFlyerMovement(delta) {
         const dt = delta / 1000;
         this.enemies?.getChildren().forEach((enemy) => {
+          if (enemy.getData('killPending')) return;
+          const move = enemy.getData('flyerMove');
+          if (!move || !enemy.active) return;
+          this.stepHorizontalEnemy(enemy, move, dt);
+        });
+      }
+
+      updateFlameRiserMovement(delta) {
+        this.enemies?.getChildren().forEach((enemy) => {
+          if (enemy.getData('killPending')) return;
+          const move = enemy.getData('riserMove');
+          if (!move || !enemy.active) return;
+
+          if (move.phase === 'fall') {
+            move.chargeProgress = 0;
+            move.rocketProgress = 0;
+            move.t += delta;
+            const p = Math.min(1, move.t / FLAME_RISER_MOVE.fallDurationMs);
+            const ease = p * p;
+            const apexY = move.startY + move.fallDistance;
+            enemy.y = move.startY + (apexY - move.startY) * ease;
+            if (p >= 1) {
+              move.phase = 'charge';
+              move.t = 0;
+              move.apexY = enemy.y;
+            }
+          } else if (move.phase === 'charge') {
+            move.rocketProgress = 0;
+            move.t += delta;
+            const p = Math.min(1, move.t / FLAME_RISER_MOVE.chargeDurationMs);
+            move.chargeProgress = p;
+            const shake = Math.sin(p * Math.PI * 7) * (2 + p * 4);
+            enemy.y = move.apexY + shake;
+            if (p >= 1) {
+              move.phase = 'rocket';
+              move.t = 0;
+              enemy.y = move.apexY;
+            }
+          } else {
+            move.chargeProgress = 1;
+            move.t += delta;
+            const p = Math.min(1, move.t / FLAME_RISER_MOVE.rocketDurationMs);
+            move.rocketProgress = p;
+            const ease = 1 - Math.pow(1 - p, 4);
+            enemy.y = move.apexY + (move.startY - move.apexY) * ease;
+            if (p >= 1) {
+              enemy.y = move.startY;
+              move.phase = 'fall';
+              move.t = 0;
+              move.rocketProgress = 0;
+              move.chargeProgress = 0;
+            }
+          }
+          enemy.x = move.startX;
+          this.syncFlameRiserRocketTailParticles(enemy, move);
+        });
+      }
+
+      syncFlameRiserRocketTailParticles(enemy, move) {
+        const tail = enemy.getData('rocketTailParticles');
+        if (!tail) return;
+        const phase = move?.phase;
+        if (phase === 'charge' || phase === 'rocket') {
+          const p = phase === 'charge'
+            ? (move.chargeProgress ?? 0)
+            : 1;
+          tail.setPosition(enemy.x, enemy.y + enemy.displayHeight * 0.44);
+          if (!tail.emitting) tail.start();
+          const freq = phase === 'charge'
+            ? 6 + p * p * 38
+            : 55 + (1 - (move.rocketProgress ?? 0)) * 55;
+          tail.setFrequency(freq);
+          tail.setParticleSpeed?.(phase === 'rocket'
+            ? { min: 90, max: 220 }
+            : { min: 20 + p * 50, max: 60 + p * 90 });
+        } else if (tail.emitting) {
+          tail.stop();
+        }
+      }
+
+      updateSaucerMovement(delta) {
+        const dt = delta / 1000;
+        const now = this.time.now;
+        this.enemies?.getChildren().forEach((enemy) => {
+          if (enemy.getData('killPending')) return;
           const move = enemy.getData('saucerMove');
           if (!move || !enemy.active) return;
 
-          move.modeTimer += delta;
-
-          if (move.mode === 'circle') {
-            move.t += dt * 1.45;
-            enemy.x = move.startX + move.rx * Math.cos(move.t);
-            enemy.y = move.startY + move.ry * Math.sin(move.t);
-            if (move.modeTimer > 4000) {
-              move.mode = 'figure8';
-              move.modeTimer = 0;
-              move.t = 0;
-            }
-            return;
+          if (now >= move.nextDirChangeAt) {
+            move.dir = Math.random() < 0.5 ? 1 : -1;
+            move.nextDirChangeAt = now + Phaser.Math.Between(
+              SAUCER_MOVE.dirChangeMinMs,
+              SAUCER_MOVE.dirChangeMaxMs
+            );
           }
 
-          if (move.mode === 'figure8') {
-            move.t += dt * 1.65;
-            enemy.x = move.startX + move.rx * Math.sin(move.t);
-            enemy.y = move.startY + move.ry * Math.sin(move.t * 2);
-            if (move.modeTimer > 4600) {
-              move.mode = 'dart';
-              move.modeTimer = 0;
-              move.dartProgress = 0;
-              move.dartFrom = { x: enemy.x, y: enemy.y };
-              const angle = Math.random() * Math.PI * 2;
-              const dist = move.rx * (1.55 + Math.random() * 0.85);
-              move.dartTo = {
-                x: move.startX + Math.cos(angle) * dist,
-                y: move.startY + Math.sin(angle) * dist * 0.78,
-              };
-            }
-            return;
-          }
-
-          move.dartProgress += dt * 2.35;
-          const p = Math.min(1, move.dartProgress);
-          if (p < 0.42) {
-            const t = p / 0.42;
-            const ease = t * t;
-            enemy.x = move.dartFrom.x + (move.dartTo.x - move.dartFrom.x) * ease;
-            enemy.y = move.dartFrom.y + (move.dartTo.y - move.dartFrom.y) * ease;
-          } else {
-            const t = (p - 0.42) / 0.58;
-            const ease = 1 - (1 - t) * (1 - t);
-            enemy.x = move.dartTo.x + (move.startX - move.dartTo.x) * ease;
-            enemy.y = move.dartTo.y + (move.startY - move.dartTo.y) * ease;
-          }
-          if (p >= 1) {
-            move.mode = 'circle';
-            move.modeTimer = 0;
-            move.t = 0;
+          const blocked = this.stepHorizontalEnemy(enemy, move, dt, { randomOnBlock: true });
+          if (blocked) {
+            move.nextDirChangeAt = now + Phaser.Math.Between(
+              SAUCER_MOVE.dirChangeMinMs * 0.5,
+              SAUCER_MOVE.dirChangeMaxMs * 0.5
+            );
           }
         });
+      }
+
+      updateGroundWalkerVisuals(time) {
+        this.enemies?.getChildren().forEach((enemy) => {
+          if (!enemy.active || enemy.getData('typeId') !== 'ground_walker') return;
+          if (this.threeOverlay?.hasEnemyMesh?.(enemy)) return;
+
+          const vx = enemy.body?.velocity?.x ?? 0;
+          const horizSpeed = Math.abs(vx);
+          const moveAmt = Math.min(1, horizSpeed / GROUND_WALKER_FX.speedForFull);
+          const bobPhase = enemy.getData('bobPhase') ?? 0;
+          const step = Math.sin(time * GROUND_WALKER_FX.stepSpeed + bobPhase);
+          const stride = 0.35 + 0.65 * Math.abs(step);
+          const stretch = 1 + moveAmt * GROUND_WALKER_FX.stretchMax * stride;
+          const squash = 1 - moveAmt * GROUND_WALKER_FX.squashMax * (0.35 + 0.65 * (1 - Math.abs(step)));
+
+          if (horizSpeed > 3) {
+            enemy.setFlipX(vx < 0);
+          }
+          const bx = enemy.getData('baseScaleX') ?? 1;
+          const by = enemy.getData('baseScaleY') ?? 1;
+          enemy.setScale(bx * stretch, by * squash);
+        });
+      }
+
+      updateHorizontalFlyerVisuals(time) {
+        this.enemies?.getChildren().forEach((enemy) => {
+          if (!enemy.active || enemy.getData('typeId') !== 'horizontal_flyer') return;
+          if (this.threeOverlay?.hasEnemyMesh?.(enemy)) return;
+
+          const bobPhase = enemy.getData('bobPhase') ?? 0;
+          const floatWave = Math.sin(time * HORIZONTAL_FLYER_FX.floatSpeed + bobPhase);
+          const wing = Math.sin(time * HORIZONTAL_FLYER_FX.flapSpeed + bobPhase);
+          const spread = 1 + HORIZONTAL_FLYER_FX.wingSpread * wing;
+          const squash = 1 - HORIZONTAL_FLYER_FX.bodySquash * wing;
+          const bx = enemy.getData('baseScaleX') ?? 1;
+          const by = enemy.getData('baseScaleY') ?? 1;
+          enemy.setScale(bx * spread, by * squash);
+          enemy.setRotation(floatWave * HORIZONTAL_FLYER_FX.tiltMax);
+
+          const vx = enemy.body?.velocity?.x ?? 0;
+          if (Math.abs(vx) > 3) {
+            enemy.setFlipX(vx < 0);
+          }
+        });
+      }
+
+      updateFlameRiserVisuals(time) {
+        this.enemies?.getChildren().forEach((enemy) => {
+          if (!enemy.active || enemy.getData('typeId') !== 'flame_riser') return;
+          if (this.threeOverlay?.hasEnemyMesh?.(enemy)) return;
+
+          const phase = enemy.getData('bobPhase') ?? 0;
+          const riserMove = enemy.getData('riserMove');
+          const riserPhase = riserMove?.phase ?? 'fall';
+          const chargeP = riserMove?.chargeProgress ?? 0;
+          const rocketStretch = riserPhase === 'rocket' ? 1.18
+            : riserPhase === 'charge' ? 1 + chargeP * 0.14 : 1;
+          const chargeSquash = riserPhase === 'charge' ? 1 - chargeP * 0.16 : 1;
+          const t1 = time * FLAME_RISER_FX.flickerSpeed + phase;
+          const t2 = time * FLAME_RISER_FX.waverSpeed + phase * 1.65;
+          const stretchY = (0.9 + 0.14 * Math.sin(t2)) * rocketStretch;
+          const stretchX = 0.94 + 0.08 * Math.cos(t1 * 1.35);
+          const bx = enemy.getData('baseScaleX') ?? 1;
+          const by = enemy.getData('baseScaleY') ?? 1;
+          enemy.setScale(bx * stretchX * rocketStretch, by * stretchY * chargeSquash);
+
+          const emitter = enemy.getData('flameParticles');
+          if (emitter?.active) {
+            emitter.setPosition(enemy.x, enemy.y - enemy.displayHeight * 0.12);
+          }
+          this.syncFlameRiserRocketTailParticles(enemy, enemy.getData('riserMove'));
+        });
+      }
+
+      attachFlameRiserParticles(enemy) {
+        if (enemy.getData('flameParticles')) return;
+        const emitter = this.add.particles(enemy.x, enemy.y, 'particle', {
+          speed: { min: 10, max: 32 },
+          angle: { min: 248, max: 292 },
+          scale: { start: 0.4, end: 0 },
+          alpha: { start: 0.75, end: 0 },
+          lifespan: 420,
+          frequency: 50,
+          tint: [0xff6622, 0xffaa33, 0xff3300],
+          blendMode: 'ADD',
+        });
+        emitter.setDepth(6);
+        enemy.setData('flameParticles', emitter);
+      }
+
+      attachFlameRiserRocketTailParticles(enemy) {
+        if (enemy.getData('rocketTailParticles')) return;
+        const emitter = this.add.particles(enemy.x, enemy.y, 'particle', {
+          speed: { min: 70, max: 160 },
+          angle: { min: 80, max: 100 },
+          scale: { start: 0.7, end: 0 },
+          alpha: { start: 0.95, end: 0 },
+          lifespan: 420,
+          frequency: -1,
+          tint: [0xff2200, 0xff6600, 0xffdd44],
+          blendMode: 'ADD',
+        });
+        emitter.setDepth(6);
+        emitter.stop();
+        enemy.setData('rocketTailParticles', emitter);
       }
 
       // ---------------------------------------------------------------------------
@@ -4262,6 +5408,26 @@ PACKAGING FOR REAL MOBILE APPS
           this.updateNormalBlockStars(time);
           this.updateGrayBlockStars();
           this.updateSaucerMovement(delta);
+          this.updateHorizontalFlyerMovement(delta);
+          this.updateFlameRiserMovement(delta);
+
+          // Keep enemy hitboxes aligned with movement
+          this.enemies?.getChildren().forEach((enemy) => {
+            if (enemy.active && enemy.body) {
+              enemy.body.reset(enemy.x, enemy.y);
+              const prev = enemy.getData('movePrev');
+              const dt = Math.max(1, delta) / 1000;
+              if (prev) {
+                enemy.body.velocity.x = (enemy.x - prev.x) / dt;
+                enemy.body.velocity.y = (enemy.y - prev.y) / dt;
+              }
+              enemy.setData('movePrev', { x: enemy.x, y: enemy.y });
+            }
+          });
+
+          this.updateGroundWalkerVisuals(time);
+          this.updateHorizontalFlyerVisuals(time);
+          this.updateFlameRiserVisuals(time);
 
           // Expire stale power bounce queue
           if (this.powerBounceQueued && time - this.powerBounceQueuedAt > POWER_BOUNCE.queueWindowMs) {
@@ -4272,21 +5438,6 @@ PACKAGING FOR REAL MOBILE APPS
             }
           }
 
-          // Keep enemy hitboxes aligned with tweened positions
-          this.enemies?.getChildren().forEach((enemy) => {
-            if (enemy.active && enemy.body) {
-              enemy.body.reset(enemy.x, enemy.y);
-              if (enemy.getData('saucerMove')) {
-                const prev = enemy.getData('saucerPrev');
-                const dt = Math.max(1, delta) / 1000;
-                if (prev) {
-                  enemy.body.velocity.x = (enemy.x - prev.x) / dt;
-                  enemy.body.velocity.y = (enemy.y - prev.y) / dt;
-                }
-                enemy.setData('saucerPrev', { x: enemy.x, y: enemy.y });
-              }
-            }
-          });
         } catch (err) {
           bbError('update()', err);
         }
@@ -4431,6 +5582,15 @@ PACKAGING FOR REAL MOBILE APPS
           window.__blockBallThreeOverlay = mod.createThreeOverlay;
           const enemyModels = await import('./enemy-models.js');
           await enemyModels.loadEnemyModels();
+          const loadedEnemyModels = Object.keys(enemyModels.ENEMY_MODELS).filter(
+            (id) => enemyModels.isEnemyModelLoaded(id)
+          );
+          bbLog('enemy models loaded', loadedEnemyModels);
+          if (!enemyModels.isEnemyModelLoaded('horizontal_flyer')) {
+            console.warn('[BlockBall 3D] horizontal_flyer GLB did not load — check console for loader errors');
+          }
+          const pinballModel = await import('./pinball-bumper-model.js');
+          await pinballModel.loadPinballBumperModel();
           await mod.loadBallFaceTexture();
           await mod.loadAbilityBlockTextures();
           await mod.loadIndestructibleCrystalTexture();

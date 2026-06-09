@@ -1,0 +1,11 @@
+Model Information:
+* title:	Simple Bumpers
+* source:	https://sketchfab.com/3d-models/simple-bumpers-463a71006f974bfdb00170aae9ab4a83
+* author:	Jenson_A (https://sketchfab.com/Jenson_A)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Simple Bumpers" (https://sketchfab.com/3d-models/simple-bumpers-463a71006f974bfdb00170aae9ab4a83) by Jenson_A (https://sketchfab.com/Jenson_A) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

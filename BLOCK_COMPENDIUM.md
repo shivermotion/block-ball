@@ -2,7 +2,7 @@
 
 Reference for every block type: durability, scoring, and how each block responds to **Normal Bounce** vs **Power Bounce** hits.
 
-**Demo implementation today:** `normal`, `gray`, `normal_long_h` / `normal_long_v`, `gray_long_h` / `gray_long_v`, `power`, `power_long_h` / `power_long_v`, `ability`, `ability_long_h` / `ability_long_v`, `spike`, `indestructible`, `score`, `bonus` — see [`block-types.js`](block-types.js).
+**Demo implementation today:** `normal`, `gray`, `normal_long_h` / `normal_long_v`, `gray_long_h` / `gray_long_v`, `power`, `power_long_h` / `power_long_v`, `ability`, `ability_long_h` / `ability_long_v`, `spike`, `indestructible`, `pinball`, `score`, `bonus` — see [`block-types.js`](block-types.js).
 
 ---
 
@@ -149,6 +149,7 @@ During **Bonus Chance**, bonus blocks **collide** with the ball — you must hit
 - **Shield / Switch:** collected or destroyed instantly (when implemented)
 - **Spike** *(demo):* hazard on contact; not destroyed
 - **Indestructible:** immune; ball bounces
+- **Pinball / Bumper:** indestructible; bounce + speed boost; **+20** pts per hit
 
 ### Power bounce
 
@@ -158,6 +159,7 @@ During **Bonus Chance**, bonus blocks **collide** with the ball — you must hit
 - Often higher score multiplier on destroyable blocks (demo: 1.5×)
 - **Spike** *(demo):* safe to bounce off while powered; hazard otherwise
 - **Indestructible:** always immune; never removed by bounce
+- **Pinball / Bumper:** same as normal bounce — speed boost + **20** pts per hit
 
 ---
 
@@ -172,6 +174,7 @@ During **Bonus Chance**, bonus blocks **collide** with the ball — you must hit
 | **Bonus Chance item** | Collect item → **30s** timer; blocks become hit-to-collect (no ricochet); uncollected blocks revert when time ends |
 | **Shield → spike cover** | Each Shield collected (Round 4) adds a protective cover over one boss-round Spike gutter; all shields → **1-Up** + safer fight |
 | **Score** | Layout block; up to 7 hits for escalating points; 7th hit with ability active may grant **1-Up** |
+| **Pinball / Bumper** | Indestructible; each hit awards **20** pts and accelerates the ball |
 | **Splitting** | Large block splits into four smaller Normal/Gray pieces |
 | **Required vs optional** | Normal, Gray, Power, Splitting usually required to clear; Shield, Score, Ability, Pinball often optional |
 
@@ -189,6 +192,7 @@ All block, ball, paddle, enemy, and item visuals are **procedural placeholders**
 | **Power** | `block_power` | Procedural dark block + gold trim |
 | **Power long** | `block_power_long_*` | Stretched from `block_power` |
 | **Indestructible** | `block_indestructible` | Procedural steel + **X** |
+| **Pinball / Bumper** | `block_pinball` | Procedural round red bumper + white ring |
 | **Score** | `block_score` | Procedural lavender **2×2** tile (50→3200, ×7 hits) |
 | **Bonus** | `block_bonus` | Procedural gold tile — pass-through collectible (100 pts when placed) |
 | **Ability** | `block_ability` | Procedural violet block + cyan diamond |
@@ -219,12 +223,13 @@ All block, ball, paddle, enemy, and item visuals are **procedural placeholders**
 | `28` | Ability — Copy Ability gatekeeper (**300** pts) |
 | `30` + `31` | Ability long ↔ (**500** pts) |
 | `32` + `33` | Ability long ↕ (**500** pts) |
+| `34` | Pinball / Bumper (**20** pts per hit) |
 
-String keys: `.` empty, `1` normal, `g` gray, `p` power, `s` spike, `i` indestructible, `7`/`f` ability, `j`/`k` ability long, `e` score, `u` bonus.
+String keys: `.` empty, `1` normal, `g` gray, `p` power, `s` spike, `i` indestructible, `7`/`f` ability, `j`/`k` ability long, `e` score, `u` bonus, `b` pinball bumper.
 
 Spike blocks use cell value `4` in `blocks.cells`. Legacy `blocks.spikes` is migrated at load.
 
-Future types (shield, switch, through, pinball, splitting) will need new cell values when implemented.
+Future types (shield, switch, through, splitting) will need new cell values when implemented.
 
 ---
 
