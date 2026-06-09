@@ -229,9 +229,9 @@ const BLOCK_COMPENDIUM = [
   {
     id: 'pinball',
     name: 'Pinball / Bumper Block',
-    implemented: false,
-    appearance: 'Round bumper',
-    points: 10,
+    implemented: true,
+    appearance: 'Round red bumper with white ring',
+    points: 20,
     normalHit: 'bounce_boost',
     powerHit: 'bounce_boost',
     notes: 'Indestructible; speeds up ball; farmable small points.',
@@ -355,6 +355,17 @@ const BLOCK_TYPES = {
     powerHit: 'immune',
     countsTowardClear: false,
   },
+  pinball: {
+    id: 'pinball',
+    texture: 'block_pinball',
+    colSpan: 2,
+    rowSpan: 2,
+    points: 20,
+    powerOnly: false,
+    normalHit: 'bounce_boost',
+    powerHit: 'bounce_boost',
+    countsTowardClear: false,
+  },
   score: {
     id: 'score',
     texture: 'block_score',
@@ -442,6 +453,9 @@ const HIDDEN_BLOCK_CELL = 23;
 /** Grid anchor for hidden block 2×2 (extensions `25`–`27`). */
 const HIDDEN_2X2_BLOCK_CELL = 24;
 
+/** Pinball bumper 2×2 anchor (extensions `35`–`37`). */
+const PINBALL_BLOCK_CELL = 34;
+
 /** Allowed `hiddenBehind` values for 1×1 hidden panels. */
 const HIDDEN_REVEAL_CELLS = new Set([1, 2, 3, 4, 5, 22, 28]);
 
@@ -472,6 +486,7 @@ const BLOCK_CELL_MAP = {
   28: 'ability',
   30: 'ability_long_h',
   32: 'ability_long_v',
+  34: 'pinball',
 };
 
 /** Long-block extension cells (second half of footprint; not spawned as their own body). */
@@ -490,6 +505,9 @@ const BLOCK_CELL_EXTENSION = {
   27: { anchorCell: 24, dCol: -1, dRow: -1 },
   31: { anchorCell: 30, dCol: -1, dRow: 0 },
   33: { anchorCell: 32, dCol: 0, dRow: -1 },
+  35: { anchorCell: 34, dCol: -1, dRow: 0 },
+  36: { anchorCell: 34, dCol: 0, dRow: -1 },
+  37: { anchorCell: 34, dCol: -1, dRow: -1 },
 };
 
 /** Score block — 2×2 anchor `18` plus extension cells `19`–`21`. */
@@ -505,6 +523,13 @@ const HIDDEN_2X2_BLOCK_CELLS = [
   { dc: 1, dr: 0, v: 25 },
   { dc: 0, dr: 1, v: 26 },
   { dc: 1, dr: 1, v: 27 },
+];
+
+const PINBALL_BLOCK_CELLS = [
+  { dc: 0, dr: 0, v: 34 },
+  { dc: 1, dr: 0, v: 35 },
+  { dc: 0, dr: 1, v: 36 },
+  { dc: 1, dr: 1, v: 37 },
 ];
 
 const LONG_BLOCK_PAINT = {
@@ -524,7 +549,10 @@ function isBlockExtensionCell(cell) {
 
 function isBlockAnchorCell(cell) {
   return (
-    Object.prototype.hasOwnProperty.call(LONG_BLOCK_PAINT, cell) || cell === 18 || cell === HIDDEN_2X2_BLOCK_CELL
+    Object.prototype.hasOwnProperty.call(LONG_BLOCK_PAINT, cell) ||
+    cell === 18 ||
+    cell === HIDDEN_2X2_BLOCK_CELL ||
+    cell === PINBALL_BLOCK_CELL
   );
 }
 
@@ -552,6 +580,14 @@ function clearScoreFootprint(cells, col, row) {
 
 function clearHidden2x2Footprint(cells, col, row) {
   for (const slot of HIDDEN_2X2_BLOCK_CELLS) {
+    const r = row + slot.dr;
+    const c = col + slot.dc;
+    if (cells[r]?.[c] != null) cells[r][c] = 0;
+  }
+}
+
+function clearPinballFootprint(cells, col, row) {
+  for (const slot of PINBALL_BLOCK_CELLS) {
     const r = row + slot.dr;
     const c = col + slot.dc;
     if (cells[r]?.[c] != null) cells[r][c] = 0;
@@ -607,6 +643,60 @@ function paintHidden2x2BlockCells(cells, col, row) {
     cells[row + slot.dr][col + slot.dc] = slot.v;
   }
   return true;
+}
+
+function canPaintPinballBlock(cells, cols, rows, col, row) {
+  for (const slot of PINBALL_BLOCK_CELLS) {
+    const c = col + slot.dc;
+    const r = row + slot.dr;
+    if (c < 0 || r < 0 || c >= cols || r >= rows) return false;
+    const v = cells[r][c];
+    if (!v) continue;
+    const existing = resolveBlockAnchor(cells, c, r);
+    if (
+      existing &&
+      existing.col === col &&
+      existing.row === row &&
+      existing.anchorCell === PINBALL_BLOCK_CELL
+    ) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+function paintPinballBlockCells(cells, col, row) {
+  for (const slot of PINBALL_BLOCK_CELLS) {
+    cells[row + slot.dr][col + slot.dc] = slot.v;
+  }
+  return true;
+}
+
+function migratePinballFootprints(cells, cols, rows) {
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (cells[row][col] !== PINBALL_BLOCK_CELL) continue;
+      const complete =
+        cells[row][col + 1] === 35 &&
+        cells[row + 1]?.[col] === 36 &&
+        cells[row + 1]?.[col + 1] === 37;
+      if (complete) continue;
+      if (canPaintPinballBlock(cells, cols, rows, col, row)) {
+        paintPinballBlockCells(cells, col, row);
+      } else {
+        clearPinballFootprint(cells, col, row);
+      }
+    }
+  }
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const v = cells[row][col];
+      if (v !== 35 && v !== 36 && v !== 37) continue;
+      const anchor = resolveBlockAnchor(cells, col, row);
+      if (!anchor || anchor.anchorCell !== PINBALL_BLOCK_CELL) cells[row][col] = 0;
+    }
+  }
 }
 
 function migrateHidden2x2Footprints(cells, cols, rows) {
@@ -671,6 +761,10 @@ function clearBlockFootprint(cells, col, row) {
     clearHidden2x2Footprint(cells, anchor.col, anchor.row);
     return;
   }
+  if (anchor?.anchorCell === PINBALL_BLOCK_CELL) {
+    clearPinballFootprint(cells, anchor.col, anchor.row);
+    return;
+  }
   if (anchor && LONG_BLOCK_PAINT[anchor.anchorCell]) {
     const paint = LONG_BLOCK_PAINT[anchor.anchorCell];
     cells[anchor.row][anchor.col] = 0;
@@ -690,7 +784,7 @@ function getBlockFootprint(typeId) {
   return { colSpan: def.colSpan ?? 1, rowSpan: def.rowSpan ?? 1 };
 }
 
-const BONUS_CHANCE_IMMUNE_TYPES = new Set(['indestructible', 'spike']);
+const BONUS_CHANCE_IMMUNE_TYPES = new Set(['indestructible', 'spike', 'pinball']);
 
 /** Whether a live block can be turned into a pass-through bonus block (Bonus Chance item). */
 function canBlockBecomeBonus(typeId) {
@@ -838,6 +932,9 @@ function resolveBlockHit(typeId, isPowered, options = {}) {
     if (hasCopyAbility) return { action: 'destroy', points: def.points };
     return { action: 'immune', points: 0 };
   }
+  if (def.normalHit === 'bounce_boost' || def.powerHit === 'bounce_boost') {
+    return { action: 'bounce_boost', points: def.points ?? 0 };
+  }
   if (isPowered) {
     if (def.powerHit === 'destroy') return { action: 'destroy', points: def.points };
     if (def.powerHit === 'immune') return { action: 'immune', points: 0 };
@@ -864,6 +961,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.isUnrevealedHiddenBlock = isUnrevealedHiddenBlock;
   globalThis.HIDDEN_BLOCK_CELL = HIDDEN_BLOCK_CELL;
   globalThis.HIDDEN_2X2_BLOCK_CELL = HIDDEN_2X2_BLOCK_CELL;
+  globalThis.PINBALL_BLOCK_CELL = PINBALL_BLOCK_CELL;
   globalThis.HIDDEN_REVEAL_CELLS = HIDDEN_REVEAL_CELLS;
   globalThis.HIDDEN_2X2_REVEAL_CELLS = HIDDEN_2X2_REVEAL_CELLS;
   globalThis.HIDDEN_BEHIND_CELLS = HIDDEN_BEHIND_CELLS;
@@ -874,6 +972,9 @@ if (typeof globalThis !== 'undefined') {
   globalThis.clearHiddenRevealFootprint = clearHiddenRevealFootprint;
   globalThis.clearHidden2x2Footprint = clearHidden2x2Footprint;
   globalThis.paintScoreBlockCells = paintScoreBlockCells;
+  globalThis.canPaintPinballBlock = canPaintPinballBlock;
+  globalThis.paintPinballBlockCells = paintPinballBlockCells;
+  globalThis.clearPinballFootprint = clearPinballFootprint;
   globalThis.ensureHiddenBehindGrid = ensureHiddenBehindGrid;
   globalThis.getHiddenRevealCell = getHiddenRevealCell;
   globalThis.setHiddenRevealCell = setHiddenRevealCell;

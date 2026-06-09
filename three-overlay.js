@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { cloneEnemyModel, hasEnemyModel, isEnemyModelLoaded } from './enemy-models.js';
+import { clonePinballBumperModel } from './pinball-bumper-model.js';
 
 const DIORAMA = {
   /** Soft isometric tilt — blocks lean toward camera; Phaser positions unchanged. */
@@ -23,6 +24,59 @@ const DIORAMA = {
   blockBulgeScaleY: 1,
   blockBulgeScaleZ: 1,
   roundedBoxSegments: 6,
+};
+
+const GROUND_WALKER_FX = {
+  faceYaw: 0.58,
+  faceLerp: 0.2,
+  stretchMax: 0.15,
+  squashMax: 0.12,
+  stepSpeed: 0.0046,
+  speedForFull: 52,
+};
+
+/** Surrounding flame ring for Flame Riser — tight halo hugging the model. */
+const FLAME_RISER_FX = {
+  groupScale: 1.95,
+  ringCount: 8,
+  topCount: 3,
+  ringRadiusFrac: 0.5,
+  flameHeightFrac: 0.48,
+  flameWidthFrac: 0.24,
+  flickerSpeed: 0.014,
+  waverSpeed: 0.021,
+  rocketIntensity: 1.55,
+  chargeIntensity: 1.28,
+  rocketTailBaseScale: 1.1,
+  rocketTailRocketBoost: 0.95,
+  ringOrbitSpeed: 0.0015,
+  ringOrbitChargeSpeed: 0.0022,
+  ringOrbitRocketSpeed: 0.0034,
+};
+
+/** 3D enemy death: pop → spin → shrink/fade over destroyDelayMs. */
+const ENEMY_DEATH_ANIM = {
+  popPeak: 0.44,
+  popAt: 0.15,
+  shrinkStart: 0.3,
+  fadeStart: 0.48,
+  spinTurns: 0.7,
+  poweredSpinTurns: 1.05,
+  liftPx: 16,
+};
+
+/** Gentle soaring flutter — rhythmic, not velocity-jittery. */
+const HORIZONTAL_FLYER_FX = {
+  floatSpeed: 0.0016,
+  flapSpeed: 0.0042,
+  wingSpread: 0.07,
+  bodySquash: 0.05,
+  liftAmp: 3.2,
+  pitchMax: 0.09,
+  glideBank: 0.09,
+  bankLerp: 0.06,
+  faceYaw: 0.38,
+  faceLerp: 0.08,
 };
 
 /** RoundedBoxGeometry groups: 0±X, 1±X, 2+Y, 3-Y, 4+Z front, 5-Z back. */
@@ -684,6 +738,7 @@ const BLOCK_MATERIALS = {
   power: { color: 0x235789, emissive: 0x235789, emissiveIntensity: 0.28 },
   ability: { color: 0x5533aa, emissive: 0x4422aa, emissiveIntensity: 0.34 },
   indestructible: { color: 0x1a1a22, emissive: 0x0a0812, emissiveIntensity: 0.12 },
+  pinball: { color: 0xff2233, emissive: 0xff1122, emissiveIntensity: 0.52 },
   spike: {
     color: 0x2e2438,
     emissive: 0x120a18,
@@ -716,6 +771,7 @@ const MESH_BLOCK_TYPES = new Set([
   'gray_long_v',
   'power_long_h',
   'power_long_v',
+  'pinball',
 ]);
 
 function isPowerBlockTypeId(typeId) {
@@ -732,6 +788,7 @@ function blockMaterialKey(block) {
   if (isPowerBlockTypeId(typeId)) return 'power';
   if (isAbilityBlockTypeId(typeId)) return 'ability';
   if (typeId === 'indestructible') return 'indestructible';
+  if (typeId === 'pinball') return 'pinball';
   if (typeId === 'spike') return 'spike';
   if (typeId === 'bonus') return 'bonus';
   if (typeId === 'score') return 'score';
@@ -1177,6 +1234,42 @@ function prepareScoreBlockHitFx(block, entry) {
   };
 }
 
+const PINBALL_BUMPER_FX = {
+  squashMs: 140,
+  squashScale: 1.16,
+};
+
+function syncPinballBumperHitFx(block, entry, scene) {
+  const sphere = entry.group.userData.boxMesh;
+  if (!sphere || block.getData('typeId') !== 'pinball' || !scene?.time) return;
+
+  const base = entry.group.userData.pinballBaseScale ?? {
+    x: sphere.scale.x,
+    y: sphere.scale.y,
+    z: sphere.scale.z,
+  };
+  entry.group.userData.pinballBaseScale = base;
+
+  const hitStart = block.getData('pinballHitFxStart');
+  if (hitStart == null) {
+    sphere.scale.set(base.x, base.y, base.z);
+    return;
+  }
+
+  const elapsed = scene.time.now - hitStart;
+  const { squashMs, squashScale } = PINBALL_BUMPER_FX;
+  if (elapsed >= squashMs) {
+    block.setData('pinballHitFxStart', null);
+    sphere.scale.set(base.x, base.y, base.z);
+    return;
+  }
+
+  const t = elapsed / squashMs;
+  const pulse = t < 0.5 ? t * 2 : (1 - t) * 2;
+  const s = 1 + (squashScale - 1) * pulse;
+  sphere.scale.set(base.x * s, base.y * s * 0.92, base.z * s);
+}
+
 function syncScoreBlockFx(block, entry, scene) {
   if (!isScoreBlockTypeId(block.getData('typeId')) || !scene?.time) return;
 
@@ -1463,6 +1556,226 @@ function createAbilityFlameGroup(iconSize) {
   }
   root.visible = false;
   return root;
+}
+
+function createFlameRiserFlameGroup(baseSize) {
+  const tex = getAbilityFlameTexture();
+  const root = new THREE.Group();
+  const ringOrbit = new THREE.Group();
+  ringOrbit.userData.isRingOrbit = true;
+  root.add(ringOrbit);
+  root.userData.ringOrbit = ringOrbit;
+
+  const addFlame = (parent, x, y, z, w, h, opacity, phase, { isRing = false, rotZ = 0 } = {}) => {
+    const flame = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({
+        map: tex,
+        color: 0xff7722,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      })
+    );
+    flame.position.set(x, y, z);
+    flame.rotation.z = rotZ;
+    flame.renderOrder = 8;
+    flame.userData.baseOpacity = opacity;
+    flame.userData.baseX = x;
+    flame.userData.baseY = y;
+    flame.userData.baseZ = z;
+    flame.userData.baseRotZ = rotZ;
+    flame.userData.flamePhase = phase;
+    flame.userData.isRing = isRing;
+    parent.add(flame);
+    return flame;
+  };
+
+  for (let i = 0; i < FLAME_RISER_FX.ringCount; i++) {
+    const angle = (i / FLAME_RISER_FX.ringCount) * Math.PI * 2;
+    const scale = 0.78 + (i % 3) * 0.12;
+    const radius = baseSize * FLAME_RISER_FX.ringRadiusFrac;
+    const w = baseSize * FLAME_RISER_FX.flameWidthFrac * scale;
+    const h = baseSize * FLAME_RISER_FX.flameHeightFrac * scale;
+    addFlame(
+      ringOrbit,
+      Math.cos(angle) * radius,
+      Math.sin(angle) * radius,
+      0,
+      w,
+      h,
+      0.45 + (i % 2) * 0.12,
+      i * 1.4,
+      { isRing: true, rotZ: angle - Math.PI * 0.5 }
+    );
+  }
+
+  for (let i = 0; i < FLAME_RISER_FX.topCount; i++) {
+    const x = (i - 1) * baseSize * 0.12;
+    addFlame(
+      root,
+      x,
+      baseSize * 0.2,
+      baseSize * 0.02,
+      baseSize * FLAME_RISER_FX.flameWidthFrac * 0.9,
+      baseSize * FLAME_RISER_FX.flameHeightFrac * 0.95,
+      0.52 + i * 0.06,
+      i * 2.1 + 4
+    );
+  }
+
+  return root;
+}
+
+function createFlameRiserRocketTail(baseSize) {
+  const tex = getAbilityFlameTexture();
+  const root = new THREE.Group();
+  root.visible = false;
+
+  const addPlume = (y, w, h, opacity, phase, rotY) => {
+    const plume = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({
+        map: tex,
+        color: 0xffaa44,
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      })
+    );
+    // Face the camera; flame height runs screen-down (−Y), not model-local.
+    plume.position.set(0, y, 2);
+    plume.rotation.set(0, rotY, 0);
+    plume.renderOrder = 10;
+    plume.userData.baseY = y;
+    plume.userData.baseOpacity = opacity;
+    plume.userData.flamePhase = phase;
+    root.add(plume);
+  };
+
+  const specs = [
+    { yOff: 0.06, w: 0.28, h: 0.68, opacity: 0.88 },
+    { yOff: 0.2, w: 0.22, h: 0.88, opacity: 0.72 },
+    { yOff: 0.36, w: 0.17, h: 1.05, opacity: 0.52 },
+    { yOff: 0.52, w: 0.12, h: 1.18, opacity: 0.34 },
+  ];
+  for (let i = 0; i < 4; i++) {
+    const rotY = (i / 4) * Math.PI * 0.5;
+    specs.forEach((spec, j) => {
+      const h = baseSize * spec.h;
+      addPlume(
+        -baseSize * spec.yOff - h * 0.42,
+        baseSize * spec.w,
+        h,
+        spec.opacity,
+        i * 1.1 + j * 2.3,
+        rotY
+      );
+    });
+  }
+  return root;
+}
+
+function syncFlameRiserRocketTail(anchor, tailGroup, baseMax, timeMs, riserPhase, chargeProgress, rocketProgress) {
+  if (!tailGroup || !anchor) return;
+  const active = riserPhase === 'charge' || riserPhase === 'rocket';
+  tailGroup.visible = active;
+  anchor.visible = active;
+  if (!active) return;
+
+  // Screen-down exhaust — sibling of tilt group, never spins with the model.
+  anchor.position.set(0, -baseMax * 0.36, 0);
+  anchor.rotation.set(0, 0, 0);
+  tailGroup.rotation.set(0, 0, 0);
+
+  let intensity = 0;
+  if (riserPhase === 'charge') {
+    const p = chargeProgress ?? 0;
+    intensity = p * p * 0.72;
+  } else {
+    intensity = 0.7 + 0.3 * (1 - (rocketProgress ?? 0));
+  }
+  const groupScale = FLAME_RISER_FX.rocketTailBaseScale
+    * (0.4 + intensity * (riserPhase === 'rocket' ? FLAME_RISER_FX.rocketTailRocketBoost : 0.85));
+  tailGroup.scale.set(groupScale, groupScale * (1.05 + intensity * 0.25), groupScale);
+
+  tailGroup.children.forEach((plume, i) => {
+    const phase = plume.userData.flamePhase ?? i;
+    const t1 = timeMs * 0.028 + phase;
+    const t2 = timeMs * 0.04 + phase;
+    const flicker = 0.5 + 0.5 * Math.sin(t1);
+    if (plume.material) {
+      plume.material.opacity = Math.min(1, (plume.userData.baseOpacity ?? 0.6) * flicker * (0.55 + intensity * 1.05));
+    }
+    const stretchY = (0.82 + 0.28 * Math.sin(t2)) * (1 + intensity * 0.4);
+    const stretchX = 0.8 + 0.2 * Math.cos(t1 * 1.2);
+    plume.scale.set(stretchX, stretchY, 1);
+    const baseY = plume.userData.baseY ?? 0;
+    plume.position.y = baseY - Math.sin(t2 * 1.1) * baseMax * 0.12 * intensity;
+  });
+}
+
+function syncFlameRiserFx(flameGroup, baseMax, timeMs, riserPhase = 'fall', chargeProgress = 0) {
+  if (!flameGroup) return;
+  const boost = riserPhase === 'rocket'
+    ? FLAME_RISER_FX.rocketIntensity
+    : riserPhase === 'charge'
+      ? 1 + (FLAME_RISER_FX.chargeIntensity - 1) * (chargeProgress ?? 0)
+      : 1;
+  const rocketStretch = riserPhase === 'rocket' ? 1.28
+    : riserPhase === 'charge' ? 1 + (chargeProgress ?? 0) * 0.14 : 1;
+  const ringOrbit = flameGroup.userData.ringOrbit;
+  if (ringOrbit) {
+    const orbitSpeed = riserPhase === 'rocket'
+      ? FLAME_RISER_FX.ringOrbitRocketSpeed
+      : riserPhase === 'charge'
+        ? FLAME_RISER_FX.ringOrbitChargeSpeed
+        : FLAME_RISER_FX.ringOrbitSpeed;
+    ringOrbit.rotation.z = timeMs * orbitSpeed;
+  }
+
+  const animateFlame = (flame, i) => {
+    const phase = flame.userData.flamePhase ?? i;
+    const t1 = timeMs * FLAME_RISER_FX.flickerSpeed + phase;
+    const t2 = timeMs * FLAME_RISER_FX.waverSpeed + phase * 1.65;
+    const flicker = 0.52 + 0.28 * Math.sin(t1) + 0.2 * Math.sin(t2 * 2.1);
+    if (flame.material) {
+      flame.material.opacity = Math.min(1, (flame.userData.baseOpacity ?? 0.6) * flicker * boost);
+    }
+
+    const stretchY = (0.78 + 0.32 * Math.sin(t2)) * rocketStretch;
+    const stretchX = 0.86 + 0.18 * Math.cos(t1 * 1.35);
+    flame.scale.set(stretchX, stretchY, 1);
+
+    const sway = baseMax * 0.016;
+    const rise = baseMax * (riserPhase === 'rocket' ? 0.055
+      : riserPhase === 'charge' ? 0.02 + (chargeProgress ?? 0) * 0.04 : 0.028);
+    const baseX = flame.userData.baseX ?? 0;
+    const baseY = flame.userData.baseY ?? 0;
+    const baseZ = flame.userData.baseZ ?? 0;
+    flame.position.x = baseX + Math.sin(t2 * 0.9) * sway;
+    flame.position.y = baseY + Math.sin(t1) * rise + Math.sin(t2 * 1.5) * rise * 0.55;
+    flame.position.z = baseZ + Math.cos(t2 * 0.85) * sway * 0.7;
+
+    if (flame.userData.isRing) {
+      flame.rotation.z = (flame.userData.baseRotZ ?? 0) + Math.sin(t1 * 1.15) * 0.14;
+    } else {
+      flame.rotation.z = Math.sin(t2) * 0.1;
+      flame.rotation.x = Math.sin(t1 * 0.9) * 0.06;
+    }
+  };
+
+  flameGroup.children.forEach((child, i) => {
+    if (child.userData?.isRingOrbit) {
+      child.children.forEach(animateFlame);
+    } else if (child.isMesh) {
+      animateFlame(child, i);
+    }
+  });
 }
 
 function addAbilityBlockMobIcon(group, pw, ph, depth) {
@@ -1759,6 +2072,9 @@ function createBlockMesh(block) {
   if (block.getData('typeId') === 'score') {
     return createScoreBlockMesh(block);
   }
+  if (block.getData('typeId') === 'pinball') {
+    return createPinballBumperMesh(block);
+  }
 
   const w = block.displayWidth;
   const h = block.displayHeight;
@@ -1799,6 +2115,84 @@ function createBlockMesh(block) {
   group.userData.blockDepth = depth;
   group.userData.blockPw = pw;
   group.userData.blockPh = ph;
+  return group;
+}
+
+function fitPinballModelToBlockSlot(model, pw, ph, depth) {
+  model.updateMatrixWorld(true);
+  const baseSize = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+  model.scale.set(
+    (pw / baseSize.x) * DIORAMA.blockBulgeScaleX,
+    (ph / baseSize.y) * DIORAMA.blockBulgeScaleY,
+    (depth / baseSize.z) * DIORAMA.blockBulgeScaleZ
+  );
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(model);
+  model.position.x -= (box.min.x + box.max.x) * 0.5;
+  model.position.y -= (box.min.y + box.max.y) * 0.5;
+  // Match centered RoundedBoxGeometry: back at -depth/2, puff toward +Z.
+  model.position.z -= box.min.z + depth * 0.5;
+  return {
+    x: model.scale.x,
+    y: model.scale.y,
+    z: model.scale.z,
+  };
+}
+
+function createPinballBumperMesh(block) {
+  const w = block.displayWidth;
+  const h = block.displayHeight;
+  const { pw, ph, depth } = blockPuffyDimensions(w, h);
+  const group = new THREE.Group();
+  const matKey = 'pinball';
+
+  const model = clonePinballBumperModel();
+  if (model) {
+    const baseScale = fitPinballModelToBlockSlot(model, pw, ph, depth);
+    group.add(model);
+
+    group.userData.matKey = matKey;
+    group.userData.boxMesh = model;
+    group.userData.pinballBaseScale = baseScale;
+    group.userData.blockDepth = depth;
+    group.userData.blockPw = pw;
+    group.userData.blockPh = ph;
+    return group;
+  }
+
+  const radius = Math.min(w, h) * 0.44;
+  const fallbackDepth = radius * 1.35;
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 28, 24),
+    makePuffyBlockMaterial('pinball')
+  );
+  sphere.scale.set(
+    DIORAMA.blockBulgeScaleX,
+    DIORAMA.blockBulgeScaleY,
+    DIORAMA.blockBulgeScaleZ
+  );
+  group.add(sphere);
+
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(radius * 0.62, radius * 0.07, 10, 32),
+    new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.35,
+      roughness: 0.35,
+      metalness: 0.05,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.15,
+    })
+  );
+  ring.position.z = dioramaFrontZ(fallbackDepth) * 0.15;
+  group.add(ring);
+
+  group.userData.matKey = matKey;
+  group.userData.boxMesh = sphere;
+  group.userData.blockDepth = fallbackDepth;
+  group.userData.blockPw = w;
+  group.userData.blockPh = h;
   return group;
 }
 
@@ -2210,11 +2604,26 @@ function createBonusChanceItemMesh(displayWidth, displayHeight) {
 function createEnemyMesh(typeId) {
   const model = cloneEnemyModel(typeId);
   if (!model) return null;
+  isolateEnemyMaterials(model);
 
   const group = new THREE.Group();
   const tiltGroup = new THREE.Group();
   const facingGroup = new THREE.Group();
   facingGroup.add(model);
+  if (typeId === 'flame_riser') {
+    const baseMax = model.userData.baseMaxDim ?? 1;
+    const flameFx = createFlameRiserFlameGroup(baseMax);
+    const s = FLAME_RISER_FX.groupScale;
+    flameFx.scale.set(s, s, s);
+    facingGroup.add(flameFx);
+    group.userData.flameRiserFx = flameFx;
+    const rocketTail = createFlameRiserRocketTail(baseMax);
+    const rocketTailAnchor = new THREE.Group();
+    rocketTailAnchor.add(rocketTail);
+    group.add(rocketTailAnchor);
+    group.userData.flameRiserRocketTail = rocketTail;
+    group.userData.flameRiserRocketTailAnchor = rocketTailAnchor;
+  }
   tiltGroup.add(facingGroup);
   group.add(tiltGroup);
 
@@ -2317,6 +2726,36 @@ function hidePhaserSprite(sprite) {
   sprite.setVisible(false);
 }
 
+/** GLB clones share geometry with the cached template — only materials may be per-instance. */
+function isolateEnemyMaterials(root) {
+  root.traverse((node) => {
+    if (!node.isMesh || !node.material) return;
+    if (Array.isArray(node.material)) {
+      node.material = node.material.map((mat) => {
+        const clone = mat.clone();
+        clone.userData.enemyInstanceMaterial = true;
+        return clone;
+      });
+    } else {
+      const clone = node.material.clone();
+      clone.userData.enemyInstanceMaterial = true;
+      node.material = clone;
+    }
+    node.userData.enemyInstanceMaterial = true;
+  });
+}
+
+function disposeEnemyInstance(group) {
+  group.traverse((obj) => {
+    if (!obj.isMesh || !obj.material || !obj.userData.enemyInstanceMaterial) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const mat of mats) {
+      if (mat.userData?.enemyInstanceMaterial) mat.dispose();
+    }
+    obj.userData.enemyInstanceMaterial = false;
+  });
+}
+
 function disposeMeshTree(mesh) {
   mesh.traverse((obj) => {
     if (obj.geometry) obj.geometry.dispose();
@@ -2392,7 +2831,7 @@ export function createThreeOverlay(opts) {
   const blockMeshes = new Map();
   /** @type {Map<object, { group: THREE.Group }>} */
   const itemMeshes = new Map();
-  /** @type {Map<object, { group: THREE.Group, enemyRef: object, baseMaxDim: number, bobPhase: number, hitFlashStart: number | null }>} */
+  /** @type {Map<object, { group: THREE.Group, enemyRef: object, baseMaxDim: number, bobPhase: number, hitFlashStart: number | null, killImpactStart: number | null, killImpactDurationMs: number, killImpactPowered: boolean }>} */
   const enemyMeshes = new Map();
   /** @type {Array<{ starGroup: THREE.Group, start: number, baseY: number, baseRot: number, onComplete?: () => void }>} */
   const scoreStarLiberations = [];
@@ -2453,7 +2892,13 @@ export function createThreeOverlay(opts) {
       zBias
     );
     const rz = sprite.rotation || 0;
-    mesh.rotation.set(DIORAMA.viewTiltX, DIORAMA.viewTiltY, rz);
+    const tiltGroup = mesh.userData.tiltGroup;
+    if (tiltGroup) {
+      mesh.rotation.set(0, 0, 0);
+      tiltGroup.rotation.set(DIORAMA.viewTiltX, DIORAMA.viewTiltY, rz);
+    } else {
+      mesh.rotation.set(DIORAMA.viewTiltX, DIORAMA.viewTiltY, rz);
+    }
   }
 
   function blockLiftFor(block, group = null) {
@@ -2462,6 +2907,96 @@ export function createThreeOverlay(opts) {
       group?.userData?.blockDepth ??
       blockPuffyDimensions(block.displayWidth, block.displayHeight).depth;
     return dioramaBlockLift(depth);
+  }
+
+  function enemyDeathAnimCurves(p, powered) {
+    const peak = powered ? ENEMY_DEATH_ANIM.popPeak * 1.12 : ENEMY_DEATH_ANIM.popPeak;
+    const popAt = ENEMY_DEATH_ANIM.popAt;
+    const shrinkStart = ENEMY_DEATH_ANIM.shrinkStart;
+    let popScale = 1;
+    if (p <= popAt) {
+      popScale = 1 + peak * Math.sin((p / popAt) * Math.PI * 0.5);
+    } else if (p < shrinkStart) {
+      const t = (p - popAt) / (shrinkStart - popAt);
+      popScale = 1 + peak * (1 - t * 0.38);
+    } else {
+      const t = (p - shrinkStart) / (1 - shrinkStart);
+      popScale = (1 + peak * 0.62) * (1 - t * t * t);
+    }
+
+    const spinTurns = powered ? ENEMY_DEATH_ANIM.poweredSpinTurns : ENEMY_DEATH_ANIM.spinTurns;
+    const spinZ = p * p * spinTurns * Math.PI * 2;
+    const fadeStart = ENEMY_DEATH_ANIM.fadeStart;
+    const alpha = p < fadeStart ? 1 : 1 - ((p - fadeStart) / (1 - fadeStart)) ** 1.55;
+    const lift = p < 0.18
+      ? (p / 0.18) * ENEMY_DEATH_ANIM.liftPx
+      : ENEMY_DEATH_ANIM.liftPx * (1 - ((p - 0.18) / 0.82) ** 1.35);
+    const flash = p < 0.26 ? 1 - p / 0.26 : 0;
+    const squash = p < popAt
+      ? 1 - 0.14 * Math.sin((p / popAt) * Math.PI)
+      : 1;
+    return { popScale, spinZ, alpha, lift, flash, squash };
+  }
+
+  function applyEnemyDeathMaterials(group, alpha, flash, powered) {
+    group.traverse((obj) => {
+      if (!obj.isMesh || !obj.material) return;
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((mat) => {
+        if (obj.userData.enemyDeathBaseOpacity == null) {
+          obj.userData.enemyDeathBaseOpacity = mat.opacity ?? 1;
+          if (!mat.transparent) {
+            mat.transparent = true;
+            mat.needsUpdate = true;
+          }
+        }
+        mat.opacity = (obj.userData.enemyDeathBaseOpacity ?? 1) * alpha;
+        if (mat.emissive) {
+          if (!obj.userData.enemyBaseEmissive) {
+            obj.userData.enemyBaseEmissive = mat.emissive.clone();
+            obj.userData.enemyBaseEmissiveIntensity = mat.emissiveIntensity ?? 0;
+          }
+          if (flash > 0) {
+            const warm = powered ? 1 : 0.96;
+            mat.emissive.setRGB(1, warm, powered ? 0.45 : 0.58);
+            mat.emissiveIntensity = 0.5 + flash * (powered ? 0.95 : 0.75);
+          } else {
+            mat.emissive.copy(obj.userData.enemyBaseEmissive);
+            mat.emissiveIntensity = (obj.userData.enemyBaseEmissiveIntensity ?? 0) * alpha;
+          }
+        }
+      });
+    });
+  }
+
+  function syncEnemyDeathAnim(entry, group, enemy) {
+    const elapsed = performance.now() - entry.killImpactStart;
+    const dur = entry.killImpactDurationMs ?? 300;
+    const p = Math.min(1, elapsed / dur);
+    const powered = !!entry.killImpactPowered;
+    const { popScale, spinZ, alpha, lift, flash, squash } = enemyDeathAnimCurves(p, powered);
+
+    const baseMax = entry.baseMaxDim || group.userData.baseMaxDim || 1;
+    const targetH = enemy.displayHeight * 0.9;
+    const s = targetH / baseMax;
+    group.scale.set(s * popScale, s * popScale * squash, s * popScale);
+    group.visible = enemy.active;
+
+    const facing = group.userData.facingGroup;
+    if (facing) {
+      facing.scale.set(1, 1, 1);
+      facing.rotation.set(0, 0, spinZ);
+    }
+
+    const fxCutoff = 0.12;
+    const flameFx = group.userData.flameRiserFx;
+    if (flameFx) flameFx.visible = p < fxCutoff;
+    const rocketAnchor = group.userData.flameRiserRocketTailAnchor;
+    if (rocketAnchor) rocketAnchor.visible = p < fxCutoff;
+
+    const liftSign = Math.sign(DIORAMA.viewTiltX || 1);
+    placeEnemyMesh(group, enemy, 6, dioramaBlockLift(12) + liftSign * lift);
+    applyEnemyDeathMaterials(group, alpha, flash, powered);
   }
 
   function placeEnemyMesh(group, enemy, zBias = 0, liftPx = 0) {
@@ -2484,34 +3019,127 @@ export function createThreeOverlay(opts) {
     const group = entry.group;
     if (!enemy?.active || !group) return;
 
+    if (entry.killImpactStart != null) {
+      syncEnemyDeathAnim(entry, group, enemy);
+      return;
+    }
+
+    const timeMs = phaserScene?.time?.now ?? performance.now();
     const targetH = enemy.displayHeight * 0.9;
     const baseMax = entry.baseMaxDim || group.userData.baseMaxDim || 1;
     const s = targetH / baseMax;
-    group.scale.set(s, s, s);
 
-    const timeMs = phaserScene?.time?.now ?? performance.now();
-    const bobAmp = entry.typeId === 'drifter' ? 3.5 : entry.typeId === 'saucer' ? 4 : 2.5;
-    const bob = Math.sin(timeMs * 0.0018 + entry.bobPhase) * bobAmp;
+    const facing = group.userData.facingGroup;
+    const vx = enemy.body?.velocity?.x ?? 0;
+    const horizSpeed = Math.abs(vx);
+
+    if (entry.typeId === 'ground_walker' && facing) {
+      const moveAmt = Math.min(1, horizSpeed / GROUND_WALKER_FX.speedForFull);
+      if (horizSpeed > 3) {
+        const targetYaw = vx > 0 ? -GROUND_WALKER_FX.faceYaw : GROUND_WALKER_FX.faceYaw;
+        entry.faceYaw = entry.faceYaw ?? targetYaw;
+        entry.faceYaw += (targetYaw - entry.faceYaw) * GROUND_WALKER_FX.faceLerp;
+        facing.rotation.y = entry.faceYaw;
+      }
+      const step = Math.sin(timeMs * GROUND_WALKER_FX.stepSpeed + entry.bobPhase);
+      const stride = 0.35 + 0.65 * Math.abs(step);
+      const stretch = 1 + moveAmt * GROUND_WALKER_FX.stretchMax * stride;
+      const squash = 1 - moveAmt * GROUND_WALKER_FX.squashMax * (0.35 + 0.65 * (1 - Math.abs(step)));
+      group.scale.set(s * stretch, s * squash, s * (0.96 + moveAmt * 0.06 * stride));
+      facing.scale.set(1, 1, 1);
+    } else if (entry.typeId === 'horizontal_flyer' && facing) {
+      const wing = Math.sin(timeMs * HORIZONTAL_FLYER_FX.flapSpeed + entry.bobPhase);
+      const spread = 1 + HORIZONTAL_FLYER_FX.wingSpread * wing;
+      const squash = 1 - HORIZONTAL_FLYER_FX.bodySquash * wing;
+      group.scale.set(s * spread, s * squash, s);
+      facing.scale.set(1, 1, 1);
+    } else {
+      group.scale.set(s, s, s);
+    }
+
+    let bob = 0;
+    if (entry.typeId === 'horizontal_flyer') {
+      bob = Math.sin(timeMs * HORIZONTAL_FLYER_FX.floatSpeed + entry.bobPhase) * HORIZONTAL_FLYER_FX.liftAmp;
+    } else {
+      const bobAmp = entry.typeId === 'drifter' ? 3.5
+        : entry.typeId === 'saucer' ? 4
+          : 2.5;
+      bob = Math.sin(timeMs * 0.0018 + entry.bobPhase) * bobAmp;
+    }
     placeEnemyMesh(group, enemy, 6, dioramaBlockLift(12) + bob);
     group.visible = enemy.active;
 
-    const facing = group.userData.facingGroup;
+    if (entry.typeId === 'flame_riser') {
+      const riserMove = enemy.getData?.('riserMove');
+      const riserPhase = riserMove?.phase ?? 'fall';
+      const chargeProgress = riserMove?.chargeProgress ?? 0;
+      const rocketProgress = riserMove?.rocketProgress ?? 0;
+      syncFlameRiserFx(group.userData.flameRiserFx, baseMax, timeMs, riserPhase, chargeProgress);
+      syncFlameRiserRocketTail(
+        group.userData.flameRiserRocketTailAnchor,
+        group.userData.flameRiserRocketTail,
+        baseMax,
+        timeMs,
+        riserPhase,
+        chargeProgress,
+        rocketProgress
+      );
+    }
+
     if (facing) {
-      if (entry.typeId === 'drifter') {
+      if (entry.typeId === 'ground_walker') {
+        // facing + squash handled above
+      } else if (entry.typeId === 'flame_riser') {
+        const riserMove = enemy.getData?.('riserMove');
+        const phase = riserMove?.phase ?? 'fall';
+        const chargeP = riserMove?.chargeProgress ?? 0;
+        const rocketP = riserMove?.rocketProgress ?? 0;
+        if (phase === 'charge') {
+          const squash = 1 - chargeP * 0.2;
+          const widen = 1 + chargeP * 0.14;
+          facing.scale.set(widen, squash, widen);
+        } else if (phase === 'rocket') {
+          const stretch = 1.1 + (1 - rocketP) * 0.12;
+          facing.scale.set(stretch, stretch, stretch);
+        } else {
+          facing.scale.set(1, 1, 1);
+        }
+        facing.rotation.y = 0;
+      } else if (entry.typeId === 'drifter') {
+        facing.scale.set(1, 1, 1);
         facing.rotation.y = Math.sin(timeMs * 0.0011 + entry.bobPhase) * 0.5;
         facing.rotation.z = Math.cos(timeMs * 0.0013 + entry.bobPhase) * 0.16;
       } else if (entry.typeId === 'saucer') {
+        facing.scale.set(1, 1, 1);
         facing.rotation.y += 0.0045 * (phaserScene?.game?.loop?.delta ?? 16);
-        facing.rotation.x = Math.sin(timeMs * 0.0022 + entry.bobPhase) * 0.1;
-        facing.rotation.z = Math.cos(timeMs * 0.0018 + entry.bobPhase) * 0.06;
-        const vx = enemy.body?.velocity?.x ?? 0;
-        const vy = enemy.body?.velocity?.y ?? 0;
-        if (Math.hypot(vx, vy) > 12) {
-          facing.rotation.z += Math.atan2(vx, -vy) * 0.08;
+        facing.rotation.x = Math.sin(timeMs * 0.0022 + entry.bobPhase) * 0.08;
+        facing.rotation.z = Math.cos(timeMs * 0.0018 + entry.bobPhase) * 0.05;
+        if (horizSpeed > 8) {
+          const targetBank = vx > 0 ? -0.14 : 0.14;
+          entry.bankZ = entry.bankZ ?? 0;
+          entry.bankZ += (targetBank - entry.bankZ) * 0.14;
+          facing.rotation.z += entry.bankZ;
         }
+      } else if (entry.typeId === 'horizontal_flyer') {
+        const floatWave = Math.sin(timeMs * HORIZONTAL_FLYER_FX.floatSpeed + entry.bobPhase);
+        const wing = Math.sin(timeMs * HORIZONTAL_FLYER_FX.flapSpeed + entry.bobPhase);
+        facing.scale.set(1, 1, 1);
+        if (horizSpeed > 3) {
+          const targetYaw = vx > 0 ? -HORIZONTAL_FLYER_FX.faceYaw : HORIZONTAL_FLYER_FX.faceYaw;
+          entry.faceYaw = entry.faceYaw ?? targetYaw;
+          entry.faceYaw += (targetYaw - entry.faceYaw) * HORIZONTAL_FLYER_FX.faceLerp;
+          facing.rotation.y = entry.faceYaw;
+        }
+        const targetBank = horizSpeed > 5
+          ? (vx > 0 ? -HORIZONTAL_FLYER_FX.glideBank : HORIZONTAL_FLYER_FX.glideBank)
+          : 0;
+        entry.bankZ = entry.bankZ ?? 0;
+        entry.bankZ += (targetBank - entry.bankZ) * HORIZONTAL_FLYER_FX.bankLerp;
+        facing.rotation.x = floatWave * HORIZONTAL_FLYER_FX.pitchMax + wing * HORIZONTAL_FLYER_FX.pitchMax * 0.35;
+        facing.rotation.z = entry.bankZ;
       } else {
-        const vx = enemy.body?.velocity?.x ?? 0;
-        if (Math.abs(vx) > 2) {
+        facing.scale.set(1, 1, 1);
+        if (horizSpeed > 2) {
           facing.rotation.y = vx > 0 ? -0.42 : 0.42;
         }
       }
@@ -2625,6 +3253,7 @@ export function createThreeOverlay(opts) {
     syncGrayDowngradeFx(block, entry, phaserScene);
     syncNormalBlockStarRotation(block, entry, phaserScene);
     syncScoreBlockFx(block, entry, phaserScene);
+    syncPinballBumperHitFx(block, entry, phaserScene);
     entry.group.visible = block.active && !hidePanel;
   }
 
@@ -2661,7 +3290,11 @@ export function createThreeOverlay(opts) {
   }
 
   function syncBallMesh() {
-    if (!ballRef?.active || !ballMesh) return;
+    if (!ballMesh) return;
+    if (!ballRef?.active) {
+      ballMesh.visible = false;
+      return;
+    }
 
     const baseR = ballMesh.userData.baseRadius;
     const halfW = ballRef.displayWidth * 0.5;
@@ -2746,8 +3379,21 @@ export function createThreeOverlay(opts) {
     syncBonusChanceRainbowColors(group, timeMs);
   }
 
+  function retryEnemyMeshRegistration() {
+    const group = phaserScene?.enemies;
+    if (!group?.getChildren) return;
+    for (const enemy of group.getChildren()) {
+      if (!enemy?.active) continue;
+      const typeId = enemy.getData?.('typeId');
+      if (!typeId || !hasEnemyModel(typeId) || enemyMeshes.has(enemy)) continue;
+      api.registerEnemy(enemy);
+    }
+  }
+
   function syncMeshes() {
     if (!phaserScene) return;
+
+    retryEnemyMeshRegistration();
 
     syncPaddleMesh();
     syncBallMesh();
@@ -2884,6 +3530,12 @@ export function createThreeOverlay(opts) {
       block.setData('scoreHitFxStart', phaserScene.time.now);
     },
 
+    triggerPinballBumperHit(block) {
+      const entry = blockMeshes.get(block);
+      if (!entry || !phaserScene?.time) return;
+      block.setData('pinballHitFxStart', phaserScene.time.now);
+    },
+
     startHiddenBlockReveal(block, onMidpoint, onComplete) {
       const entry = blockMeshes.get(block);
       if (!entry || !phaserScene?.time) return false;
@@ -2967,6 +3619,11 @@ export function createThreeOverlay(opts) {
       hidePhaserSprite(ball);
     },
 
+    setBallMeshVisible(visible) {
+      if (!ballMesh) return;
+      ballMesh.visible = visible && Boolean(ballRef?.active);
+    },
+
     registerItem(item) {
       const typeId = item.getData('typeId');
       if (typeId !== 'item_bonus_chance') return false;
@@ -2993,15 +3650,25 @@ export function createThreeOverlay(opts) {
       return itemMeshes.has(item);
     },
 
+    hasEnemyMesh(enemy) {
+      return enemyMeshes.has(enemy);
+    },
+
     registerEnemy(enemy) {
       const typeId = enemy.getData?.('typeId');
-      if (!typeId || !hasEnemyModel(typeId) || enemyMeshes.has(enemy)) return false;
+      if (!typeId || enemyMeshes.has(enemy)) return false;
+      if (!hasEnemyModel(typeId)) return false;
       if (!isEnemyModelLoaded(typeId)) {
-        console.warn('[BlockBall 3D] enemy model not loaded yet:', typeId);
         return false;
       }
 
-      const group = createEnemyMesh(typeId);
+      let group;
+      try {
+        group = createEnemyMesh(typeId);
+      } catch (err) {
+        console.error('[BlockBall 3D] createEnemyMesh threw:', typeId, err);
+        return false;
+      }
       if (!group) {
         console.warn('[BlockBall 3D] failed to create enemy mesh:', typeId);
         return false;
@@ -3013,8 +3680,11 @@ export function createThreeOverlay(opts) {
         enemyRef: enemy,
         typeId,
         baseMaxDim: group.userData.baseMaxDim,
-        bobPhase: Math.random() * Math.PI * 2,
+        bobPhase: enemy.getData?.('bobPhase') ?? Math.random() * Math.PI * 2,
         hitFlashStart: null,
+        killImpactStart: null,
+        killImpactDurationMs: 300,
+        killImpactPowered: false,
       });
       hidePhaserSprite(enemy);
       syncEnemyMesh(enemyMeshes.get(enemy));
@@ -3026,7 +3696,7 @@ export function createThreeOverlay(opts) {
       const entry = enemyMeshes.get(enemy);
       if (!entry) return;
       root.remove(entry.group);
-      disposeMeshTree(entry.group);
+      disposeEnemyInstance(entry.group);
       enemyMeshes.delete(enemy);
     },
 
@@ -3034,6 +3704,16 @@ export function createThreeOverlay(opts) {
       const entry = enemyMeshes.get(enemy);
       if (!entry) return;
       entry.hitFlashStart = performance.now();
+    },
+
+    triggerEnemyKillImpact(enemy, options = {}) {
+      const entry = enemyMeshes.get(enemy);
+      if (!entry) return false;
+      entry.killImpactStart = performance.now();
+      entry.killImpactDurationMs = options.durationMs ?? 300;
+      entry.killImpactPowered = !!options.powered;
+      entry.hitFlashStart = null;
+      return true;
     },
 
     syncLayout,

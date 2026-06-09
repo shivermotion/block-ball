@@ -206,6 +206,8 @@ const BLOCK_LAYOUT_CHARS = {
   '?': 23,
   x: 24,
   X: 24,
+  b: 34,
+  B: 34,
 };
 
 function createLevelGrid(level, gameHeight = 780, gameWidth = 390) {
@@ -415,6 +417,7 @@ function ensurePlayBlockCells(level, levelGrid) {
   if (sizeOk) {
     level.blocks.cells = parsed;
     migrateScoreFootprints(parsed, cols, rows);
+    migratePinballFootprints(parsed, cols, rows);
     if (typeof migrateHidden2x2Footprints === 'function') {
       migrateHidden2x2Footprints(parsed, cols, rows);
     }
@@ -443,6 +446,7 @@ function ensurePlayBlockCells(level, levelGrid) {
 
   level.blocks.cells = grid;
   migrateScoreFootprints(grid, cols, rows);
+  migratePinballFootprints(grid, cols, rows);
   if (typeof migrateHidden2x2Footprints === 'function') {
     migrateHidden2x2Footprints(grid, cols, rows);
   }
@@ -566,7 +570,7 @@ function parseBlockLayoutRows(rows) {
 }
 
 function layoutToStrings(layout) {
-  const inv = { 0: '.', 1: '1', 2: 'g', 3: 'p', 4: 's', 5: 'i', 18: 'e', 22: 'u', 23: 'h', 24: 'x' };
+  const inv = { 0: '.', 1: '1', 2: 'g', 3: 'p', 4: 's', 5: 'i', 18: 'e', 22: 'u', 23: 'h', 24: 'x', 34: 'b' };
   return layout.map((row) => row.map((c) => inv[c] ?? '.').join(''));
 }
 

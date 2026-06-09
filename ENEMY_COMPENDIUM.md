@@ -2,7 +2,7 @@
 
 Enemies are shootable targets (ball collision) with **HP**, movement patterns, and drops. The ball **bounces** off them; each hit deals damage until HP reaches zero.
 
-**Demo today:** `ground_walker`, `drifter`, and `saucer` mobs (GLB models) — see [`enemy-types.js`](enemy-types.js).
+**Demo today:** `ground_walker`, `horizontal_flyer`, `flame_riser`, `drifter`, and `saucer` mobs (GLB models) — see [`enemy-types.js`](enemy-types.js).
 
 ---
 
@@ -24,10 +24,9 @@ Small, single-hit targets — points, food, or power-up drops.
 | Name             | HP | Movement                      | Speed     | Drops / reward | Notes |
 |------            |-----|----------                    |-------    |----------------|-------|
 | Ground Walker    | 1 | Slow horizontal / gentle float | Very slow | Food (candy/cake) | Most common; predictable — **implemented** (`assets/enemies/ground-walker/mushroom_monster.glb`) |
-| Horizontal Flyer | 1 | Horizontal + gentle waves      | Medium    | Food (apple/cake) | Aerial practice target |
-| Pinball Bouncer  | 1 | Short arcs between walls/blocks| Medium    | Ability changer (roulette) | Erratic but contained |
+| Horizontal Flyer | 1 | Horizontal + gentle waves      | Medium    | Food (apple/cake) | Aerial practice target — **implemented** (`assets/enemies/horizontal-flyer/cute_monster.glb`) |
 | Spark Blaster    | 1 | Stationary / slow drift        | Stationary | Spark ability | Often near blocks |
-| Flame Riser      | 1 | Upward / diagonal              | Medium    | Burn ability | Vertical clear |
+| Flame Riser      | 1 | Upward / diagonal              | Medium    | Burn ability | Vertical clear — **implemented** (`assets/enemies/slime-fire/slime_fire.glb`) |
 | Heavy Roller     | 1 | Very slow walk / stationary    | Very slow | Stone ability | Moving block feel |
 | Wall Clinger     | 1 | Along walls; occasional drop   | Slow      | Needle ability | Paddle-stick |
 | Block Shifter    | 1 | Slow roll / shift increments   | Slow      | Flip item | Tough moving block |
@@ -93,7 +92,7 @@ One per stage. Multi-phase; need Power Bounces + abilities.
 
 - Registry: [`enemy-types.js`](enemy-types.js)
 - 3D models: [`enemy-models.js`](enemy-models.js) · GLBs under `assets/enemies/`
-- 2D placeholders: [`enemy-ground-walker-art.js`](enemy-ground-walker-art.js), [`enemy-drifter-art.js`](enemy-drifter-art.js), [`enemy-saucer-art.js`](enemy-saucer-art.js) (editor + non-3D demo)
+- 2D placeholders: [`enemy-ground-walker-art.js`](enemy-ground-walker-art.js), [`enemy-horizontal-flyer-art.js`](enemy-horizontal-flyer-art.js), [`enemy-slime-fire-art.js`](enemy-slime-fire-art.js), [`enemy-drifter-art.js`](enemy-drifter-art.js), [`enemy-saucer-art.js`](enemy-saucer-art.js) (editor + non-3D demo)
 - Playable spawns: [`block-ball-demo.html`](block-ball-demo.html) → `createEnemies()`
 - Block interactions: [`BLOCK_COMPENDIUM.md`](BLOCK_COMPENDIUM.md)
 - Item drops: [`ITEM_COMPENDIUM.md`](ITEM_COMPENDIUM.md) · [`item-types.js`](item-types.js)

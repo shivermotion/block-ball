@@ -10,7 +10,7 @@ const BLOCK_PICKER_OPTIONS = [
   { value: 6, label: 'Normal Long ↔', key: '6', procedural: 'normal', long: 'h' },
   { value: 8, label: 'Normal Long ↕', key: '8', procedural: 'normal', long: 'v' },
   { value: 10, label: 'Gray Long ↔', key: 'a', procedural: 'gray', long: 'h' },
-  { value: 12, label: 'Gray Long ↕', key: 'b', procedural: 'gray', long: 'v' },
+  { value: 12, label: 'Gray Long ↕', key: 'v', procedural: 'gray', long: 'v' },
   { value: 3, label: 'Power', key: '3', procedural: 'power', power: true },
   { value: 14, label: 'Power Long ↔', key: 'c', procedural: 'power', power: true, long: 'h' },
   { value: 16, label: 'Power Long ↕', key: 'd', procedural: 'power', power: true, long: 'v' },
@@ -19,6 +19,7 @@ const BLOCK_PICKER_OPTIONS = [
   { value: 32, label: 'Ability Long ↕', key: 'k', ability: true, long: 'v' },
   { value: 4, label: 'Spike', key: '4', procedural: 'spike' },
   { value: 5, label: 'Indestructible', key: '5', procedural: 'indestructible' },
+  { value: 34, label: 'Pinball Bumper', key: 'b', procedural: 'pinball', span: '2x2' },
   { value: 18, label: 'Score', key: 'e', procedural: 'score', span: '2x2' },
   { value: 22, label: 'Bonus', key: 'u', procedural: 'bonus' },
   { value: 23, label: 'Hidden', key: 'h', procedural: 'hidden' },
@@ -57,6 +58,7 @@ const BLOCK_FALLBACK_COLORS = {
   32: '#8b7355',
   4: '#ff2266',
   5: '#44aaff',
+  34: '#ff3344',
   18: '#cc66ff',
   22: '#ffee22',
   23: '#7a5c48',
@@ -163,6 +165,26 @@ function buildProceduralBlockCanvas(cellW, cellH, type) {
     c.lineTo(pad + innerW - 4, pad + innerH - 4);
     c.moveTo(pad + innerW - 4, pad + 4);
     c.lineTo(pad + 4, pad + innerH - 4);
+    c.stroke();
+  } else if (type === 'pinball') {
+    const cx = cellW / 2;
+    const baseH = innerH * 0.28;
+    const domeR = Math.min(innerW, innerH) * 0.36;
+    const domeCy = pad + innerH - baseH - domeR * 0.82;
+    fillRoundRect(c, pad, pad + innerH - baseH, innerW, baseH, 4, '#0000cc');
+    c.fillStyle = '#cc0022';
+    c.beginPath();
+    c.ellipse(cx, pad + innerH - baseH * 0.55, domeR * 1.05, baseH * 0.72, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#00cc33';
+    c.beginPath();
+    c.arc(cx, domeCy, domeR, Math.PI, 0);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    c.lineWidth = Math.max(2, domeR * 0.08);
+    c.beginPath();
+    c.arc(cx, domeCy, domeR * 0.72, Math.PI * 1.12, Math.PI * -0.12);
     c.stroke();
   } else if (type === 'score') {
     fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#cc5500');
@@ -491,7 +513,9 @@ function resolveBlockSprite(opt, cellW, cellH) {
     return buildAbilityBlockCanvas(cellW, cellH, colSpan, rowSpan);
   }
   if (opt.procedural) {
-    return buildProceduralBlockCanvas(cellW, cellH, opt.procedural);
+    const cw = opt.span === '2x2' ? cellW * 2 : cellW;
+    const ch = opt.span === '2x2' ? cellH * 2 : cellH;
+    return buildProceduralBlockCanvas(cw, ch, opt.procedural);
   }
   return buildPlaceholderCanvas(cellW, cellH, {
     bg: BLOCK_FALLBACK_COLORS[opt.value] || '#666',
@@ -509,6 +533,12 @@ function resolveEnemySprite(entry, cellW, cellH) {
   }
   if (entry.id === 'saucer' && typeof buildSaucerCanvas === 'function') {
     return buildSaucerCanvas(cellW, cellH);
+  }
+  if (entry.id === 'horizontal_flyer' && typeof buildHorizontalFlyerCanvas === 'function') {
+    return buildHorizontalFlyerCanvas(cellW, cellH);
+  }
+  if (entry.id === 'flame_riser' && typeof buildSlimeFireCanvas === 'function') {
+    return buildSlimeFireCanvas(cellW, cellH);
   }
   if (entry.implemented) {
     return buildProceduralEnemyCanvas(cellW, cellH);
