@@ -247,6 +247,35 @@ function drawDebossedNormalStarPhaser(g, cx, cy, outerR) {
   g.strokePoints(pts, true);
 }
 
+/** Yellow fill + brown outline — matches score / shield block 3D stars. */
+const SCORE_STAR_FACE_STYLE = {
+  fill: 0xffee44,
+  fillCanvas: '#ffee44',
+  outline: 0x331100,
+  outlineCanvas: '#331100',
+};
+
+function drawFilledScoreStarCanvas(ctx, cx, cy, outerR) {
+  const pts = sampleRoundedNormalStarPoints(cx, cy, outerR);
+  ctx.fillStyle = SCORE_STAR_FACE_STYLE.fillCanvas;
+  traceNormalStarPath(ctx, pts);
+  ctx.fill();
+  ctx.strokeStyle = SCORE_STAR_FACE_STYLE.outlineCanvas;
+  ctx.lineWidth = Math.max(1.5, outerR * 0.12);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  traceNormalStarPath(ctx, pts);
+  ctx.stroke();
+}
+
+function drawFilledScoreStarPhaser(g, cx, cy, outerR) {
+  const pts = sampleRoundedNormalStarPoints(cx, cy, outerR);
+  g.fillStyle(SCORE_STAR_FACE_STYLE.fill, 1);
+  g.fillPoints(pts, true);
+  g.lineStyle(Math.max(1.5, outerR * 0.12), SCORE_STAR_FACE_STYLE.outline, 1);
+  g.strokePoints(pts, true);
+}
+
 /** Filled star on gray blocks — matches block_gray inner/border (static, no ticker). */
 const GRAY_STAR_STYLE = {
   fill: 0xa8c0ff,
@@ -298,6 +327,114 @@ function drawMutedGrayStarPhaser(g, cx, cy, outerR) {
   g.fillPoints(pts, true);
   g.lineStyle(Math.max(1, outerR * 0.1), GRAY_STAR_STYLE.outline, 0.92);
   g.strokePoints(pts, true);
+}
+
+/** Cute teardrop symbol on block faces (points up). */
+const BLOCK_TEARDROP_STYLE = {
+  outlineCanvas: '#220044',
+  outlinePhaser: 0x220044,
+  roundness: 0.52,
+  curveSegments: 8,
+};
+
+const GRAY_TEARDROP_STYLE = {
+  fill: 0xa8c0ff,
+  fillCanvas: '#a8c0ff',
+  outline: 0x4466ff,
+  outlineCanvas: '#4466ff',
+};
+
+/** Soft knot ring for a chubby teardrop silhouette. */
+function buildCuteTeardropKnots(cx, cy, outerR, yDown = true) {
+  const dir = yDown ? 1 : -1;
+  return [
+    { x: cx, y: cy - dir * outerR * 0.62 },
+    { x: cx + outerR * 0.34, y: cy - dir * outerR * 0.48 },
+    { x: cx + outerR * 0.72, y: cy - dir * outerR * 0.08 },
+    { x: cx + outerR * 0.78, y: cy + dir * outerR * 0.34 },
+    { x: cx + outerR * 0.48, y: cy + dir * outerR * 0.62 },
+    { x: cx, y: cy + dir * outerR * 0.7 },
+    { x: cx - outerR * 0.48, y: cy + dir * outerR * 0.62 },
+    { x: cx - outerR * 0.78, y: cy + dir * outerR * 0.34 },
+    { x: cx - outerR * 0.72, y: cy - dir * outerR * 0.08 },
+    { x: cx - outerR * 0.34, y: cy - dir * outerR * 0.48 },
+  ];
+}
+
+/** Rounded loop through knot points (same technique as the cute star). */
+function sampleRoundedKnotLoop(knots, roundness, segments) {
+  const n = knots.length;
+  const result = [];
+  for (let i = 0; i < n; i++) {
+    const prev = knots[(i - 1 + n) % n];
+    const curr = knots[i];
+    const next = knots[(i + 1) % n];
+    const sx = prev.x + (curr.x - prev.x) * (1 - roundness);
+    const sy = prev.y + (curr.y - prev.y) * (1 - roundness);
+    const ex = curr.x + (next.x - curr.x) * roundness;
+    const ey = curr.y + (next.y - curr.y) * roundness;
+    for (let s = 0; s <= segments; s++) {
+      const t = s / segments;
+      const u = 1 - t;
+      result.push({
+        x: u * u * sx + 2 * u * t * curr.x + t * t * ex,
+        y: u * u * sy + 2 * u * t * curr.y + t * t * ey,
+      });
+    }
+  }
+  return result;
+}
+
+/**
+ * Cute soft teardrop — chubby bulb, blunt rounded tip.
+ * @param {boolean} yDown true for canvas/Phaser (y grows downward); false for Three.js block faces (+y up).
+ */
+function sampleBlockTeardropPoints(cx, cy, outerR, segments, yDown = true) {
+  const roundness = BLOCK_TEARDROP_STYLE.roundness;
+  const segs = segments ?? BLOCK_TEARDROP_STYLE.curveSegments;
+  const knots = buildCuteTeardropKnots(cx, cy, outerR, yDown);
+  return sampleRoundedKnotLoop(knots, roundness, segs);
+}
+
+function traceBlockTeardropPath(ctx, cx, cy, outerR) {
+  const pts = sampleBlockTeardropPoints(cx, cy, outerR);
+  ctx.beginPath();
+  pts.forEach((p, i) => {
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.closePath();
+}
+
+function drawDebossedNormalTeardropCanvas(ctx, cx, cy, outerR) {
+  traceBlockTeardropPath(ctx, cx, cy, outerR);
+  ctx.strokeStyle = BLOCK_TEARDROP_STYLE.outlineCanvas;
+  ctx.lineWidth = Math.max(1.5, outerR * 0.16);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+}
+
+function drawDebossedNormalTeardropPhaser(g, cx, cy, outerR) {
+  const pts = sampleBlockTeardropPoints(cx, cy, outerR);
+  g.lineStyle(Math.max(1.5, outerR * 0.16), BLOCK_TEARDROP_STYLE.outlinePhaser, 1);
+  g.strokePoints(pts, true);
+}
+
+function drawMutedGrayTeardropCanvas(ctx, cx, cy, outerR) {
+  traceBlockTeardropPath(ctx, cx, cy, outerR);
+  ctx.fillStyle = GRAY_TEARDROP_STYLE.fillCanvas;
+  ctx.fill();
+}
+
+function drawMutedGrayTeardropPhaser(g, cx, cy, outerR) {
+  const pts = sampleBlockTeardropPoints(cx, cy, outerR);
+  g.fillStyle(GRAY_TEARDROP_STYLE.fill, 1);
+  g.fillPoints(pts, true);
+}
+
+function isShieldBlockType(typeId) {
+  return typeId === 'shield';
 }
 
 const POWER_BLOCK_COLORS = {
@@ -377,6 +514,14 @@ if (typeof globalThis !== 'undefined') {
   globalThis.drawMutedGrayStarCanvas = drawMutedGrayStarCanvas;
   globalThis.drawMutedGrayStarPhaser = drawMutedGrayStarPhaser;
   globalThis.drawHiddenPanelPhaser = drawHiddenPanelPhaser;
+  globalThis.sampleBlockTeardropPoints = sampleBlockTeardropPoints;
+  globalThis.drawDebossedNormalTeardropCanvas = drawDebossedNormalTeardropCanvas;
+  globalThis.drawDebossedNormalTeardropPhaser = drawDebossedNormalTeardropPhaser;
+  globalThis.drawFilledScoreStarCanvas = drawFilledScoreStarCanvas;
+  globalThis.drawFilledScoreStarPhaser = drawFilledScoreStarPhaser;
+  globalThis.drawMutedGrayTeardropCanvas = drawMutedGrayTeardropCanvas;
+  globalThis.drawMutedGrayTeardropPhaser = drawMutedGrayTeardropPhaser;
+  globalThis.isShieldBlockType = isShieldBlockType;
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -392,6 +537,12 @@ if (typeof module !== 'undefined' && module.exports) {
     GRAY_STAR_STYLE,
     drawMutedGrayStarCanvas,
     drawMutedGrayStarPhaser,
+    sampleBlockTeardropPoints,
+    drawDebossedNormalTeardropCanvas,
+    drawDebossedNormalTeardropPhaser,
+    drawMutedGrayTeardropCanvas,
+    drawMutedGrayTeardropPhaser,
+    isShieldBlockType,
     buildNormalStarPoints,
     sampleRoundedNormalStarPoints,
     NORMAL_STAR_OUTLINE,
@@ -402,6 +553,9 @@ if (typeof module !== 'undefined' && module.exports) {
     normalStarTickerPhase,
     drawDebossedNormalStarCanvas,
     drawDebossedNormalStarPhaser,
+    SCORE_STAR_FACE_STYLE,
+    drawFilledScoreStarCanvas,
+    drawFilledScoreStarPhaser,
     SPIKE_STYLE,
     cuteSpikeLayout,
     sampleCuteSpikePoints,

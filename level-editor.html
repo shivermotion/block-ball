@@ -501,6 +501,7 @@
   <script src="enemy-horizontal-flyer-art.js"></script>
   <script src="enemy-slime-fire-art.js"></script>
   <script src="item-types.js"></script>
+  <script src="item-art.js"></script>
   <script src="editor-entity-art.js"></script>
   <script src="level-grid.js"></script>
   <script src="levels/registry.js"></script>
@@ -870,6 +871,11 @@
         await loadAbilityBlockAssets();
       } else if (typeof loadAbilityGravelImage === 'function') {
         await loadAbilityGravelImage();
+      }
+      if (typeof loadAllItemImages === 'function') {
+        await loadAllItemImages();
+      } else if (typeof loadAppleItemImage === 'function') {
+        await loadAppleItemImage();
       }
       entityArt = EditorEntityArt.buildEntityArt(g.cellWidth, g.cellHeight);
       entityArtKey = key;
@@ -1354,6 +1360,10 @@
       ctx.fillStyle = 'rgba(238,238,238,0.85)';
       ctx.textAlign = 'left';
       ctx.fillText('Score', b.x + pos.score.x, b.y + pos.score.y + 4);
+      if (pos.stars) {
+        ctx.fillStyle = 'rgba(255,238,68,0.95)';
+        ctx.fillText('★ 0', b.x + pos.stars.x, b.y + pos.stars.y + 4);
+      }
 
       const av = pos.avatar.size;
       ctx.fillStyle = 'rgba(61,79,111,0.9)';

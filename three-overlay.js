@@ -413,6 +413,49 @@ function getScoreBlockSheenTexture() {
   return scoreBlockSheenTexture;
 }
 
+let shieldBlockSheenTexture = null;
+
+/** Bold green base + diagonal highlight for shield block faces. */
+function getShieldBlockSheenTexture() {
+  if (shieldBlockSheenTexture) return shieldBlockSheenTexture;
+
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const baseGrad = ctx.createLinearGradient(0, 0, size, size);
+  baseGrad.addColorStop(0, '#88ffaa');
+  baseGrad.addColorStop(0.28, '#44ee77');
+  baseGrad.addColorStop(0.58, '#22dd55');
+  baseGrad.addColorStop(0.82, '#11cc44');
+  baseGrad.addColorStop(1, '#0a9944');
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  const sheenGrad = ctx.createLinearGradient(size * 0.05, size * 0.02, size * 0.92, size * 0.62);
+  sheenGrad.addColorStop(0, 'rgba(255,255,255,0)');
+  sheenGrad.addColorStop(0.38, 'rgba(255,255,255,0.68)');
+  sheenGrad.addColorStop(0.52, 'rgba(255,255,255,0.16)');
+  sheenGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sheenGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  const rimGrad = ctx.createRadialGradient(size * 0.5, size * 0.5, size * 0.18, size * 0.5, size * 0.5, size * 0.72);
+  rimGrad.addColorStop(0, 'rgba(255,255,255,0.12)');
+  rimGrad.addColorStop(0.72, 'rgba(255,255,255,0)');
+  rimGrad.addColorStop(1, 'rgba(0,80,30,0.1)');
+  ctx.fillStyle = rimGrad;
+  ctx.fillRect(0, 0, size, size);
+
+  shieldBlockSheenTexture = new THREE.CanvasTexture(canvas);
+  shieldBlockSheenTexture.colorSpace = THREE.SRGBColorSpace;
+  shieldBlockSheenTexture.wrapS = THREE.RepeatWrapping;
+  shieldBlockSheenTexture.wrapT = THREE.RepeatWrapping;
+  return shieldBlockSheenTexture;
+}
+
 let abilityGravelTexture = null;
 let abilityGravelLoadPromise = null;
 
@@ -732,6 +775,26 @@ function makeScoreBlockMaterial(tone = 1) {
   });
 }
 
+function makeShieldBlockMaterial(tone = 1) {
+  const spec = BLOCK_MATERIALS.shield;
+  const tint = new THREE.Color(0xffffff);
+  if (tone !== 1) tint.multiplyScalar(tone);
+
+  return new THREE.MeshPhysicalMaterial({
+    map: getShieldBlockSheenTexture(),
+    color: tint,
+    emissive: spec.emissive,
+    emissiveIntensity: (spec.emissiveIntensity ?? 0.4) * Math.min(1.12, tone + 0.12),
+    roughness: 0.34,
+    metalness: 0.04,
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.22,
+    sheen: 1,
+    sheenRoughness: 0.18,
+    sheenColor: new THREE.Color(0x88ffaa),
+  });
+}
+
 const BLOCK_MATERIALS = {
   normal: { color: 0xffe600, emissive: 0xffe014, emissiveIntensity: 0.28 },
   gray: { color: 0x4466ff, emissive: 0x3355ee, emissiveIntensity: 0.3 },
@@ -749,6 +812,7 @@ const BLOCK_MATERIALS = {
   bonus: { color: 0xffee22, emissive: 0xddaa00, emissiveIntensity: 0.45, transparent: true, opacity: 0.96 },
   bonusCollectible: { color: 0xffee44, emissive: 0xddaa00, emissiveIntensity: 0.5, transparent: true, opacity: 0.88 },
   score: { color: 0xff8800, emissive: 0xff6600, emissiveIntensity: 0.36 },
+  shield: { color: 0x22ee55, emissive: 0x11cc44, emissiveIntensity: 0.4 },
   hidden: { color: 0x7a5c48, emissive: 0x4a382c, emissiveIntensity: 0.12 },
 };
 
@@ -760,6 +824,7 @@ const MESH_BLOCK_TYPES = new Set([
   'spike',
   'bonus',
   'score',
+  'shield',
   'power',
   'ability',
   'ability_long_h',
@@ -792,6 +857,7 @@ function blockMaterialKey(block) {
   if (typeId === 'spike') return 'spike';
   if (typeId === 'bonus') return 'bonus';
   if (typeId === 'score') return 'score';
+  if (typeId === 'shield') return 'shield';
   if (typeId === 'hidden' || typeId === 'hidden_2x2') return 'hidden';
   if (typeId === 'gray' || typeId.startsWith('gray_')) return 'gray';
   return 'normal';
@@ -859,6 +925,17 @@ function makeDioramaBlockMaterials(key) {
     });
   }
 
+  if (key === 'shield') {
+    const side = makeShieldBlockMaterial(1);
+    const top = makeShieldBlockMaterial(1.04);
+    const front = makeShieldBlockMaterial(1.02);
+    return Array.from({ length: 6 }, (_, i) => {
+      if (i === frontIdx) return front;
+      if (i === BOX_FACE.POS_Y) return top;
+      return side.clone();
+    });
+  }
+
   const side = makePuffyBlockMaterial(key, 0.98);
   const top = makePuffyBlockMaterial(key, 1.04);
   const front = makePuffyBlockMaterial(key, 1);
@@ -874,6 +951,7 @@ function disposeBlockMaterials(material) {
     normalBlockSheenTexture,
     grayBlockSheenTexture,
     scoreBlockSheenTexture,
+    shieldBlockSheenTexture,
     abilityGravelTexture,
     abilityMobIconTexture,
     abilityMobIconWhiteTexture,
@@ -1043,6 +1121,37 @@ function createStarOutlineShape(outerR, innerRatio = 0.66, roundness = 0.42, thi
   return outer;
 }
 
+function sampleBlockTeardropPoints3D(outerR) {
+  if (typeof globalThis.sampleBlockTeardropPoints === 'function') {
+    return globalThis.sampleBlockTeardropPoints(0, 0, outerR, 10, false);
+  }
+  return [
+    { x: 0, y: outerR * 0.9 },
+    { x: outerR * 0.68, y: -outerR * 0.3 },
+    { x: 0, y: -outerR * 0.86 },
+    { x: -outerR * 0.68, y: -outerR * 0.3 },
+  ];
+}
+
+function createBlockTeardropShape(outerR) {
+  const pts = sampleBlockTeardropPoints3D(outerR);
+  const shape = new THREE.Shape();
+  pts.forEach((p, i) => {
+    if (i === 0) shape.moveTo(p.x, p.y);
+    else shape.lineTo(p.x, p.y);
+  });
+  return shape;
+}
+
+/** Ring outline — thickness matches shield-block star (`createStarOutlineShape`). */
+function createTeardropOutlineShape(outerR, thickness = 0.28) {
+  const outer = createBlockTeardropShape(outerR);
+  const innerPts = sampleBlockTeardropPoints3D(outerR * (1 - thickness));
+  innerPts.reverse();
+  outer.holes.push(new THREE.Path(innerPts));
+  return outer;
+}
+
 /** Fill + outline star mesh pair (score block, liberation, bonus chance). */
 function createFaceStarGroup(outerR, {
   fillColor = 0xffee44,
@@ -1102,12 +1211,12 @@ function prepareStarCameraBillboard(starGroup, camera) {
   });
 }
 
-function addNormalBlockStarFace(group, pw, ph, depth) {
+function addNormalBlockTeardropFace(group, pw, ph, depth) {
   const outerR = Math.min(pw, ph) * 0.26;
   const zFront = dioramaFrontZ(depth);
 
   const outline = new THREE.Mesh(
-    new THREE.ShapeGeometry(createStarOutlineShape(outerR)),
+    new THREE.ShapeGeometry(createTeardropOutlineShape(outerR)),
     new THREE.MeshBasicMaterial({
       color: 0x220044,
       polygonOffset: true,
@@ -1117,7 +1226,6 @@ function addNormalBlockStarFace(group, pw, ph, depth) {
   );
   outline.position.set(0, 0, zFront);
   outline.userData.blockDetail = true;
-  group.userData.starMesh = outline;
   group.add(outline);
 }
 
@@ -1125,14 +1233,12 @@ function isGrayBlockTypeId(typeId) {
   return typeId === 'gray' || typeId === 'gray_long_h' || typeId === 'gray_long_v';
 }
 
-function addGrayBlockStarFace(group, pw, ph, depth) {
+function addGrayBlockTeardropFace(group, pw, ph, depth) {
   const outerR = Math.min(pw, ph) * 0.26;
   const zFront = dioramaFrontZ(depth);
-  const starGroup = new THREE.Group();
-  starGroup.position.set(0, 0, zFront);
 
   const fill = new THREE.Mesh(
-    new THREE.ShapeGeometry(createCuteStarShape(outerR)),
+    new THREE.ShapeGeometry(createBlockTeardropShape(outerR)),
     new THREE.MeshBasicMaterial({
       color: 0xa8c0ff,
       polygonOffset: true,
@@ -1140,39 +1246,26 @@ function addGrayBlockStarFace(group, pw, ph, depth) {
       polygonOffsetUnits: -2,
     })
   );
+  fill.position.set(0, 0, zFront);
   fill.userData.blockDetail = true;
-
-  const outline = new THREE.Mesh(
-    new THREE.ShapeGeometry(createStarOutlineShape(outerR, 0.66, 0.42, 0.18)),
-    new THREE.MeshBasicMaterial({
-      color: 0x4466ff,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3,
-    })
-  );
-  outline.position.z = 0.02;
-  outline.userData.blockDetail = true;
-
-  starGroup.add(fill, outline);
-  group.userData.grayStarGroup = starGroup;
-  group.add(starGroup);
+  group.userData.grayTeardropMesh = fill;
+  group.add(fill);
 }
 
-function removeGrayBlockStarFace(group) {
-  const starGroup = group.userData.grayStarGroup;
-  if (!starGroup) return;
-  group.remove(starGroup);
-  disposeMeshTree(starGroup);
-  group.userData.grayStarGroup = null;
+function removeGrayBlockTeardropFace(group) {
+  const mesh = group.userData.grayTeardropMesh;
+  if (!mesh) return;
+  group.remove(mesh);
+  disposeMeshTree(mesh);
+  group.userData.grayTeardropMesh = null;
 }
 
-function ensureGrayBlockStarFace(group, block) {
-  if (!isGrayBlockTypeId(block.getData('typeId')) || group.userData.grayStarGroup) return;
+function ensureGrayBlockTeardropFace(group, block) {
+  if (!isGrayBlockTypeId(block.getData('typeId')) || group.userData.grayTeardropMesh) return;
   const w = block.displayWidth;
   const h = block.displayHeight;
   const { pw, ph, depth } = blockPuffyDimensions(w, h);
-  addGrayBlockStarFace(group, pw, ph, depth);
+  addGrayBlockTeardropFace(group, pw, ph, depth);
 }
 
 function isNormalBlockTypeId(typeId) {
@@ -1190,19 +1283,34 @@ function resolveNormalStarTickerAngle(timeMs, phase = 0) {
   return (step % steps) * ((Math.PI * 2) / steps) + phase;
 }
 
-function ensureNormalBlockStarFace(group, block) {
-  if (!isNormalBlockTypeId(block.getData('typeId')) || group.userData.starMesh) return;
+function ensureNormalBlockTeardropFace(group, block) {
+  if (!isNormalBlockTypeId(block.getData('typeId')) || group.userData.hasTeardropFace) return;
   const w = block.displayWidth;
   const h = block.displayHeight;
   const { pw, ph, depth } = blockPuffyDimensions(w, h);
-  addNormalBlockStarFace(group, pw, ph, depth);
+  addNormalBlockTeardropFace(group, pw, ph, depth);
+  group.userData.hasTeardropFace = true;
 }
 
-function syncNormalBlockStarRotation(block, entry, scene) {
-  const star = entry.group.userData.starMesh;
-  if (!star || !scene?.time) return;
+function isShieldBlockTypeId(typeId) {
+  return typeId === 'shield';
+}
+
+function addShieldBlockStarFace(group, pw, ph, depth) {
+  const outerR = Math.min(pw, ph) * 0.26;
+  const zFront = dioramaFrontZ(depth);
+
+  const starGroup = createFaceStarGroup(outerR, { detailTag: 'blockDetail' });
+  starGroup.position.set(0, 0, zFront);
+  group.userData.shieldStarGroup = starGroup;
+  group.add(starGroup);
+}
+
+function syncShieldBlockStarRotation(block, entry, scene) {
+  const starGroup = entry.group.userData.shieldStarGroup;
+  if (!starGroup || !scene?.time) return;
   const phase = block.getData('starPhase') || 0;
-  star.rotation.z = resolveNormalStarTickerAngle(scene.time.now, phase);
+  starGroup.rotation.z = resolveNormalStarTickerAngle(scene.time.now, phase);
 }
 
 function isScoreBlockTypeId(typeId) {
@@ -1452,6 +1560,29 @@ function createScoreBlockMesh(block) {
   group.userData.matKey = 'score';
   group.userData.boxMesh = box;
   group.userData.blockDepth = depth;
+  return group;
+}
+
+function createShieldBlockMesh(block) {
+  const w = block.displayWidth;
+  const h = block.displayHeight;
+  const { pw, ph, depth, radius } = blockPuffyDimensions(w, h);
+  const group = new THREE.Group();
+  const geo = new RoundedBoxGeometry(pw, ph, depth, DIORAMA.roundedBoxSegments, radius);
+  const box = new THREE.Mesh(geo, makeDioramaBlockMaterials('shield'));
+  box.scale.set(
+    DIORAMA.blockBulgeScaleX,
+    DIORAMA.blockBulgeScaleY,
+    DIORAMA.blockBulgeScaleZ
+  );
+  group.add(box);
+  addShieldBlockStarFace(group, pw, ph, depth);
+
+  group.userData.matKey = 'shield';
+  group.userData.boxMesh = box;
+  group.userData.blockDepth = depth;
+  group.userData.blockPw = pw;
+  group.userData.blockPh = ph;
   return group;
 }
 
@@ -2072,6 +2203,9 @@ function createBlockMesh(block) {
   if (block.getData('typeId') === 'score') {
     return createScoreBlockMesh(block);
   }
+  if (block.getData('typeId') === 'shield') {
+    return createShieldBlockMesh(block);
+  }
   if (block.getData('typeId') === 'pinball') {
     return createPinballBumperMesh(block);
   }
@@ -2092,10 +2226,11 @@ function createBlockMesh(block) {
 
   const typeId = block.getData('typeId');
   if (typeId === 'normal' || typeId === 'normal_long_h' || typeId === 'normal_long_v') {
-    addNormalBlockStarFace(group, pw, ph, depth);
+    addNormalBlockTeardropFace(group, pw, ph, depth);
+    group.userData.hasTeardropFace = true;
   }
   if (isGrayBlockTypeId(typeId)) {
-    addGrayBlockStarFace(group, pw, ph, depth);
+    addGrayBlockTeardropFace(group, pw, ph, depth);
   }
 
   if (isPowerBlockTypeId(typeId)) {
@@ -3181,20 +3316,23 @@ export function createThreeOverlay(opts) {
     }
     mesh.userData.matKey = matKey;
     if (matKey === 'normal' && prevKey !== 'normal') {
-      ensureNormalBlockStarFace(mesh, block);
+      ensureNormalBlockTeardropFace(mesh, block);
     }
     if (matKey === 'gray' && prevKey !== 'gray') {
-      ensureGrayBlockStarFace(mesh, block);
+      ensureGrayBlockTeardropFace(mesh, block);
     }
     if (matKey !== 'gray' && prevKey === 'gray') {
-      removeGrayBlockStarFace(mesh);
+      removeGrayBlockTeardropFace(mesh);
     }
   }
 
   function blockMeshMatchesType(block, entry) {
     const typeId = block.getData('typeId');
     const meshIsScore = Boolean(entry.group.userData.scoreStarGroup);
-    return (typeId === 'score') === meshIsScore;
+    const meshIsShield = Boolean(entry.group.userData.shieldStarGroup);
+    if (typeId === 'score') return meshIsScore;
+    if (typeId === 'shield') return meshIsShield;
+    return !meshIsScore && !meshIsShield;
   }
 
   function replaceBlockMesh(block) {
@@ -3251,7 +3389,7 @@ export function createThreeOverlay(opts) {
     syncPowerBlockFx(block, entry, phaserScene);
     syncAbilityBlockHitFx(block, entry, phaserScene);
     syncGrayDowngradeFx(block, entry, phaserScene);
-    syncNormalBlockStarRotation(block, entry, phaserScene);
+    syncShieldBlockStarRotation(block, entry, phaserScene);
     syncScoreBlockFx(block, entry, phaserScene);
     syncPinballBumperHitFx(block, entry, phaserScene);
     entry.group.visible = block.active && !hidePanel;
@@ -3552,12 +3690,12 @@ export function createThreeOverlay(opts) {
       return true;
     },
 
-    releaseScoreBlockStar(block) {
+    releaseBlockFaceStar(block) {
       const entry = blockMeshes.get(block);
       if (!entry || !phaserScene?.time) return false;
 
       const group = entry.group;
-      const starGroup = group.userData.scoreStarGroup;
+      const starGroup = group.userData.scoreStarGroup || group.userData.shieldStarGroup;
       if (!starGroup) return false;
 
       block.setData('scoreHitFxStart', null);
@@ -3587,6 +3725,14 @@ export function createThreeOverlay(opts) {
       root.remove(group);
       disposeMeshTree(group);
       return true;
+    },
+
+    releaseScoreBlockStar(block) {
+      return this.releaseBlockFaceStar(block);
+    },
+
+    releaseShieldBlockStar(block) {
+      return this.releaseBlockFaceStar(block);
     },
 
     registerPaddle(paddle) {

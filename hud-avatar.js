@@ -112,6 +112,45 @@ function getHudAvatarTextureKey(stateId, avatarConfig = null, scene = null) {
   return primary;
 }
 
+/** Bake a circular-alpha portrait so HUD clipping works without Phaser masks. */
+function bakeHudAvatarCircleTexture(scene, sourceKey, size) {
+  const outKey = `hud_avatar_round_${sourceKey}_${size}`;
+  if (scene.textures.exists(outKey)) return outKey;
+  if (!scene.textures.exists(sourceKey)) return sourceKey;
+
+  const frame = scene.textures.getFrame(sourceKey);
+  const src = frame?.source?.image;
+  if (!src || !frame) return sourceKey;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return sourceKey;
+
+  ctx.clearRect(0, 0, size, size);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(size * 0.5, size * 0.5, size * 0.5, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(
+    src,
+    frame.cutX,
+    frame.cutY,
+    frame.cutWidth,
+    frame.cutHeight,
+    0,
+    0,
+    size,
+    size
+  );
+  ctx.restore();
+
+  scene.textures.addCanvas(outKey, canvas);
+  return outKey;
+}
+
 /**
  * Apply state to a Phaser Image. No-op if texture key missing.
  * @param {Phaser.GameObjects.Image} image
@@ -123,8 +162,9 @@ function applyHudAvatarState(image, stateId, avatarConfig = null) {
   const scene = image.scene;
   const key = getHudAvatarTextureKey(stateId, avatarConfig, scene);
   if (!scene?.textures?.exists(key)) return stateId;
-  if (image.texture.key !== key) image.setTexture(key);
   const size = image.getData('hudAvatarSize');
+  const roundKey = size ? bakeHudAvatarCircleTexture(scene, key, size) : key;
+  if (image.texture.key !== roundKey) image.setTexture(roundKey);
   if (size) image.setDisplaySize(size, size);
   image.setData('avatarState', stateId);
   return stateId;

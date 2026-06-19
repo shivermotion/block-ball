@@ -21,6 +21,7 @@ const BLOCK_PICKER_OPTIONS = [
   { value: 5, label: 'Indestructible', key: '5', procedural: 'indestructible' },
   { value: 34, label: 'Pinball Bumper', key: 'b', procedural: 'pinball', span: '2x2' },
   { value: 18, label: 'Score', key: 'e', procedural: 'score', span: '2x2' },
+  { value: 29, label: 'Shield', key: 's', procedural: 'shield' },
   { value: 22, label: 'Bonus', key: 'u', procedural: 'bonus' },
   { value: 23, label: 'Hidden', key: 'h', procedural: 'hidden' },
   { value: 24, label: 'Hidden 2×2', key: 'x', procedural: 'hidden', span: '2x2' },
@@ -60,6 +61,7 @@ const BLOCK_FALLBACK_COLORS = {
   5: '#44aaff',
   34: '#ff3344',
   18: '#cc66ff',
+  29: '#22ee55',
   22: '#ffee22',
   23: '#7a5c48',
   24: '#7a5c48',
@@ -119,14 +121,14 @@ function buildProceduralBlockCanvas(cellW, cellH, type) {
   if (type === 'normal') {
     fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#cdb002');
     fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#f1d302');
-    if (typeof drawDebossedNormalStarCanvas === 'function') {
-      drawDebossedNormalStarCanvas(c, cellW / 2, cellH / 2, normalStarOuterRadius(innerW, innerH));
+    if (typeof drawDebossedNormalTeardropCanvas === 'function') {
+      drawDebossedNormalTeardropCanvas(c, cellW / 2, cellH / 2, normalStarOuterRadius(innerW, innerH));
     }
   } else if (type === 'gray') {
     fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#4466ff');
     fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#a8c0ff');
-    if (typeof drawMutedGrayStarCanvas === 'function') {
-      drawMutedGrayStarCanvas(c, cellW / 2, cellH / 2, normalStarOuterRadius(innerW, innerH));
+    if (typeof drawMutedGrayTeardropCanvas === 'function') {
+      drawMutedGrayTeardropCanvas(c, cellW / 2, cellH / 2, normalStarOuterRadius(innerW, innerH));
     }
   } else if (type === 'power') {
     fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#1a425f');
@@ -194,6 +196,13 @@ function buildProceduralBlockCanvas(cellW, cellH, type) {
     const starCy = pad + innerH / 2;
     if (typeof drawDebossedNormalStarCanvas === 'function') {
       drawDebossedNormalStarCanvas(c, starCx, starCy, starR);
+    }
+  } else if (type === 'shield') {
+    fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#0a9944');
+    fillRoundRect(c, pad + 2, pad + 2, innerW - 4, innerH - 4, r.inner, '#22ee55');
+    const starR = normalStarOuterRadius(innerW, innerH);
+    if (typeof drawFilledScoreStarCanvas === 'function') {
+      drawFilledScoreStarCanvas(c, cellW / 2, cellH / 2, starR);
     }
   } else if (type === 'hidden') {
     fillRoundRect(c, pad, pad, innerW, innerH, r.outer, '#4a382c');
@@ -324,6 +333,12 @@ function buildProceduralItemCanvas(cellW, cellH, entry) {
   if (entry.id === 'item_bonus_chance') {
     drawBonusChanceItemArt(c, w, h);
     return canvas;
+  }
+
+  if (hasItemArt(entry.id) && typeof getItemCanvas === 'function') {
+    const art = getItemCanvas(entry.id);
+    const fit = typeof getItemArtFit === 'function' ? getItemArtFit(entry.id) : 'contain';
+    if (art && drawItemArt(c, w, h, art, fit)) return canvas;
   }
 
   const size = Math.max(8, Math.min(cellW, cellH) - 4);

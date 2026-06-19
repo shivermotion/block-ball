@@ -153,9 +153,9 @@ function createBlankLevel() {
     },
     hudGap: 8,
     hudLayout: {
-      left: ['score'],
+      left: ['score', 'stars'],
       right: ['lives', 'avatar'],
-      gaps: { livesToAvatar: 10 },
+      gaps: { livesToAvatar: 10, scoreToStars: 156 },
       avatar: { size: 44 },
     },
     grid: {

@@ -6,6 +6,7 @@ const CAMPAIGN_WORLD_COUNT = 10;
 const CAMPAIGN_STAGE_COUNT = 5;
 const CAMPAIGN_PROGRESS_KEY = 'blockBall.campaignProgress';
 const CAMPAIGN_LAST_KEY = 'blockBall.campaignLast';
+const WORLD_STAR_COUNT_KEY = 'blockBall.worldStarCounts';
 
 function worldIdForIndex(index) {
   return `world-${String(index + 1).padStart(2, '0')}`;
@@ -127,6 +128,59 @@ function markStageCompleted(worldId, stageIndex) {
 
 function resetCampaignProgress() {
   saveCampaignProgress({ completedStages: [] });
+  saveWorldStarCounts({});
+}
+
+function resetAllWorldStarCounts() {
+  saveWorldStarCounts({});
+}
+
+function loadWorldStarCounts() {
+  try {
+    const raw = localStorage.getItem(WORLD_STAR_COUNT_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function saveWorldStarCounts(counts) {
+  try {
+    localStorage.setItem(WORLD_STAR_COUNT_KEY, JSON.stringify(counts));
+  } catch (_) {
+    /* private mode */
+  }
+}
+
+function getWorldStarCount(worldId) {
+  if (!worldId) return 0;
+  const counts = loadWorldStarCounts();
+  const n = counts[worldId];
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+function incrementWorldStarCount(worldId) {
+  if (!worldId) return 0;
+  const counts = loadWorldStarCounts();
+  const next = getWorldStarCount(worldId) + 1;
+  counts[worldId] = next;
+  saveWorldStarCounts(counts);
+  return next;
+}
+
+function resetWorldStarCount(worldId) {
+  if (!worldId) return;
+  const counts = loadWorldStarCounts();
+  if (counts[worldId] == null) return;
+  delete counts[worldId];
+  saveWorldStarCounts(counts);
+}
+
+/** Campaign stage 5 (index 4) is the world boss stage. */
+function isBossStage(stageIndex) {
+  return stageIndex === CAMPAIGN_STAGE_COUNT - 1;
 }
 
 function assignedStagesInWorld(world) {
@@ -296,6 +350,7 @@ const Campaign = {
   CAMPAIGN_WORLD_COUNT,
   CAMPAIGN_STAGE_COUNT,
   CAMPAIGN_PROGRESS_KEY,
+  WORLD_STAR_COUNT_KEY,
   DEFAULT_CAMPAIGN,
   createDefaultCampaign,
   ensureCampaign,
@@ -306,6 +361,12 @@ const Campaign = {
   loadCampaignProgress,
   saveCampaignProgress,
   resetCampaignProgress,
+  loadWorldStarCounts,
+  getWorldStarCount,
+  incrementWorldStarCount,
+  resetWorldStarCount,
+  resetAllWorldStarCounts,
+  isBossStage,
   isStageCompleted,
   markStageCompleted,
   isWorldComplete,

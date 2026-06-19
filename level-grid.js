@@ -42,9 +42,9 @@ const DEFAULT_HUD = {
 
 /** Zone-based HUD slots (order within `right` is left → toward screen edge). */
 const DEFAULT_HUD_LAYOUT = {
-  left: ['score'],
+  left: ['score', 'stars'],
   right: ['lives', 'avatar'],
-  gaps: { betweenZones: 12, livesToAvatar: 10 },
+  gaps: { betweenZones: 12, livesToAvatar: 10, scoreToStars: 156 },
   avatar: { size: 44 },
 };
 
@@ -91,6 +91,7 @@ function resolveHudLayout(level, bounds, options = {}) {
   const maxLives = options.maxLives ?? 3;
   const lifeStep = 20;
   const gapLA = layout.gaps?.livesToAvatar ?? DEFAULT_HUD_LAYOUT.gaps.livesToAvatar;
+  const scoreToStars = layout.gaps?.scoreToStars ?? DEFAULT_HUD_LAYOUT.gaps.scoreToStars;
   const avatarSize = layout.avatar?.size ?? DEFAULT_HUD_LAYOUT.avatar.size;
 
   const avatarCx = W - padX - avatarSize / 2;
@@ -103,6 +104,7 @@ function resolveHudLayout(level, bounds, options = {}) {
     padY,
     cy,
     score: { x: padX, y: cy },
+    stars: { x: padX + scoreToStars, y: cy },
     livesContainer: { x: livesOriginX, y: cy },
     avatar: { x: avatarCx, y: avatarCy, size: avatarSize },
   };

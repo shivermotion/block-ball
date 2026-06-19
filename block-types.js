@@ -196,10 +196,10 @@ const BLOCK_COMPENDIUM = [
     notes: 'Solid when placed; pass-through collectible during Bonus Chance timer.',
   },
   {
-    id: 'star',
-    name: 'Star / Protective Star Block',
-    implemented: false,
-    appearance: 'Small rectangle with star symbol',
+    id: 'shield',
+    name: 'Shield Block',
+    implemented: true,
+    appearance: 'Vibrant green 1×1 puff with animated star (score-style)',
     points: 0,
     normalHit: 'collect',
     powerHit: 'collect',
@@ -379,6 +379,15 @@ const BLOCK_TYPES = {
     powerHit: 'hit_increment_high',
     countsTowardClear: false,
   },
+  shield: {
+    id: 'shield',
+    texture: 'block_shield',
+    points: 0,
+    powerOnly: false,
+    normalHit: 'collect',
+    powerHit: 'collect',
+    countsTowardClear: false,
+  },
   /** Placed in editor — solid until Bonus Chance; pass-through while timer runs. */
   hidden: {
     id: 'hidden',
@@ -484,6 +493,7 @@ const BLOCK_CELL_MAP = {
   23: 'hidden',
   24: 'hidden_2x2',
   28: 'ability',
+  29: 'shield',
   30: 'ability_long_h',
   32: 'ability_long_v',
   34: 'pinball',

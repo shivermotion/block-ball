@@ -399,6 +399,7 @@ PACKAGING FOR REAL MOBILE APPS
   <script src="enemy-horizontal-flyer-art.js"></script>
   <script src="enemy-slime-fire-art.js"></script>
   <script src="item-types.js"></script>
+  <script src="item-art.js"></script>
   <script src="score-popup.js"></script>
   <script src="level-grid.js"></script>
   <script src="hud-avatar.js"></script>
@@ -408,7 +409,7 @@ PACKAGING FOR REAL MOBILE APPS
   <script src="levels/registry.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
   <script>
-    /* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, blockCountsTowardLevelClear, getHiddenRevealCell, canBlockBecomeBonus, getBonusCollectPoints, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemEffect, getItemTextureKey, getItemFootprint, ITEM_CATEGORY, spawnFloatingScore, spawnFloatingHint, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, drawGameFrameBezelFill, fitEntityToCell, fitEntityToCellSpan, fitSpikeToCellBottom, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES, markStageCompleted, getNextStage, campaignPlayUrl, campaignMenuUrl, createParallaxGridBackground, updateParallaxGridBackground, setGameHapticsEnabled, gameHaptic, hapticLaunchChargeStart, hapticLaunchChargeTick, hapticLaunchRelease, isPowerBlockType, isAbilityBlockType, bakeAbilityBlockTextures */
+    /* global Phaser, BLOCK_TYPES, BLOCK_CELL_MAP, getBlockDef, getBlockFootprint, getBlockTypeFromCell, isBlockExtensionCell, resolveBlockHit, blockCountsTowardLevelClear, getHiddenRevealCell, canBlockBecomeBonus, getBonusCollectPoints, getEnemyDef, resolveEnemyHit, getItemDef, getItemPoints, getItemEffect, getItemTextureKey, getItemFootprint, ITEM_CATEGORY, spawnFloatingScore, spawnFloatingHint, awardPointsAt, createLevelGrid, ensurePlayBlockCells, drawLevelGridDebug, drawDevViewBorders, drawGameFrameBezelFill, fitEntityToCell, fitEntityToCellSpan, fitSpikeToCellBottom, ballRadiusForCell, resolveGridRow, resolveActiveLevel, populateLevelSelect, BLOCK_BALL_LEVELS, resolveHudLayout, DEFAULT_HUD_LAYOUT, generateHudAvatarTextures, resolveHudAvatarState, applyHudAvatarState, getHudAvatarTextureKey, HUD_AVATAR_STATES, markStageCompleted, getNextStage, campaignPlayUrl, campaignMenuUrl, getWorldStarCount, incrementWorldStarCount, resetWorldStarCount, isBossStage, createParallaxGridBackground, updateParallaxGridBackground, setGameHapticsEnabled, gameHaptic, hapticLaunchChargeStart, hapticLaunchChargeTick, hapticLaunchRelease, isPowerBlockType, isAbilityBlockType, bakeAbilityBlockTextures */
 
     let ACTIVE_LEVEL = null;
     /** @type {{ campaign: object, worldId: string, worldName: string, worldIndex: number, stageIndex: number, stageNumber: number } | null} */
@@ -956,6 +957,18 @@ PACKAGING FOR REAL MOBILE APPS
     /** Matches procedural paddle texture size (see generateTextures). */
     const PADDLE_PAD = 2;
 
+    /** HUD portrait: thin inner black ring, thick outer white ring. */
+    const HUD_AVATAR_BORDER = { black: 2, white: 7 };
+
+    function drawHudAvatarBorderFrame(graphics, radius) {
+      const { black, white } = HUD_AVATAR_BORDER;
+      graphics.clear();
+      graphics.fillStyle(0xffffff, 1);
+      graphics.fillCircle(0, 0, radius + black + white);
+      graphics.fillStyle(0x000000, 1);
+      graphics.fillCircle(0, 0, radius + black);
+    }
+
     function getPaddleDisplaySize(cellW, cellH, colSpan = 2) {
       return {
         width: Math.max(1, Math.round(colSpan * cellW - PADDLE_PAD)),
@@ -1026,11 +1039,16 @@ PACKAGING FOR REAL MOBILE APPS
         g.generateTexture(key, cellW, cellH);
       }
 
-      drawBlockTexture('block_normal', COLORS.blockNormal, COLORS.blockNormalBorder);
+      drawBlockTexture('block_normal', COLORS.blockNormal, COLORS.blockNormalBorder, (gfx, px, w, h) => {
+        const symbolR = normalStarOuterRadius(w, h);
+        if (typeof drawDebossedNormalTeardropPhaser === 'function') {
+          drawDebossedNormalTeardropPhaser(gfx, px + w / 2, px + h / 2, symbolR);
+        }
+      });
       drawBlockTexture('block_gray', COLORS.blockGray, COLORS.blockGrayBorder, (gfx, px, w, h) => {
-        const starR = normalStarOuterRadius(w, h);
-        if (typeof drawMutedGrayStarPhaser === 'function') {
-          drawMutedGrayStarPhaser(gfx, px + w / 2, px + h / 2, starR);
+        const symbolR = normalStarOuterRadius(w, h);
+        if (typeof drawMutedGrayTeardropPhaser === 'function') {
+          drawMutedGrayTeardropPhaser(gfx, px + w / 2, px + h / 2, symbolR);
         }
       });
       bakePowerBlockTextures(scene, cellW, cellH, g);
@@ -1121,6 +1139,14 @@ PACKAGING FOR REAL MOBILE APPS
         g.generateTexture('block_score', scoreW, scoreH);
       }
 
+      // Shield block — 1×1 vibrant green puff (score-style) + static star on 2D fallback
+      drawBlockTexture('block_shield', 0x22ee55, 0x0a9944, (gfx, px, w, h) => {
+        const starR = normalStarOuterRadius(w, h);
+        if (typeof drawFilledScoreStarPhaser === 'function') {
+          drawFilledScoreStarPhaser(gfx, px + w / 2, px + h / 2, starR);
+        }
+      });
+
       drawBlockTexture('block_bonus', 0xffee22, 0xff9900, (gfx, px, w, h, r) => {
         gfx.fillStyle(0xffffff, 0.95);
         gfx.fillCircle(px + w / 2, px + h * 0.44, Math.min(w, h) * 0.14);
@@ -1133,6 +1159,15 @@ PACKAGING FOR REAL MOBILE APPS
       g.fillStyle(COLORS.ball, 1);
       g.fillCircle(8, 8, 8);
       g.generateTexture('life_icon', 16, 16);
+
+      g.clear();
+      if (typeof drawFilledScoreStarPhaser === 'function') {
+        drawFilledScoreStarPhaser(g, 10, 10, 8);
+      } else {
+        g.fillStyle(0xffee44, 1);
+        g.fillCircle(10, 10, 8);
+      }
+      g.generateTexture('hud_star_icon', 20, 20);
 
       if (!scene.textures.exists(BALL_TEXTURE.neutral)) {
         const ballSize = 64;
@@ -1407,6 +1442,18 @@ PACKAGING FOR REAL MOBILE APPS
           g.fillCircle(cx, cy, circleR);
           g.fillStyle(0xffee44, 1);
           fillStar(g, cx, cy, circleR * 0.55, circleR * 0.55 * 0.42, 5);
+        } else if (typeof hasItemArt === 'function' && hasItemArt(id) && typeof getItemCanvas === 'function') {
+          const art = getItemCanvas(id);
+          if (art) {
+            const fullW = foot.colSpan * cellW;
+            const fullH = foot.rowSpan * cellH;
+            const canvas = document.createElement('canvas');
+            canvas.width = fullW;
+            canvas.height = fullH;
+            drawItemArt(canvas.getContext('2d'), fullW, fullH, art, getItemArtFit(id));
+            scene.textures.addCanvas(key, canvas);
+            continue;
+          }
         } else {
           const size = Math.max(8, Math.min(texW, texH) - 4);
           g.fillStyle(colors.border, 1);
@@ -1536,6 +1583,9 @@ PACKAGING FOR REAL MOBILE APPS
         bbLog('create() start');
         this.gameState = 'playing'; // playing | levelClear | gameOver
         this.score = 0;
+        this.worldStarCount = ACTIVE_CAMPAIGN_CTX
+          ? getWorldStarCount(ACTIVE_CAMPAIGN_CTX.worldId)
+          : 0;
         this.ballLaunched = false;
         this.ballOnPaddle = true;
         this.powerBounceQueued = false;
@@ -1697,13 +1747,12 @@ PACKAGING FOR REAL MOBILE APPS
 
       registerThreeBlock(block) {
         if (this.threeOverlay?.registerBlock(block)) return;
-        this.attachNormalBlockStar(block);
-        this.attachGrayBlockStar(block);
+        this.attachShieldBlockStar(block);
       }
 
-      attachNormalBlockStar(block) {
-        if (!block?.active || !isNormalBlockType(block.getData('typeId'))) return;
-        if (block.getData('starGfx')?.active) return;
+      attachShieldBlockStar(block) {
+        if (!block?.active || block.getData('typeId') !== 'shield') return;
+        if (block.getData('shieldStarGfx')?.active) return;
 
         const col = block.getData('gridCol') ?? 0;
         const row = block.getData('gridRow') ?? 0;
@@ -1711,17 +1760,17 @@ PACKAGING FOR REAL MOBILE APPS
 
         const gfx = this.add.graphics();
         gfx.setDepth((block.depth ?? 5) + 0.2);
-        block.setData('starGfx', gfx);
-        this.redrawNormalBlockStarGfx(block);
+        block.setData('shieldStarGfx', gfx);
+        this.redrawShieldBlockStarGfx(block);
         block.once('destroy', () => {
-          const g = block.getData('starGfx');
+          const g = block.getData('shieldStarGfx');
           if (g?.active) g.destroy();
-          block.setData('starGfx', null);
+          block.setData('shieldStarGfx', null);
         });
       }
 
-      redrawNormalBlockStarGfx(block) {
-        const gfx = block.getData('starGfx');
+      redrawShieldBlockStarGfx(block) {
+        const gfx = block.getData('shieldStarGfx');
         if (!gfx?.active) return;
         gfx.clear();
         const pad = 4;
@@ -1729,55 +1778,19 @@ PACKAGING FOR REAL MOBILE APPS
           Math.max(8, block.displayWidth - pad),
           Math.max(8, block.displayHeight - pad)
         );
-        drawDebossedNormalStarPhaser(gfx, 0, 0, outerR);
-      }
-
-      attachGrayBlockStar(block) {
-        if (!block?.active || !isGrayBlockType(block.getData('typeId'))) return;
-        if (block.getData('grayStarGfx')?.active) return;
-
-        const gfx = this.add.graphics();
-        gfx.setDepth((block.depth ?? 5) + 0.2);
-        block.setData('grayStarGfx', gfx);
-        this.redrawGrayBlockStarGfx(block);
-        block.once('destroy', () => {
-          const g = block.getData('grayStarGfx');
-          if (g?.active) g.destroy();
-          block.setData('grayStarGfx', null);
-        });
-      }
-
-      redrawGrayBlockStarGfx(block) {
-        const gfx = block.getData('grayStarGfx');
-        if (!gfx?.active) return;
-        gfx.clear();
-        const pad = 4;
-        const outerR = normalStarOuterRadius(
-          Math.max(8, block.displayWidth - pad),
-          Math.max(8, block.displayHeight - pad)
-        );
-        if (typeof drawMutedGrayStarPhaser === 'function') {
-          drawMutedGrayStarPhaser(gfx, 0, 0, outerR);
+        if (typeof drawFilledScoreStarPhaser === 'function') {
+          drawFilledScoreStarPhaser(gfx, 0, 0, outerR);
         }
       }
 
-      updateNormalBlockStars(time) {
+      updateShieldBlockStars(time) {
         if (!this.blocks) return;
         for (const block of this.blocks.getChildren()) {
-          const gfx = block.getData('starGfx');
+          const gfx = block.getData('shieldStarGfx');
           if (!gfx?.active || !block.active) continue;
           gfx.setPosition(block.x, block.y);
           const phase = block.getData('starPhase') || 0;
           gfx.setRotation(normalStarTickerAngle(time, NORMAL_STAR_TICK_MS, phase));
-        }
-      }
-
-      updateGrayBlockStars() {
-        if (!this.blocks) return;
-        for (const block of this.blocks.getChildren()) {
-          const gfx = block.getData('grayStarGfx');
-          if (!gfx?.active || !block.active) continue;
-          gfx.setPosition(block.x, block.y);
         }
       }
 
@@ -1902,7 +1915,11 @@ PACKAGING FOR REAL MOBILE APPS
           item.body.setImmovable(true);
           item.body.allowGravity = false;
           if (foot.colSpan > 1 || foot.rowSpan > 1) {
-            fitEntityToCellSpan(item, this.levelGrid, foot.colSpan, foot.rowSpan);
+            const spanOpts =
+              typeof hasItemArt === 'function' && hasItemArt(spawn.type) ? { padding: 0 } : {};
+            fitEntityToCellSpan(item, this.levelGrid, foot.colSpan, foot.rowSpan, spanOpts);
+          } else if (typeof hasItemArt === 'function' && hasItemArt(spawn.type)) {
+            fitEntityToCell(item, this.levelGrid, { padding: 0 });
           } else {
             fitEntityToCell(item, this.levelGrid, { contain: true });
           }
@@ -2530,6 +2547,19 @@ PACKAGING FOR REAL MOBILE APPS
           return;
         }
 
+        if (result.action === 'collect') {
+          if (result.points > 0) {
+            this.awardDestroyPoints(result.points, block.x, block.y);
+          }
+          if (block.getData('typeId') === 'shield') {
+            this.destroyShieldBlock(block);
+          } else {
+            this.destroyBlock(block);
+          }
+          this.clampBallSpeed();
+          return;
+        }
+
         if (result.action === 'destroy') {
           let points = result.points;
           if (this.powerBounceMultiplier) {
@@ -2709,8 +2739,8 @@ PACKAGING FOR REAL MOBILE APPS
         gfx.setDepth(14);
         const drawStar = () => {
           gfx.clear();
-          if (typeof drawDebossedNormalStarPhaser === 'function') {
-            drawDebossedNormalStarPhaser(gfx, 0, 0, outerR);
+          if (typeof drawFilledScoreStarPhaser === 'function') {
+            drawFilledScoreStarPhaser(gfx, 0, 0, outerR);
           } else {
             gfx.fillStyle(0xffee44, 1);
             gfx.fillCircle(0, 0, outerR * 0.55);
@@ -2796,6 +2826,38 @@ PACKAGING FOR REAL MOBILE APPS
         this.playScoreStarLiberation2D(bx, by, dw, dh);
       }
 
+      destroyShieldBlock(block) {
+        if (!block?.active) return;
+
+        this.onShieldStarCollected();
+
+        if (block.body) block.body.checkCollision.none = true;
+
+        const bx = block.x;
+        const by = block.y;
+        const tint = this.getBlockDebrisTint(block);
+        const dw = block.displayWidth;
+        const dh = block.displayHeight;
+
+        const teardownBlock = () => {
+          if (!block.active) return;
+          gameHaptic('blockDestroy');
+          this.spawnBlockClayDebris(bx, by, tint);
+          this.threeOverlay?.unregisterBlock(block);
+          block.destroy();
+        };
+
+        if (this.threeOverlay?.releaseShieldBlockStar?.(block)) {
+          block.setVisible(false);
+          teardownBlock();
+          return;
+        }
+
+        block.setVisible(false);
+        teardownBlock();
+        this.playScoreStarLiberation2D(bx, by, dw, dh);
+      }
+
       applyHiddenReveal(block, options = {}) {
         const { syncThree = true } = options;
         let revealCell = block.getData('hiddenRevealCell') ?? 1;
@@ -2838,14 +2900,10 @@ PACKAGING FOR REAL MOBILE APPS
 
         if (toTypeId === 'score') block.setData('scoreHits', 0);
 
-        if (isNormalBlockType(toTypeId)) {
+        if (toTypeId === 'shield') {
           block.setData('starPhase', normalStarTickerPhase(col ?? 0, row ?? 0));
           if (!this.threeOverlay?.hasBlockMesh?.(block)) {
-            this.attachNormalBlockStar(block);
-          }
-        } else if (isGrayBlockType(toTypeId)) {
-          if (!this.threeOverlay?.hasBlockMesh?.(block)) {
-            this.attachGrayBlockStar(block);
+            this.attachShieldBlockStar(block);
           }
         }
 
@@ -2976,21 +3034,6 @@ PACKAGING FOR REAL MOBILE APPS
         }
         block.refreshBody();
         this.threeOverlay?.updateBlock(block);
-        const grayGfx = block.getData('grayStarGfx');
-        if (grayGfx?.active) {
-          grayGfx.destroy();
-          block.setData('grayStarGfx', null);
-        }
-        if (isNormalBlockType(toTypeId)) {
-          const col = block.getData('gridCol') ?? 0;
-          const row = block.getData('gridRow') ?? 0;
-          if (block.getData('starPhase') == null) {
-            block.setData('starPhase', normalStarTickerPhase(col, row));
-          }
-          if (!this.threeOverlay?.hasBlockMesh?.(block)) {
-            this.attachNormalBlockStar(block);
-          }
-        }
         this.playGrayDowngradeSpring(block);
         this.flashBlock(block, 0xdddddd);
         bbLog('block downgraded', { to: toTypeId });
@@ -4503,9 +4546,28 @@ PACKAGING FOR REAL MOBILE APPS
 
         const pos = resolveHudLayout(this.level, { width, height }, { maxLives });
         const hudLayout = { ...DEFAULT_HUD_LAYOUT, ...(this.level.hudLayout || {}) };
+        if (hudLayout.left?.includes('score') && !hudLayout.left.includes('stars')) {
+          hudLayout.left = [...hudLayout.left, 'stars'];
+        }
 
         this.scoreText = this.add.text(pos.score.x, pos.score.y, 'Score: 0', textStyle).setOrigin(0, 0.5);
         this.hudContainer.add(this.scoreText);
+
+        this.starsContainer = null;
+        this.starsText = null;
+        if (hudLayout.left?.includes('stars')) {
+          this.starsContainer = this.add.container(pos.stars.x, pos.stars.y);
+          const starIcon = this.add.image(0, 0, 'hud_star_icon').setOrigin(0, 0.5);
+          this.starsText = this.add
+            .text(starIcon.displayWidth + 4, 0, '0', {
+              ...textStyle,
+              color: '#ffee44',
+            })
+            .setOrigin(0, 0.5);
+          this.starsContainer.add([starIcon, this.starsText]);
+          this.hudContainer.add(this.starsContainer);
+          this.updateStarCountHud();
+        }
 
         const lifeStep = 20;
         this.livesContainer = this.add.container(pos.livesContainer.x, pos.livesContainer.y);
@@ -4521,15 +4583,24 @@ PACKAGING FOR REAL MOBILE APPS
         this.hudAvatarConfig = { ...(this.level.hudLayout?.avatar || {}) };
 
         this.hudAvatar = null;
+        this.hudAvatarWrap = null;
         if (hudLayout.right && hudLayout.right.includes('avatar')) {
           const avSize = pos.avatar.size;
+          const avRadius = avSize * 0.5;
           const startKey = getHudAvatarTextureKey('default', this.hudAvatarConfig, this);
+
+          this.hudAvatarWrap = this.add.container(pos.avatar.x, pos.avatar.y);
+          const avFrame = this.add.graphics();
+          drawHudAvatarBorderFrame(avFrame, avRadius);
+          this.hudAvatarWrap.add(avFrame);
+
           this.hudAvatar = this.add
-            .image(pos.avatar.x, pos.avatar.y, startKey)
+            .image(0, 0, startKey)
             .setDisplaySize(avSize, avSize)
             .setOrigin(0.5, 0.5)
             .setData('hudAvatarSize', avSize);
-          this.hudContainer.add(this.hudAvatar);
+          this.hudAvatarWrap.add(this.hudAvatar);
+          this.hudContainer.add(this.hudAvatarWrap);
           this.updateHudAvatar();
         }
 
@@ -4563,8 +4634,32 @@ PACKAGING FOR REAL MOBILE APPS
         this.hudAvatarState = applyHudAvatarState(this.hudAvatar, stateId, this.hudAvatarConfig);
       }
 
+      updateStarCountHud() {
+        if (!this.starsText?.active) return;
+        this.starsText.setText(String(this.worldStarCount ?? 0));
+      }
+
+      onShieldStarCollected() {
+        if (ACTIVE_CAMPAIGN_CTX) {
+          this.worldStarCount = incrementWorldStarCount(ACTIVE_CAMPAIGN_CTX.worldId);
+        } else {
+          this.worldStarCount = (this.worldStarCount ?? 0) + 1;
+        }
+        this.updateStarCountHud();
+        if (this.starsContainer?.active) {
+          this.tweens.add({
+            targets: this.starsContainer,
+            scaleX: 1.2,
+            scaleY: 1.2,
+            duration: 90,
+            yoyo: true,
+          });
+        }
+      }
+
       updateUI() {
         this.scoreText.setText(`Score: ${this.score}`);
+        this.updateStarCountHud();
         this.lifeIcons.forEach((icon, i) => {
           icon.setAlpha(i < this.lives ? 1 : 0.25);
           icon.setTint(i < this.lives ? 0xffffff : 0x8844aa);
@@ -5075,6 +5170,11 @@ PACKAGING FOR REAL MOBILE APPS
         if (ACTIVE_CAMPAIGN_CTX) {
           const { campaign, worldId, worldName, stageIndex, stageNumber } = ACTIVE_CAMPAIGN_CTX;
           markStageCompleted(worldId, stageIndex);
+          if (isBossStage(stageIndex)) {
+            resetWorldStarCount(worldId);
+            this.worldStarCount = 0;
+            this.updateStarCountHud();
+          }
           const next = getNextStage(campaign, worldId, stageIndex);
           let title = 'Stage Clear!';
           if (!next) {
@@ -5405,8 +5505,7 @@ PACKAGING FOR REAL MOBILE APPS
 
           updateParallaxGridBackground(this, delta);
 
-          this.updateNormalBlockStars(time);
-          this.updateGrayBlockStars();
+          this.updateShieldBlockStars(time);
           this.updateSaucerMovement(delta);
           this.updateHorizontalFlyerMovement(delta);
           this.updateFlameRiserMovement(delta);
@@ -5600,6 +5699,11 @@ PACKAGING FOR REAL MOBILE APPS
           await loadAbilityBlockAssets();
         } else if (typeof loadAbilityGravelImage === 'function') {
           await loadAbilityGravelImage();
+        }
+        if (typeof loadAllItemImages === 'function') {
+          await loadAllItemImages();
+        } else if (typeof loadAppleItemImage === 'function') {
+          await loadAppleItemImage();
         }
         status.remove();
         initLevelBar(entry, campaignCtx || null);
